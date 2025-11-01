@@ -9,6 +9,7 @@ Tests template_engine module functionality.
 """
 
 import pytest
+
 from template_engine import render_template
 
 
@@ -22,13 +23,14 @@ class TestTemplateRendering:
             {
                 "title": "Test Error",
                 "error_message": "Test error message",
+                "status_code": 404,
                 "base_url": "/",
             },
         )
 
         assert html is not None
         assert isinstance(html, str)
-        assert "Test Error" in html or "Error" in html
+        assert "Error" in html
 
     def test_render_template_with_data(self):
         """Test template rendering with context data."""
@@ -72,8 +74,10 @@ class TestTemplateHelpers:
             {
                 "title": "Test",
                 "error_message": "Test message",
+                "status_code": 500,
                 "base_url": "/",
             },
         )
 
         assert isinstance(html, str)
+        assert len(html) > 0

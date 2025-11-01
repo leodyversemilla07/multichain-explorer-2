@@ -8,13 +8,14 @@ using BlockchainService instead of MCEDataHandler delegation.
 """
 
 import pytest
-from handlers.block_handler import BlockHandler
-from handlers.transaction_handler import TransactionHandler
+
 from handlers.address_handler import AddressHandler
 from handlers.asset_handler import AssetHandler
-from handlers.stream_handler import StreamHandler
+from handlers.block_handler import BlockHandler
 from handlers.chain_handler import ChainHandler
 from handlers.permission_handler import PermissionHandler
+from handlers.stream_handler import StreamHandler
+from handlers.transaction_handler import TransactionHandler
 
 
 # Block Handler Tests
@@ -33,7 +34,7 @@ def test_block_handler_has_methods():
     """Test BlockHandler has expected methods."""
     handler = BlockHandler()
     assert hasattr(handler, "handle_blocks_list")
-    assert hasattr(handler, "handle_block")
+    assert hasattr(handler, "handle_block_detail")
     assert hasattr(handler, "handle_block_transactions")
 
 
@@ -52,7 +53,7 @@ def test_transaction_handler_creation():
 def test_transaction_handler_has_methods():
     """Test TransactionHandler has expected methods."""
     handler = TransactionHandler()
-    assert hasattr(handler, "handle_transaction")
+    assert hasattr(handler, "handle_transaction_detail")
 
 
 # Address Handler Tests
@@ -70,7 +71,7 @@ def test_address_handler_creation():
 def test_address_handler_has_methods():
     """Test AddressHandler has expected methods."""
     handler = AddressHandler()
-    assert hasattr(handler, "handle_address")
+    assert hasattr(handler, "handle_address_detail")
     assert hasattr(handler, "handle_address_transactions")
 
 
@@ -148,7 +149,7 @@ def test_permission_handler_creation():
 def test_permission_handler_has_methods():
     """Test PermissionHandler has expected methods."""
     handler = PermissionHandler()
-    assert hasattr(handler, "handle_permissions")
+    assert hasattr(handler, "handle_permissions_list")
 
 
 # Integration Tests
