@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ status_code }} - MultiChain Explorer{% endblock %}
+
+{% block content %}
+<div x-data="{ showDetails: false }" class="max-w-4xl mx-auto space-y-6">
+    <!-- Error Alert -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="p-8">
+            <div class="flex items-center mb-4">
+                {% if status_code == 404 %}
+                <div class="flex-shrink-0 p-3 bg-yellow-100 rounded-full">
+                    <svg class="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                {% elif status_code >= 500 %}
+                <div class="flex-shrink-0 p-3 bg-red-100 rounded-full">
+                    <svg class="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                {% else %}
+                <div class="flex-shrink-0 p-3 bg-orange-100 rounded-full">
+                    <svg class="w-12 h-12 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                {% endif %}
+
+                <div class="ml-6">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">
+                        {{ error_title|default('Error ' ~ status_code) }}
+                    </h2>
+                    <p class="text-xl text-gray-600">{{ error_message }}</p>
+                </div>
+            </div>
+
+            {% if error_details and debug_mode %}
+            <div class="mt-6">
+                <button @click="showDetails = !showDetails"
+                        class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span x-show="!showDetails">Show Debug Information</span>
+                    <span x-show="showDetails">Hide Debug Information</span>
+                </button>
+
+                <div x-show="showDetails" x-transition class="mt-4">
+                    <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                        <pre class="text-green-400 text-sm"><code>{{ error_details }}</code></pre>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Suggestions -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            What can you do?
+        </h3>
+
+        <ul class="space-y-3">
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <a href="" class="text-blue-600 hover:text-blue-800 hover:underline">Go back to the home page</a>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="text-gray-700">Check the URL and try again</span>
+            </li>
+            {% if status_code == 404 %}
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="text-gray-700">Use the search box to find what you're looking for</span>
+            </li>
+            {% endif %}
+            {% if status_code >= 500 %}
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="text-gray-700">Try again later - the service may be temporarily unavailable</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="text-gray-700">Contact the system administrator if the problem persists</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

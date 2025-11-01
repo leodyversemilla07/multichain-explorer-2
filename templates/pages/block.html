@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Block #{{ block.height }} - {{ chain_name }} - MultiChain Explorer{% endblock %}
+
+{% block content %}
+<div x-data="{ showRaw: false, copied: false }" class="space-y-6">
+    <!-- Block Header -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-3xl font-bold text-gray-800">Block #{{ block.height }}</h2>
+            <button @click="showRaw = !showRaw"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <span x-show="!showRaw">Show Raw</span>
+                <span x-show="showRaw">Hide Raw</span>
+            </button>
+        </div>
+
+        <!-- Block Details -->
+        <div class="grid grid-cols-1 gap-4">
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-start justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Block Hash</dt>
+                    <dd class="text-sm text-gray-900 flex-1 font-mono break-all">
+                        <div class="flex items-center gap-2">
+                            <span class="flex-1">{{ block.hash }}</span>
+                            <button @click="navigator.clipboard.writeText('{{ block.hash }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors">
+                                <span x-show="!copied">Copy</span>
+                                <span x-show="copied" class="text-green-600">✓ Copied</span>
+                            </button>
+                        </div>
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Height</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">{{ block.height }}</span>
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Timestamp</dt>
+                    <dd class="text-sm text-gray-900 flex-1">{{ block.time|format_timestamp }}</dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Miner</dt>
+                    <dd class="text-sm text-gray-900 flex-1 font-mono">
+                        {% if block.miner %}
+                        <a href="{{ base_url }}{{ chain_path }}/address/{{ block.miner }}"
+                           class="text-blue-600 hover:text-blue-800 hover:underline">
+                            {{ block.miner|format_hash }}
+                        </a>
+                        {% else %}
+                        <span class="text-gray-400">N/A</span>
+                        {% endif %}
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Transactions</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold">
+                            {{ block.tx|length if block.tx else 0 }}
+                        </span>
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Size</dt>
+                    <dd class="text-sm text-gray-900 flex-1">{{ block.size }} bytes</dd>
+                </div>
+            </div>
+
+            {% if block.previousblockhash %}
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Previous Block</dt>
+                    <dd class="text-sm text-gray-900 flex-1 font-mono">
+                        <a href="chain/{{ chain_name }}/block/{{ block.height - 1 }}"
+                           class="text-blue-600 hover:text-blue-800 hover:underline">
+                            {{ block.previousblockhash|format_hash }}
+                        </a>
+                    </dd>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if block.nextblockhash %}
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Next Block</dt>
+                    <dd class="text-sm text-gray-900 flex-1 font-mono">
+                        <a href="chain/{{ chain_name }}/block/{{ block.height + 1 }}"
+                           class="text-blue-600 hover:text-blue-800 hover:underline">
+                            {{ block.nextblockhash|format_hash }}
+                        </a>
+                    </dd>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Raw Data (collapsible) -->
+        <div x-show="showRaw" x-transition class="mt-4">
+            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs">{{ block|tojson(indent=2) }}</pre>
+        </div>
+    </div>
+
+    <!-- Transactions -->
+    {% if tx_details %}
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h3 class="text-2xl font-bold text-gray-800 mb-4">Transactions ({{ tx_details|length }})</h3>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Transaction ID
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Size
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for tx in tx_details %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <a href="{{ base_url }}{{ chain_path }}/tx/{{ tx.txid }}"
+                               class="font-mono text-sm text-blue-600 hover:text-blue-800 hover:underline break-all">
+                                {{ tx.txid }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-mono">
+                            {{ tx.size }} bytes
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Navigation -->
+    <div class="flex gap-2 flex-wrap">
+        {% if block.height > 0 %}
+        <a href="{{ base_url }}{{ chain_path }}/block/{{ block.height - 1 }}"
+           class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Previous Block
+        </a>
+        {% endif %}
+        <a href="{{ base_url }}{{ chain_path }}"
+           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Chain Home
+        </a>
+        {% if block.nextblockhash %}
+        <a href="{{ base_url }}{{ chain_path }}/block/{{ block.height + 1 }}"
+           class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+            Next Block
+            <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

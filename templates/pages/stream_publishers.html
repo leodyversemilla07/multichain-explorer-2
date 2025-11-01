@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <nav class="text-sm text-gray-600 mb-4">
+            <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}" class="hover:text-blue-600">{{ stream_name }}</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900">Publishers</span>
+        </nav>
+
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Stream Publishers</h1>
+                <p class="mt-2 text-gray-600">Addresses publishing to: <span class="font-semibold">{{ stream_name }}</span></p>
+            </div>
+            <span class="text-sm text-gray-600">{{ pagination.total|default(0) }} publishers</span>
+        </div>
+    </div>
+
+    <!-- Publishers Grid -->
+    {% if publishers and publishers|length > 0 %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for publisher in publishers %}
+        <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200">
+            <div class="p-6">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1">Address</h3>
+                        <a href="{{ base_url }}{{ chain_path }}/address/{{ publisher['publisher']|default(publisher.get('publisher', '')) }}"
+                           class="text-blue-600 hover:text-blue-800 font-mono text-sm break-all">
+                            {{ publisher['publisher']|default(publisher.get('publisher', 'N/A')) }}
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500">Items Published</p>
+                        <p class="text-2xl font-bold text-gray-900 tabular-nums font-mono">{{ publisher['items']|default(publisher.get('items', 0)) }}</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500">Confirmed</p>
+                        <p class="text-2xl font-bold text-green-600 tabular-nums font-mono">{{ publisher['confirmed']|default(publisher.get('confirmed', 0)) }}</p>
+                    </div>
+                </div>
+
+                {% if publisher.first %}
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-500">First item:</span>
+                        <span class="text-gray-700">Block {{ publisher.first }}</span>
+                    </div>
+                    {% if publisher.last %}
+                    <div class="flex items-center justify-between text-sm mt-1">
+                        <span class="text-gray-500">Last item:</span>
+                        <span class="text-gray-700">Block {{ publisher.last }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="mt-4">
+                    <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/publisher/{{ publisher['publisher']|default(publisher.get('publisher', '')) }}"
+                       class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800">
+                        View items
+                        <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    <div class="mt-8">
+        {% include 'components/pagination.html' %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No publishers</h3>
+        <p class="mt-1 text-sm text-gray-500">No addresses have published to this stream yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

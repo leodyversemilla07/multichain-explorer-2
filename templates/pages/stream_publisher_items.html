@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <nav class="text-sm text-gray-600 mb-4">
+            <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}" class="hover:text-blue-600">{{ stream_name }}</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/publishers" class="hover:text-blue-600">Publishers</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900 font-mono">{{ publisher[:16] }}...</span>
+        </nav>
+
+        <div class="flex items-start justify-between mb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Publisher Items</h1>
+                <p class="text-gray-600">Items published by:</p>
+                <p class="mt-1 font-mono text-sm text-gray-800 bg-gray-100 px-3 py-2 rounded break-all">{{ publisher }}</p>
+                <p class="mt-2 text-gray-600">to stream: <span class="font-semibold">{{ stream_name }}</span></p>
+            </div>
+            <span class="text-sm text-gray-600 whitespace-nowrap ml-4">{{ pagination.total|default(0) }} total items</span>
+        </div>
+    </div>
+
+    <!-- Publisher Items -->
+    {% if items and items|length > 0 %}
+    <div class="space-y-4">
+        {% for item in items %}
+        <div class="bg-white rounded-lg shadow overflow-hidden hover:shadow-lg transition-shadow duration-200">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h3 class="text-lg font-semibold text-gray-900">
+                            {% if item.key or item.get('key') %}
+                            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/key/{{ item.key|default(item.get('key')) }}"
+                               class="text-blue-600 hover:text-blue-800">
+                                {{ item.key|default(item.get('key')) }}
+                            </a>
+                            {% elif item.get('keys') and item.get('keys')|length > 0 %}
+                            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/key/{{ item.get('keys')[0] }}"
+                               class="text-blue-600 hover:text-blue-800">
+                                {{ item.get('keys')[0] }}
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400 italic text-sm">(keyless item)</span>
+                            {% endif %}
+                        </h3>
+
+                        {% if item.confirmations is defined or item['confirmations'] is defined %}
+                        {% set confirmations = item.confirmations|default(item['confirmations'])|default(0) %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                                     {% if confirmations > 0 %}bg-green-100 text-green-800
+                                     {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ confirmations }} confirmations
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-sm text-gray-500">
+                        {% if item.blocktime or item['blocktime'] %}
+                        Block {{ item.blockheight|default(item['blockheight'])|default('?') }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-4">
+                <!-- Show procurement info if available in JSON -->
+                {% if item.data or item['data'] %}
+                {% set item_data = item.data|default(item['data']) %}
+                {% if item_data is mapping and 'json' in item_data %}
+                    {% set json_data = item_data['json'] %}
+                    {% if json_data.procurement_id or json_data.procurement_title %}
+                    <div class="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                        {% if json_data.procurement_id %}
+                        <p class="text-sm font-medium text-blue-900">
+                            📋 {{ json_data.procurement_id }}
+                        </p>
+                        {% endif %}
+                        {% if json_data.procurement_title %}
+                        <p class="text-sm text-blue-700 mt-1">{{ json_data.procurement_title }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endif %}
+                {% endif %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Transaction ID</p>
+                        <a href="{{ base_url }}{{ chain_path }}/tx/{{ item.txid|default(item['txid']) }}"
+                           class="text-sm text-blue-600 hover:text-blue-800 font-mono break-all">
+                            {{ item.txid|default(item['txid']) }}
+                        </a>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Block Height</p>
+                        <a href="{{ base_url }}{{ chain_path }}/block/{{ item.blockheight|default(item['blockheight']) }}"
+                           class="text-sm text-blue-600 hover:text-blue-800 font-mono tabular-nums">
+                            {{ item.blockheight|default(item['blockheight'])|default('Pending') }}
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Data Display -->
+                {% if item.data or item['data'] %}
+                {% set item_data = item.data|default(item['data']) %}
+                <div class="mt-4">
+                    <p class="text-sm font-medium text-gray-500 mb-2">Data</p>
+                    <div class="bg-gray-50 rounded-lg p-4 overflow-x-auto">
+                        {% if item_data is mapping and 'json' in item_data %}
+                        <pre class="text-xs text-gray-900 font-mono leading-relaxed">{{ item_data['json']|tojson(indent=2) }}</pre>
+                        {% elif item_data is mapping %}
+                        <pre class="text-xs text-gray-900 font-mono leading-relaxed">{{ item_data|tojson(indent=2) }}</pre>
+                        {% else %}
+                        <pre class="text-xs text-gray-900 font-mono leading-relaxed">{{ item_data }}</pre>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    <div class="mt-8">
+        {% include 'components/pagination.html' %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No items</h3>
+        <p class="mt-1 text-sm text-gray-500">This publisher hasn't published any items to this stream yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

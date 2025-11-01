@@ -1,0 +1,4 @@
+# Bandit security configuration
+[bandit]
+exclude_dirs = ['/tests', '/htmlcov', '/.venv', '/build', '/dist']
+skips = ['B101', 'B601']  # B101: assert used, B601: paramiko calls

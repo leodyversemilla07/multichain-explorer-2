@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Stream: {{ stream.name }} - {{ chain_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Stream Header -->
+    <div class="bg-gradient-to-r from-purple-500 to-purple-700 rounded-lg shadow-lg p-6 mb-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                    </svg>
+                    <h1 class="text-3xl font-bold">{{ stream.name }}</h1>
+                </div>
+                <p class="text-purple-100 mt-2">Stream Reference: {{ stream.streamref }}</p>
+            </div>
+            <div class="text-right">
+                <div class="text-sm text-purple-100">Total Items</div>
+                <div class="text-3xl font-bold">{{ stream['items']|default(0) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stream Navigation Tabs -->
+    <div x-data="{ activeTab: 'details' }" class="mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <button @click="activeTab = 'details'"
+                        :class="activeTab === 'details' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Details
+                </button>
+                <button @click="activeTab = 'items'"
+                        :class="activeTab === 'items' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Items ({{ stream_items|length if stream_items else 0 }})
+                </button>
+                <button @click="activeTab = 'keys'"
+                        :class="activeTab === 'keys' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Keys
+                </button>
+                <button @click="activeTab = 'publishers'"
+                        :class="activeTab === 'publishers' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Publishers
+                </button>
+            </nav>
+        </div>
+
+        <!-- Details Tab -->
+        <div x-show="activeTab === 'details'" class="mt-6">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Stream Information</h2>
+                </div>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500 w-1/4">Name</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ stream.name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Stream Reference</td>
+                            <td class="px-6 py-4 text-sm text-gray-900 font-mono">
+                                {{ stream.streamref }}
+                                <button onclick="navigator.clipboard.writeText('{{ stream.streamref }}')"
+                                        class="ml-2 text-purple-600 hover:text-purple-800">
+                                    <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                        {% if stream.createtxid %}
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Creation Transaction</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <a href="/{{ chain_name }}/tx/{{ stream.createtxid }}" class="text-purple-600 hover:text-purple-800 font-mono">
+                                    {{ stream.createtxid[:16] }}...{{ stream.createtxid[-16:] }}
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if stream.creators %}
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Creators</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                {% for creator in stream.creators %}
+                                <a href="/{{ chain_name }}/address/{{ creator }}" class="text-purple-600 hover:text-purple-800 font-mono block">
+                                    {{ creator }}
+                                </a>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Open</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                {% if stream.open %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Yes
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    No
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if stream.restrict %}
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Restrictions</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ stream.restrict }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Total Items</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ stream['items']|default(0) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-500">Confirmed Items</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ stream['confirmed']|default(0) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Items Tab -->
+        <div x-show="activeTab === 'items'" class="mt-6">
+            {% if stream_items and stream_items|length > 0 %}
+            <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Recent Stream Items</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publisher</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confirmations</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for item in stream_items %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    <span class="font-mono">{{ item.key if item.key else 'N/A' }}</span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    {% if item.publishers %}
+                                    <a href="/{{ chain_name }}/address/{{ item.publishers[0] }}" class="text-purple-600 hover:text-purple-800 font-mono">
+                                        {{ item.publishers[0][:16] }}...
+                                    </a>
+                                    {% else %}
+                                    N/A
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    <a href="/{{ chain_name }}/tx/{{ item.txid }}" class="text-purple-600 hover:text-purple-800 font-mono">
+                                        {{ item.txid[:16] }}...
+                                    </a>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    {{ item.confirmations|default('0') }}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    {% if item.data %}
+                                    <span class="text-gray-600">{{ item.data|string|truncate(50) }}</span>
+                                    {% else %}
+                                    <span class="text-gray-400">No data</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if show_pagination %}
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                    {% include "components/pagination.html" %}
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="bg-white shadow-md rounded-lg p-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No items found</h3>
+                <p class="mt-1 text-sm text-gray-500">This stream doesn't have any items yet.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Keys Tab -->
+        <div x-show="activeTab === 'keys'" class="mt-6">
+            <div class="bg-white shadow-md rounded-lg p-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">Stream Keys</h3>
+                <p class="mt-1 text-sm text-gray-500">Browse items by key.</p>
+                <div class="mt-6">
+                    <a href="/{{ chain_name }}/stream/{{ stream.name }}/keys" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700">
+                        View All Keys
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Publishers Tab -->
+        <div x-show="activeTab === 'publishers'" class="mt-6">
+            <div class="bg-white shadow-md rounded-lg p-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">Stream Publishers</h3>
+                <p class="mt-1 text-sm text-gray-500">View addresses that have published to this stream.</p>
+                <div class="mt-6">
+                    <a href="/{{ chain_name }}/stream/{{ stream.name }}/publishers" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700">
+                        View All Publishers
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <a href="/{{ chain_name }}/stream/{{ stream.name }}/items" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-center">
+            <svg class="mx-auto h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">All Items</h3>
+            <p class="mt-1 text-xs text-gray-500">Browse all stream items</p>
+        </a>
+
+        <a href="/{{ chain_name }}/stream/{{ stream.name }}/keys" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-center">
+            <svg class="mx-auto h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Browse by Key</h3>
+            <p class="mt-1 text-xs text-gray-500">View items by key</p>
+        </a>
+
+        <a href="/{{ chain_name }}/streams" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-center">
+            <svg class="mx-auto h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">All Streams</h3>
+            <p class="mt-1 text-xs text-gray-500">Back to streams list</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

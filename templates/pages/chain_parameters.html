@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <nav class="text-sm text-gray-600 mb-4">
+            <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900">Chain Parameters</span>
+        </nav>
+
+        <h1 class="text-3xl font-bold text-gray-900">Chain Parameters</h1>
+        <p class="mt-2 text-gray-600">Blockchain configuration and settings</p>
+    </div>
+
+    {% if params %}
+    <!-- Parameters Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Basic Information -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Basic Information</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Chain Name</dt>
+                        <dd class="text-sm text-gray-900">{{ params['chain-name']|default(chain_name) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Chain Description</dt>
+                        <dd class="text-sm text-gray-900">{{ params['chain-description']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Protocol Version</dt>
+                        <dd class="text-sm text-gray-900">{{ params['protocol-version']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Chain Protocol</dt>
+                        <dd class="text-sm text-gray-900">{{ params['chain-protocol']|default('multichain') }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Network Settings -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Network Settings</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Default Network Port</dt>
+                        <dd class="text-sm text-gray-900 font-mono">{{ params['default-network-port']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Default RPC Port</dt>
+                        <dd class="text-sm text-gray-900 font-mono">{{ params['default-rpc-port']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Address Checksum Value</dt>
+                        <dd class="text-sm text-gray-900 font-mono">{{ params['address-checksum-value']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Address Pubkeyhash Version</dt>
+                        <dd class="text-sm text-gray-900 font-mono">{{ params['address-pubkeyhash-version']|default('N/A') }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Blockchain Parameters -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Blockchain Parameters</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Target Block Time</dt>
+                        <dd class="text-sm text-gray-900">{{ params['target-block-time']|default('N/A') }} seconds</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Maximum Block Size</dt>
+                        <dd class="text-sm text-gray-900">{{ params['maximum-block-size']|default('N/A') }} bytes</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Max Std TX Size</dt>
+                        <dd class="text-sm text-gray-900">{{ params['max-std-tx-size']|default('N/A') }} bytes</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Max Std OP Return Size</dt>
+                        <dd class="text-sm text-gray-900">{{ params['max-std-op-return-size']|default('N/A') }} bytes</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Mining Settings -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Mining Settings</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Mining Diversity</dt>
+                        <dd class="text-sm text-gray-900">{{ params['mining-diversity']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Mining Requires Peers</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['mining-requires-peers'] %}bg-green-100 text-green-800
+                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ 'Yes' if params['mining-requires-peers'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Mining Turnover</dt>
+                        <dd class="text-sm text-gray-900">{{ params['mining-turnover']|default('N/A') }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">First Block Reward</dt>
+                        <dd class="text-sm text-gray-900">{{ params['first-block-reward']|default('N/A') }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Permission Settings -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Permission Settings</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Anyone Can Connect</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['anyone-can-connect'] %}bg-green-100 text-green-800
+                                         {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ 'Yes' if params['anyone-can-connect'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Anyone Can Send</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['anyone-can-send'] %}bg-green-100 text-green-800
+                                         {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ 'Yes' if params['anyone-can-send'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Anyone Can Receive</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['anyone-can-receive'] %}bg-green-100 text-green-800
+                                         {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ 'Yes' if params['anyone-can-receive'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Anyone Can Mine</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['anyone-can-mine'] %}bg-green-100 text-green-800
+                                         {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ 'Yes' if params['anyone-can-mine'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Asset Settings -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Asset & Stream Settings</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3">
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Support Miner Precheck</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['support-miner-precheck'] %}bg-green-100 text-green-800
+                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ 'Yes' if params['support-miner-precheck'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Allow Arbitrary Outputs</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['allow-arbitrary-outputs'] %}bg-green-100 text-green-800
+                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ 'Yes' if params['allow-arbitrary-outputs'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Allow P2SH Outputs</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['allow-p2sh-outputs'] %}bg-green-100 text-green-800
+                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ 'Yes' if params['allow-p2sh-outputs'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-sm font-medium text-gray-500">Allow Multisig Outputs</dt>
+                        <dd class="text-sm text-gray-900">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                         {% if params['allow-multisig-outputs'] %}bg-green-100 text-green-800
+                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ 'Yes' if params['allow-multisig-outputs'] else 'No' }}
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No parameters available</h3>
+        <p class="mt-1 text-sm text-gray-500">Unable to retrieve blockchain parameters.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

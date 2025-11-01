@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <nav class="text-sm text-gray-600 mb-4">
+            <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}" class="hover:text-blue-600">{{ stream_name }}</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900">Items</span>
+        </nav>
+
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Stream Items</h1>
+                <p class="mt-2 text-gray-600">Items in stream: <span class="font-semibold">{{ stream_name }}</span></p>
+            </div>
+            <span class="text-sm text-gray-600">{{ pagination.total|default(0) }} total items</span>
+        </div>
+    </div>
+
+    <!-- Stream Items -->
+    {% if items and items|length > 0 %}
+    <div class="space-y-4">
+        {% for item in items %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h3 class="text-lg font-semibold text-gray-900">
+                            {% if item.key or item.get('key') %}
+                            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/key/{{ item.key|default(item.get('key')) }}"
+                               class="text-blue-600 hover:text-blue-800 font-mono">
+                                {{ item.key|default(item.get('key')) }}
+                            </a>
+                            {% elif item.get('keys') and item.get('keys')|length > 0 %}
+                            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/key/{{ item.get('keys')[0] }}"
+                               class="text-blue-600 hover:text-blue-800 font-mono">
+                                {{ item.get('keys')[0] }}
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400 italic text-sm">(keyless item)</span>
+                            {% endif %}
+                        </h3>
+
+                        {% if item.confirmations is defined %}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                                     {% if item.confirmations > 0 %}bg-green-100 text-green-800
+                                     {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ item.confirmations }} confirmations
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="text-sm text-gray-500">
+                        {% if item.blocktime %}
+                        {{ item.blocktime|format_timestamp }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Publisher</p>
+                        {% set publisher = item.get('publisher') if item.get('publisher') else (item.get('publishers')[0] if item.get('publishers') and item.get('publishers')|length > 0 else None) %}
+                        {% if publisher %}
+                        <a href="{{ base_url }}{{ chain_path }}/address/{{ publisher }}"
+                           class="text-sm text-blue-600 hover:text-blue-800 font-mono break-all">
+                            {{ publisher }}
+                        </a>
+                        {% else %}
+                        <span class="text-sm text-gray-400">N/A</span>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Transaction</p>
+                        <a href="{{ base_url }}{{ chain_path }}/tx/{{ item.txid }}"
+                           class="text-sm text-blue-600 hover:text-blue-800 font-mono break-all">
+                            {{ item.txid }}
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Data Display -->
+                {% if item.data %}
+                <div class="mt-4">
+                    <p class="text-sm font-medium text-gray-500 mb-2">Data</p>
+                    <div class="bg-gray-50 rounded-lg p-4 overflow-x-auto">
+                        {% if item.data is mapping and 'json' in item.data %}
+                        <pre class="text-xs text-gray-900 font-mono leading-relaxed">{{ item.data['json']|tojson(indent=2) }}</pre>
+                        {% elif item.data is mapping %}
+                        <pre class="text-xs text-gray-900 font-mono leading-relaxed">{{ item.data|tojson(indent=2) }}</pre>
+                        {% else %}
+                        <pre class="text-xs text-gray-900 font-mono leading-relaxed">{{ item.data }}</pre>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    <div class="mt-8">
+        {% include 'components/pagination.html' %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No items</h3>
+        <p class="mt-1 text-sm text-gray-500">This stream has no items yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

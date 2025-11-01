@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Transaction {{ txid|format_hash }} - {{ chain_name }} - MultiChain Explorer{% endblock %}
+
+{% block content %}
+<div x-data="{ showRaw: false, copied: false, activeTab: 'inputs' }" class="space-y-6">
+    <!-- Transaction Header -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-3xl font-bold text-gray-800">Transaction Details</h2>
+            <button @click="showRaw = !showRaw"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <span x-show="!showRaw">Show Raw</span>
+                <span x-show="showRaw">Hide Raw</span>
+            </button>
+        </div>
+
+        <!-- Transaction Details -->
+        <div class="grid grid-cols-1 gap-4">
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-start justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Transaction ID</dt>
+                    <dd class="text-sm text-gray-900 flex-1 font-mono break-all">
+                        <div class="flex items-center gap-2">
+                            <span class="flex-1">{{ tx.txid }}</span>
+                            <button @click="navigator.clipboard.writeText('{{ tx.txid }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors">
+                                <span x-show="!copied">Copy</span>
+                                <span x-show="copied" class="text-green-600">✓ Copied</span>
+                            </button>
+                        </div>
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Block</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        {% if tx.blockhash %}
+                        {% set block_height = tx.blockheight or tx.height or tx.blockindex %}
+                        <a href="{{ base_url }}{{ chain_path }}/block/{{ block_height }}"
+                           class="text-blue-600 hover:text-blue-800 hover:underline">
+                            Block #{{ block_height }}
+                        </a>
+                        {% else %}
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-semibold">
+                            Unconfirmed
+                        </span>
+                        {% endif %}
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Timestamp</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        {{ tx.time|format_timestamp if tx.time else 'Pending' }}
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Confirmations</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
+                            {{ tx.confirmations|default(0) }}
+                        </span>
+                    </dd>
+                </div>
+            </div>
+
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Size</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        {% if tx.size and tx.size > 0 %}
+                        {{ tx.size }} bytes
+                        {% elif tx.vsize and tx.vsize > 0 %}
+                        {{ tx.vsize }} bytes
+                        {% else %}
+                        {{ tx.hex|length // 2 if tx.hex else 'Unknown' }} bytes
+                        {% endif %}
+                    </dd>
+                </div>
+            </div>
+        </div>
+
+        <!-- Raw Data (collapsible) -->
+        <div x-show="showRaw" x-transition class="mt-4">
+            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs">{{ tx|tojson(indent=2) }}</pre>
+        </div>
+    </div>
+
+    <!-- Inputs/Outputs Tabs -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <!-- Tab Navigation -->
+        <div class="border-b border-gray-200 mb-4">
+            <nav class="-mb-px flex space-x-8">
+                <button @click="activeTab = 'inputs'"
+                        :class="activeTab === 'inputs' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Inputs ({{ tx.vin|length if tx.vin else 0 }})
+                </button>
+                <button @click="activeTab = 'outputs'"
+                        :class="activeTab === 'outputs' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Outputs ({{ tx.vout|length if tx.vout else 0 }})
+                </button>
+            </nav>
+        </div>
+
+        <!-- Inputs Tab Content -->
+        <div x-show="activeTab === 'inputs'" x-transition>
+            {% if tx.vin %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Previous Output
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Address
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Amount
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for vin in tx.vin %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                                {% if vin.coinbase %}
+                                <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold">
+                                    Coinbase (Newly Minted)
+                                </span>
+                                {% elif vin.txid %}
+                                <a href="{{ base_url }}{{ chain_path }}/tx/{{ vin.txid }}"
+                                   class="text-blue-600 hover:text-blue-800 hover:underline">
+                                    {{ vin.txid|format_hash }}
+                                </a>:<span class="text-gray-600">{{ vin.vout }}</span>
+                                {% else %}
+                                <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                                    No Previous Output
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                                {% if vin.coinbase %}
+                                    {% if tx.vout and tx.vout|length > 0 and tx.vout[0].scriptPubKey and tx.vout[0].scriptPubKey.addresses %}
+                                        {% for addr in tx.vout[0].scriptPubKey.addresses %}
+                                        <a href="{{ base_url }}{{ chain_path }}/address/{{ addr }}"
+                                           class="text-blue-600 hover:text-blue-800 hover:underline">
+                                            {{ addr|format_hash }}
+                                        </a>
+                                        <span class="text-xs text-gray-500">(miner)</span>
+                                        {% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-gray-400 italic">No miner address</span>
+                                    {% endif %}
+                                {% elif vin.address %}
+                                <a href="{{ base_url }}{{ chain_path }}/address/{{ vin.address }}"
+                                   class="text-blue-600 hover:text-blue-800 hover:underline">
+                                    {{ vin.address|format_hash }}
+                                </a>
+                                {% else %}
+                                <span class="text-gray-400 italic">No Address</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                {% if vin.coinbase %}
+                                    {% if tx.vout and tx.vout|length > 0 %}
+                                        {{ tx.vout[0].value|format_amount }}
+                                        <span class="text-xs text-gray-500">(reward)</span>
+                                    {% else %}
+                                        <span class="text-gray-400 italic">No reward</span>
+                                    {% endif %}
+                                {% elif vin.amount %}
+                                {{ vin.amount|format_amount }}
+                                {% else %}
+                                <span class="text-gray-400 italic">No Amount</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No inputs available</p>
+            {% endif %}
+        </div>
+
+        <!-- Outputs Tab Content -->
+        <div x-show="activeTab === 'outputs'" x-transition>
+            {% if tx.vout %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Index
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Address
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Amount
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Type
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for vout in tx.vout %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ vout.n }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                                {% if vout.scriptPubKey and vout.scriptPubKey.addresses %}
+                                {% for addr in vout.scriptPubKey.addresses %}
+                                <a href="{{ base_url }}{{ chain_path }}/address/{{ addr }}"
+                                   class="text-blue-600 hover:text-blue-800 hover:underline">
+                                    {{ addr|format_hash }}
+                                </a>
+                                {% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                                {% else %}
+                                <span class="text-gray-400 italic">No Address</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {% if vout.value is defined %}
+                                {{ vout.value|format_amount }}
+                                {% else %}
+                                <span class="text-gray-400 italic">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if vout.scriptPubKey %}
+                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-semibold">
+                                    {{ vout.scriptPubKey.type }}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No outputs available</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="flex gap-2">
+        <a href="{{ base_url }}{{ chain_path }}"
+           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Chain
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+# MultiChain Explorer 2 - Production Dependencies
+# Generated: 2024-10-31
+# Python: 3.8+
+
+# Validation & Security
+pydantic==2.5.0
+
+# Configuration
+python-dotenv==1.0.0
+
+# Templating
+Jinja2==3.1.2

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Assets - {{ chain_name }} - MultiChain Explorer{% endblock %}
+
+{% block content %}
+<div x-data="{
+    searchQuery: '',
+    filterType: 'all',
+    sortBy: 'name',
+    sortOrder: 'asc',
+    get filteredAssets() {
+        let filtered = {{ assets|tojson if assets else '[]' }};
+
+        // Filter by search
+        if (this.searchQuery) {
+            filtered = filtered.filter(asset =>
+                asset.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                (asset.description && asset.description.toLowerCase().includes(this.searchQuery.toLowerCase()))
+            );
+        }
+
+        // Filter by type
+        if (this.filterType !== 'all') {
+            filtered = filtered.filter(asset => asset.type === this.filterType);
+        }
+
+        // Sort
+        filtered.sort((a, b) => {
+            let aVal = a[this.sortBy];
+            let bVal = b[this.sortBy];
+            if (this.sortOrder === 'asc') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
+
+        return filtered;
+    }
+}" class="space-y-6">
+
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-3xl font-bold text-gray-800 mb-4">Assets</h2>
+
+        <!-- Search and Filters -->
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text"
+                       x-model="searchQuery"
+                       placeholder="Search assets by name or description..."
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <div class="flex gap-2">
+                <select x-model="filterType"
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">All Types</option>
+                    <option value="asset">Asset</option>
+                    <option value="token">Token</option>
+                    <option value="nft">NFT</option>
+                </select>
+                <select x-model="sortBy"
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="name">Name</option>
+                    <option value="issued">Issued Amount</option>
+                    <option value="units">Units</option>
+                </select>
+                <button @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <span x-show="sortOrder === 'asc'">↑</span>
+                    <span x-show="sortOrder === 'desc'">↓</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assets Grid -->
+    {% if assets %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="asset in filteredAssets" :key="asset.name">
+            <div class="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-gray-900 mb-1" x-text="asset.name"></h3>
+                        <p class="text-sm text-gray-600" x-text="asset.description || 'No description'"></p>
+                    </div>
+                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold"
+                          x-text="asset.type || 'asset'"></span>
+                </div>
+
+                <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Issued:</span>
+                        <span class="font-medium text-gray-900" x-text="asset.issued || 0"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Units:</span>
+                        <span class="font-medium text-gray-900" x-text="asset.units || 1"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Reissuable:</span>
+                        <span :class="asset.reissuable ? 'text-green-600' : 'text-red-600'"
+                              class="font-medium"
+                              x-text="asset.reissuable ? 'Yes' : 'No'"></span>
+                    </div>
+                </div>
+
+                <a :href="'chain/{{ chain_name }}/asset/' + asset.name"
+                   class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    View Details →
+                </a>
+            </div>
+        </template>
+    </div>
+
+    <!-- Static fallback for when JS is disabled -->
+    <noscript>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for asset in assets %}
+            <div class="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold text-gray-900 mb-1">{{ asset.name }}</h3>
+                        <p class="text-sm text-gray-600">{{ asset.description|default('No description') }}</p>
+                    </div>
+                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                        {{ asset.type|default('asset') }}
+                    </span>
+                </div>
+
+                <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Issued:</span>
+                        <span class="font-medium text-gray-900">{{ asset.issued|default(0) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Units:</span>
+                        <span class="font-medium text-gray-900">{{ asset.units|default(1) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">Reissuable:</span>
+                        <span class="font-medium {{ 'text-green-600' if asset.reissuable else 'text-red-600' }}">
+                            {{ 'Yes' if asset.reissuable else 'No' }}
+                        </span>
+                    </div>
+                </div>
+
+                <a href="chain/{{ chain_name }}/asset/{{ asset.name }}"
+                   class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    View Details →
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </noscript>
+
+    <!-- Empty State -->
+    <div x-show="filteredAssets.length === 0" class="bg-white rounded-lg shadow-sm p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No assets found</h3>
+        <p class="text-gray-500">Try adjusting your search or filter criteria.</p>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow-sm p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No assets created yet</h3>
+        <p class="text-gray-500">This chain doesn't have any assets created yet.</p>
+    </div>
+    {% endif %}
+
+    <!-- Navigation -->
+    <div class="flex gap-2">
+        <a href="chain/{{ chain_name }}"
+           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Chain
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+<div class="flex items-center justify-between mb-8 bg-white rounded-lg shadow-sm p-4">
+    <div class="flex items-center gap-4">
+        <a title="Back to home" href="" class="flex-shrink-0">
+            <img src="/static/logo32.png" alt="MultiChain logo" class="h-10" />
+        </a>
+        <h1 class="text-2xl font-bold text-gray-800">{{ h1|default(title) }}</h1>
+    </div>
+
+    <!-- Modern Search Component -->
+    {% include 'components/search.html' %}
+</div>

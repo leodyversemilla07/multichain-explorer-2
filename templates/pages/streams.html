@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Streams - {{ chain_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-purple-500 to-purple-700 rounded-lg shadow-lg p-6 mb-6 text-white">
+        <div class="flex items-center space-x-3">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+            <div>
+                <h1 class="text-3xl font-bold">Streams</h1>
+                <p class="text-purple-100 mt-1">Browse all data streams on {{ chain_name }}</p>
+            </div>
+        </div>
+    </div>
+
+    {% if streams and streams|length > 0 %}
+    <!-- Search and Filter -->
+    <div class="mb-6" x-data="{ search: '' }">
+        <div class="bg-white rounded-lg shadow-md p-4">
+            <div class="flex items-center space-x-4">
+                <div class="flex-1">
+                    <label for="stream-search" class="sr-only">Search streams</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <input x-model="search" type="text" id="stream-search"
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                               placeholder="Search streams...">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 text-sm text-gray-600">
+                    <span x-text="search ? document.querySelectorAll('[data-stream-card]:not([style*=&quot;display: none&quot;])').length : {{ streams|length }}"></span>
+                    <span>streams</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Streams Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+         x-data="{ search: '' }"
+         x-init="$watch('search', value => {
+             const cards = document.querySelectorAll('[data-stream-card]');
+             cards.forEach(card => {
+                 const name = card.dataset.streamName.toLowerCase();
+                 const ref = card.dataset.streamRef.toLowerCase();
+                 const searchLower = value.toLowerCase();
+                 if (name.includes(searchLower) || ref.includes(searchLower) || searchLower === '') {
+                     card.style.display = '';
+                 } else {
+                     card.style.display = 'none';
+                 }
+             });
+         })">
+        {% for stream in streams %}
+        <div data-stream-card
+             data-stream-name="{{ stream.name }}"
+             data-stream-ref="{{ stream.streamref }}"
+             class="bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-200 overflow-hidden border border-gray-200 hover:border-purple-300">
+            <a href="/{{ chain_name }}/stream/{{ stream.name }}" class="block">
+                <div class="p-6">
+                    <!-- Stream Icon and Name -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-gray-900 truncate">{{ stream.name }}</h3>
+                                {% if stream.open %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    Open
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                    Restricted
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stream Reference -->
+                    <div class="mb-4">
+                        <p class="text-xs text-gray-500 font-mono truncate">{{ stream.streamref }}</p>
+                    </div>
+
+                    <!-- Stream Stats -->
+                    <div class="grid grid-cols-2 gap-4 py-3 border-t border-gray-100">
+                        <div>
+                            <p class="text-xs text-gray-500">Total Items</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ stream['items']|default(0) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Confirmed</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ stream['confirmed']|default(0) }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Links -->
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex space-x-2 text-xs">
+                            <a href="/{{ chain_name }}/stream/{{ stream.name }}/items"
+                               class="flex-1 text-center px-3 py-1 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors"
+                               onclick="event.stopPropagation();">
+                                Items
+                            </a>
+                            <a href="/{{ chain_name }}/stream/{{ stream.name }}/keys"
+                               class="flex-1 text-center px-3 py-1 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors"
+                               onclick="event.stopPropagation();">
+                                Keys
+                            </a>
+                            <a href="/{{ chain_name }}/stream/{{ stream.name }}/publishers"
+                               class="flex-1 text-center px-3 py-1 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors"
+                               onclick="event.stopPropagation();">
+                                Publishers
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if show_pagination %}
+    <div class="mt-6">
+        {% include "components/pagination.html" %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg shadow-md p-12 text-center">
+        <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
+        <h3 class="mt-4 text-lg font-medium text-gray-900">No streams found</h3>
+        <p class="mt-2 text-sm text-gray-500">This blockchain doesn't have any streams yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Sync search across components
+document.addEventListener('alpine:init', () => {
+    Alpine.store('streamSearch', {
+        query: '',
+        setQuery(value) {
+            this.query = value;
+        }
+    });
+});
+</script>
+{% endblock %}

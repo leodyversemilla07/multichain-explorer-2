@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <nav class="breadcrumb">
+        <a href="{{ base_url }}{{ chain_path }}">{{ chain_name }}</a> /
+        <a href="{{ base_url }}{{ chain_path }}/address/{{ address }}">{{ address[:16] }}...</a> /
+        <span>Streams</span>
+    </nav>
+
+    <h1>Streams Published by Address</h1>
+    <p class="address-display">{{ address }}</p>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Stream</th>
+                    <th>Items Published</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stream in streams %}
+                <tr>
+                    <td>
+                        <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream.name }}">
+                            {{ stream.name }}
+                        </a>
+                    </td>
+                    <td>{{ stream.get('items', 0) }}</td>
+                    <td>
+                        <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream.name }}/publisher/{{ address }}">
+                            View Items
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="text-center">No streams found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination %}
+    <div class="pagination">
+        {% if pagination.has_prev %}
+        <a href="?start={{ pagination.prev_start }}&count={{ pagination.count }}">Previous</a>
+        {% endif %}
+        <span>{{ pagination.start + 1 }} - {{ pagination.end }} of {{ pagination.total }}</span>
+        {% if pagination.has_next %}
+        <a href="?start={{ pagination.next_start }}&count={{ pagination.count }}">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

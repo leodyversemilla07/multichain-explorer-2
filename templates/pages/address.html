@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Address {{ address|format_hash }} - {{ chain_name }} - MultiChain Explorer{% endblock %}
+
+{% block content %}
+<div x-data="{ showRaw: false, copied: false, activeTab: 'transactions' }" class="space-y-6">
+    <!-- Address Header -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-3xl font-bold text-gray-800">Address Details</h2>
+            <button @click="showRaw = !showRaw"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <span x-show="!showRaw">Show Raw</span>
+                <span x-show="showRaw">Hide Raw</span>
+            </button>
+        </div>
+
+        <!-- Address Info -->
+        <div class="grid grid-cols-1 gap-4">
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-start justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Address</dt>
+                    <dd class="text-sm text-gray-900 flex-1 font-mono break-all">
+                        <div class="flex items-center gap-2">
+                            <span class="flex-1">{{ address }}</span>
+                            <button @click="navigator.clipboard.writeText('{{ address }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors">
+                                <span x-show="!copied">Copy</span>
+                                <span x-show="copied" class="text-green-600">✓ Copied</span>
+                            </button>
+                        </div>
+                    </dd>
+                </div>
+            </div>
+
+            {% if balance is defined %}
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Balance</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-semibold text-lg">
+                            {{ balance|format_amount }}
+                        </span>
+                    </dd>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if transactions_count is defined %}
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Total Transactions</dt>
+                    <dd class="text-sm text-gray-900 flex-1">
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">
+                            {{ transactions_count }}
+                        </span>
+                    </dd>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if first_seen is defined %}
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">First Seen</dt>
+                    <dd class="text-sm text-gray-900 flex-1">{{ first_seen|format_timestamp }}</dd>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if last_seen is defined %}
+            <div class="border-b border-gray-200 pb-3">
+                <div class="flex items-center justify-between">
+                    <dt class="text-sm font-medium text-gray-500 w-48">Last Seen</dt>
+                    <dd class="text-sm text-gray-900 flex-1">{{ last_seen|format_timestamp }}</dd>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Raw Data (collapsible) -->
+        <div x-show="showRaw" x-transition class="mt-4">
+            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs">{{ address_data|tojson(indent=2) if address_data else '{}' }}</pre>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="border-b border-gray-200 mb-4">
+            <nav class="-mb-px flex space-x-8">
+                <button @click="activeTab = 'transactions'"
+                        :class="activeTab === 'transactions' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Transactions
+                </button>
+                <button @click="activeTab = 'assets'"
+                        :class="activeTab === 'assets' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Assets
+                </button>
+                <button @click="activeTab = 'permissions'"
+                        :class="activeTab === 'permissions' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Permissions
+                </button>
+            </nav>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div x-show="activeTab === 'transactions'" x-transition>
+            {% if transactions %}
+            <div class="mb-4 flex justify-between items-center">
+                <p class="text-sm text-gray-600">Showing recent transactions ({{ transactions|length }} of {{ transactions_count }})</p>
+                <a href="{{ base_url }}{{ chain_path }}/address/{{ address }}/transactions"
+                   class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    View All {{ transactions_count }} Transactions →
+                </a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Transaction ID
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Time
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Confirmations
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for tx in transactions %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                                <a href="{{ base_url }}{{ chain_path }}/tx/{{ tx.txid }}"
+                                   class="text-blue-600 hover:text-blue-800 hover:underline">
+                                    {{ tx.txid|format_hash }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                {{ tx.time|format_timestamp if tx.time else 'Pending' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs
+                                    {% if tx.confirmations > 6 %}bg-green-100 text-green-800
+                                    {% elif tx.confirmations > 0 %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ tx.confirmations|default(0) }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No transactions found</p>
+            {% endif %}
+        </div>
+
+        <!-- Assets Tab -->
+        <div x-show="activeTab === 'assets'" x-transition>
+            {% if assets %}
+            <div class="mb-4">
+                <a href="{{ base_url }}{{ chain_path }}/address/{{ address }}/assets"
+                   class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    View All Assets →
+                </a>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for asset in assets %}
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <h4 class="font-semibold text-gray-900 mb-2 font-mono">{{ asset.name if asset is mapping else asset }}</h4>
+                    <div class="flex justify-between items-center">
+                        <span class="text-lg font-bold text-green-600 font-mono">
+                            {{ asset.qty|format_amount if asset is mapping else 'N/A' }}
+                        </span>
+                        {% if asset is mapping and asset.name %}
+                        <a href="{{ base_url }}{{ chain_path }}/asset/{{ asset.name }}"
+                           class="text-blue-600 hover:text-blue-800 text-sm">View →</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No assets found</p>
+            {% endif %}
+        </div>
+
+        <!-- Permissions Tab -->
+        <div x-show="activeTab === 'permissions'" x-transition>
+            {% if permissions %}
+            <div class="mb-4">
+                <a href="{{ base_url }}{{ chain_path }}/address/{{ address }}/permissions"
+                   class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    View All Permissions →
+                </a>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                {% for perm in permissions %}
+                <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-semibold font-mono">
+                    {{ perm.type if perm is mapping else perm }}
+                </span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No permissions found</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="flex gap-2">
+        <a href="{{ base_url }}{{ chain_path }}"
+           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Chain
+        </a>
+    </div>
+</div>
+{% endblock %}

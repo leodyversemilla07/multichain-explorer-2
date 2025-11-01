@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <nav class="text-sm text-gray-600 mb-4">
+            <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}/asset/{{ asset_name }}" class="hover:text-blue-600">{{ asset_name }}</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900">Transactions</span>
+        </nav>
+
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Asset Transactions</h1>
+                <p class="mt-2 text-gray-600">Transactions for: <span class="font-semibold">{{ asset_name }}</span></p>
+            </div>
+            <span class="text-sm text-gray-600">{{ pagination.total|default(0) }} total</span>
+        </div>
+    </div>
+
+    <!-- Transactions List -->
+    {% if transactions and transactions|length > 0 %}
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Transaction ID
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Type
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Amount
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Block
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Time
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for tx in transactions %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="{{ base_url }}{{ chain_path }}/tx/{{ tx.txid }}"
+                               class="text-blue-600 hover:text-blue-800 font-mono text-sm">
+                                {{ tx.txid|format_hash(16) }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if tx.type %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                         {% if tx.type == 'issue' %}bg-green-100 text-green-800
+                                         {% elif tx.type == 'transfer' %}bg-blue-100 text-blue-800
+                                         {% elif tx.type == 'issuemore' %}bg-purple-100 text-purple-800
+                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ tx.type|capitalize }}
+                            </span>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {% if tx.qty is defined %}
+                            {{ tx.qty|format_amount }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if tx.blockheight is defined %}
+                            <a href="{{ base_url }}{{ chain_path }}/block/{{ tx.blockheight }}"
+                               class="text-blue-600 hover:text-blue-800">
+                                {{ tx.blockheight }}
+                            </a>
+                            {% else %}
+                            <span class="text-yellow-600">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if tx.time %}
+                            {{ tx.time|format_timestamp }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination %}
+    <div class="mt-8">
+        {% include 'components/pagination.html' %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No transactions</h3>
+        <p class="mt-1 text-sm text-gray-500">No transactions found for this asset.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
