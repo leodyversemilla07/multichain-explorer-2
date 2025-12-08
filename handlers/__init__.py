@@ -5,7 +5,7 @@
 
 from handlers.address_handler import AddressHandler
 from handlers.asset_handler import AssetHandler
-from handlers.base import BaseHandler
+from handlers.base import BaseHandler, safe_int
 from handlers.block_handler import BlockHandler
 from handlers.chain_handler import ChainHandler
 from handlers.permission_handler import PermissionHandler
@@ -15,6 +15,7 @@ from handlers.transaction_handler import TransactionHandler
 
 __all__ = [
     "BaseHandler",
+    "safe_int",
     "AddressHandler",
     "AssetHandler",
     "BlockHandler",

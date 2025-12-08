@@ -9,7 +9,7 @@ Base handler class with common functionality for all entity handlers.
 
 import json
 from html import escape
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 from urllib import parse
 
 try:
@@ -28,6 +28,16 @@ except ImportError:
 
     def sanitize_html(text: str) -> str:
         return escape(str(text), quote=True)
+
+
+def safe_int(value: Any, default: int = 0) -> int:
+    """Safely convert a value to int, returning default if empty or invalid."""
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 
 # Navigation symbols
@@ -300,7 +310,7 @@ class BaseHandler:
         return {
             "pagination": page_info,  # Keep the object for programmatic access
             "total_pages": page_info.total_pages,
-            "current_page": page_info.current_page,
+            "page_number": page_info.current_page,
             "total_items": page_info.total_items,
             "items_per_page": page_info.items_per_page,
             "has_previous": page_info.has_previous,

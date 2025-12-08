@@ -14,64 +14,23 @@ from collections import OrderedDict
 from urllib import parse, request
 
 import app_state
-import readconf
 import utils
 
 
-def multichain_init_rpc_parameters(chain):
-    if readconf.is_missing(app_state.get_state().settings[chain], "datadir"):
-        app_state.get_state().settings[chain]["datadir"] = "~/.multichain"
-
-    datadir = (
-        app_state.get_state().settings[chain]["datadir"]
-        + "/"
-        + app_state.get_state().settings[chain]["name"]
-        + "/"
-    )
-    datadir = utils.full_dir_name(datadir)
-
-    if readconf.is_missing(app_state.get_state().settings[chain], "rpcport"):
-        params_file = datadir + "params.dat"
-        if not utils.file_exists(params_file):
-            utils.print_error("Couldn't find MultiChain directory " + datadir)
-            return False
-        params = readconf.read_plain_config_file(params_file)
-        if params["default-rpc-port"] is None:
-            utils.print_error("Couldn't find default-rpc-port in " + params_file)
-            return False
-        app_state.get_state().settings[chain]["rpcport"] = (
-            params["default-rpc-port"].split("#", 1)[0].rstrip()
-        )
-
-    conf_file = datadir + "multichain.conf"
-    if readconf.is_missing(app_state.get_state().settings[chain], "rpcuser") or readconf.is_missing(
-        app_state.get_state().settings[chain], "rpcpassword"
-    ):
-        if not utils.file_exists(conf_file):
-            utils.print_error("Couldn't find configuration file " + conf_file)
-            return False
-
-        conf = readconf.read_plain_config_file(conf_file)
-
-        if readconf.is_missing(app_state.get_state().settings[chain], "rpcuser"):
-            if readconf.is_missing(conf, "rpcuser"):
-                utils.print_error("Couldn't find rpcuser in " + conf_file)
-                return False
-            app_state.get_state().settings[chain]["rpcuser"] = conf["rpcuser"]
-
-        if readconf.is_missing(app_state.get_state().settings[chain], "rpcpassword"):
-            if readconf.is_missing(conf, "rpcpassword"):
-                utils.print_error("Couldn't find rpcpassword in " + conf_file)
-                return False
-            app_state.get_state().settings[chain]["rpcpassword"] = conf["rpcpassword"]
-
-        if not readconf.is_missing(conf, "rpcport"):
-            app_state.get_state().settings[chain]["rpcport"] = conf["rpcport"]
-
-    return True
+def is_missing(config, key):
+    """Check if a config key is missing or empty."""
+    if key not in config:
+        return True
+    if config[key] is None:
+        return True
+    if len(str(config[key])) == 0:
+        return True
+    return False
 
 
 class MCEChain:
+    """MultiChain blockchain connection wrapper."""
+    
     def __init__(self, name):
         self.name = name
         self.config = app_state.get_state().settings[name].copy()
@@ -80,11 +39,12 @@ class MCEChain:
         self.config["path-ini-name"] = parse.quote_plus(name)
 
     def initialize(self):
+        """Initialize the chain connection with RPC credentials."""
         url = "http://127.0.0.1"
-        if not readconf.is_missing(self.config, "rpchost"):
-            url = self.config["rpchost"]
+        if not is_missing(self.config, "rpchost"):
+            url = f"http://{self.config['rpchost']}"
 
-        url = url + ":" + self.config["rpcport"]
+        url = url + ":" + str(self.config["rpcport"])
         userpass64 = base64.b64encode(
             (self.config["rpcuser"] + ":" + self.config["rpcpassword"]).encode("ascii")
         ).decode("ascii")

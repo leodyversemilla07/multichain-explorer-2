@@ -6,7 +6,7 @@
 from typing import Any, Dict, Optional, Tuple
 
 import app_state
-from handlers.base import BaseHandler
+from handlers.base import BaseHandler, safe_int
 from services.blockchain_service import BlockchainService
 from template_engine import render_template
 

@@ -1,10 +1,11 @@
 # MultiChain Explorer 2
 
-**Version:** 2.0.0  
+**Version:** 2.1.0  
 **License:** BSD-3-Clause  
-**Python:** 3.8+
+**Python:** 3.8+  
+**Framework:** FastAPI + Uvicorn
 
-A modern, web-based explorer for MultiChain blockchains with a clean architecture, comprehensive testing, and professional UI.
+A modern, web-based explorer for MultiChain blockchains with a clean architecture, comprehensive testing, and professional UI. **Now powered by FastAPI** for async performance and modern API design.
 
 ---
 
@@ -30,8 +31,10 @@ A modern, web-based explorer for MultiChain blockchains with a clean architectur
 - **Comprehensive Explorer** - View blocks, transactions, addresses, assets, streams, and permissions
 - **Modern UI** - Clean, responsive interface built with TailwindCSS and AlpineJS
 - **Real-time Search** - Live search and filtering across all entity types
-- **Clean Architecture** - Modular handler system with separated concerns
-- **Type-Safe** - Input validation with Pydantic
+- **FastAPI Powered** - Async performance with modern Python web framework
+- **Auto-Generated API Docs** - Interactive Swagger UI at `/docs`
+- **Clean Architecture** - Modular router/handler system with separated concerns
+- **Type-Safe** - Input validation with Pydantic and FastAPI
 - **Well-Tested** - 283+ tests with 100% pass rate
 - **Production-Ready** - Security hardening, error handling, and performance optimizations
 
@@ -42,7 +45,7 @@ A modern, web-based explorer for MultiChain blockchains with a clean architectur
 ### Prerequisites
 
 - Python 3.8 or higher
-- Access to one or more MultiChain nodes (local or remote)
+- Access to a MultiChain node (local or remote)
 - MultiChain RPC credentials
 
 ### Basic Installation
@@ -55,15 +58,18 @@ cd multichain-explorer-2
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Copy and configure the example config file
-cp example.ini multichain.ini
-# Edit multichain.ini with your MultiChain node details
+# 3. Copy and configure the .env file
+cp .env.example .env
+# Edit .env with your MultiChain node details
 
 # 4. Start the explorer
-python main.py multichain.ini
+python main.py
+
+# Or using uvicorn directly (recommended for production)
+uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-The explorer will be available at `http://localhost:4444` (or the port specified in your config).
+The explorer will be available at `http://localhost:8080`.
 
 ---
 
@@ -100,127 +106,92 @@ pip install -e ".[dev]"
 
 ## ⚙️ Configuration
 
-### Configuration File
+### Environment Variables
 
-Create a configuration file (e.g., `multichain.ini`) based on `example.ini`:
+Configuration is managed through a `.env` file. Copy `.env.example` to `.env` and customize:
 
-```ini
-[main]
-# Network settings
-host=localhost        # Use 0.0.0.0 to accept connections from anywhere
-port=4444            # Web server port
+```bash
+cp .env.example .env
+```
 
-# Optional: URL prefix for all links (default: /)
-# base=/explorer/
+### Configuration File (.env)
 
-[chains]
-# Enable/disable chains
-chain1=on
-chain2=off
+```env
+# MultiChain Node Connection
+MULTICHAIN_CHAIN_NAME=mychain
+MULTICHAIN_RPC_HOST=127.0.0.1
+MULTICHAIN_RPC_PORT=8000
+MULTICHAIN_RPC_USERNAME=multichainrpc
+MULTICHAIN_RPC_PASSWORD=your_rpc_password_here
 
-[chain1]
-# Chain display name
-name=My MultiChain
-
-# RPC connection settings
-# For remote nodes, specify all RPC settings:
-# rpchost=http://123.45.67.89
-# rpcport=8000
-# rpcuser=multichainrpc
-# rpcpassword=your-secure-password
-
-# For local nodes, specify datadir (credentials auto-detected):
-datadir=~/.multichain/chain1
-
-[chain2]
-name=Another Chain
-# ... additional chain configuration
+# Explorer Settings
+EXPLORER_HOST=127.0.0.1
+EXPLORER_PORT=8080
+DEBUG=false
 ```
 
 ### Configuration Parameters
 
-#### Main Section
-
-| Parameter | Description | Default | Required |
-|-----------|-------------|---------|----------|
-| `host` | Server bind address | `localhost` | No |
-| `port` | Server port | `4444` | No |
-| `base` | URL prefix for links | `/` | No |
-| `debug` | Enable debug mode | `false` | No |
-
-#### Chain Section
-
-| Parameter | Description | Default | Required |
-|-----------|-------------|---------|----------|
-| `name` | Display name for the chain | - | Yes |
-| `rpchost` | RPC server URL (with scheme) | `http://127.0.0.1` | No* |
-| `rpcport` | RPC server port | Auto-detected | No* |
-| `rpcuser` | RPC username | Auto-detected | No* |
-| `rpcpassword` | RPC password | Auto-detected | No* |
-| `datadir` | MultiChain data directory | `~/.multichain` | No* |
-
-\* For **local nodes**, only `datadir` is needed (RPC credentials auto-detected).  
-\* For **remote nodes**, all RPC parameters (`rpchost`, `rpcport`, `rpcuser`, `rpcpassword`) are required.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MULTICHAIN_CHAIN_NAME` | Name of the blockchain | `chain1` |
+| `MULTICHAIN_RPC_HOST` | MultiChain RPC host | `127.0.0.1` |
+| `MULTICHAIN_RPC_PORT` | MultiChain RPC port | `8000` |
+| `MULTICHAIN_RPC_USERNAME` | RPC username | `multichainrpc` |
+| `MULTICHAIN_RPC_PASSWORD` | RPC password | (required) |
+| `EXPLORER_HOST` | Explorer bind address | `127.0.0.1` |
+| `EXPLORER_PORT` | Explorer web port | `8080` |
+| `DEBUG` | Enable debug/reload | `false` |
+| `BASE_URL` | URL prefix for reverse proxy | `/` |
 
 ---
 
 ## 🏃 Running the Server
 
-### Standard Mode
+### Starting the Server
 
-Start the server in the foreground:
+Start the server using Uvicorn:
 
 ```bash
-python main.py multichain.ini
+# Development mode with auto-reload
+uvicorn main:app --reload --port 8080
+
+# Production mode
+uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
+
+# Using the built-in CLI
+python main.py --port 8080 --reload
+python main.py --host 0.0.0.0 --port 8080
 ```
 
-Access the explorer at `http://localhost:4444` (or your configured host/port).
+Access the explorer at `http://localhost:8080`
 
 Press `Ctrl+C` to stop the server.
 
-### Daemon Mode
+**Additional endpoints:**
+- **API Documentation:** `http://localhost:8080/docs` (Swagger UI)
+- **Alternative Docs:** `http://localhost:8080/redoc` (ReDoc)
 
-Start the server as a background daemon:
+### CLI Options
+
+The `main.py` supports the following command-line options:
 
 ```bash
-# Start in background
-python main.py multichain.ini daemon
+python main.py [OPTIONS]
 
-# Check status
-python main.py multichain.ini status
-
-# Stop the daemon
-python main.py multichain.ini stop
+Options:
+  --host HOST       Host to bind to (default: 127.0.0.1)
+  --port PORT       Port to bind to (default: 8080)
+  --reload          Enable auto-reload for development
+  --config FILE     Path to configuration file (default: multichain.ini)
 ```
 
-### Alternative Entry Points
+### Production Deployment
 
-You can also run the server directly using:
-
-```bash
-# Using http_server.py (recommended for development)
-python http_server.py
-
-# This requires the configuration to be loaded first
-```
-
-### Server Options
+For production environments, use Uvicorn with multiple workers:
 
 ```bash
-# Show usage information
-python main.py
-
-# Start with a specific config file
-python main.py /path/to/config.ini
-
-# Start as daemon
-python main.py multichain.ini daemon
-
-# Check if running
-python main.py multichain.ini status
-
-# Stop daemon
-python main.py multichain.ini stop
+uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
 ```
 
 ### Logs
@@ -299,19 +270,32 @@ This will:
 
 ## 🏗️ Architecture
 
-MultiChain Explorer 2 follows a clean, modular architecture:
+MultiChain Explorer 2 follows a clean, modular architecture powered by **FastAPI**:
 
 ```
 ┌─────────────────┐
-│  HTTP Server    │  ← http_server.py (Modern HTTPServer)
+│   Uvicorn       │  ← ASGI server (production-ready)
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   Routing       │  ← routing.py (URL routing & dispatch)
+│   FastAPI App   │  ← main.py (Modern async framework)
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   Handlers      │  ← handlers/ (Specialized request handlers)
+│   Routers       │  ← routers/ (API route definitions)
+├─────────────────┤
+│ • chains.py     │  ← Chain listing & home
+│ • blocks.py     │  ← Block operations
+│ • transactions  │  ← Transaction operations
+│ • addresses.py  │  ← Address operations
+│ • assets.py     │  ← Asset operations
+│ • streams.py    │  ← Stream operations
+│ • permissions   │  ← Permission operations
+│ • search.py     │  ← Search functionality
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│   Handlers      │  ← handlers/ (Business logic)
 ├─────────────────┤
 │ • BlockHandler  │  ← Block operations
 │ • TxHandler     │  ← Transaction operations
@@ -323,7 +307,7 @@ MultiChain Explorer 2 follows a clean, modular architecture:
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   Services      │  ← services/ (Business logic)
+│   Services      │  ← services/ (Data layer)
 ├─────────────────┤
 │ • Blockchain    │  ← RPC abstraction
 │ • Cache         │  ← Response caching
@@ -338,16 +322,14 @@ MultiChain Explorer 2 follows a clean, modular architecture:
 
 ### Key Components
 
-- **`http_server.py`** - Modern HTTP server with static file serving
-- **`routing.py`** - URL routing and request dispatching
+- **`main.py`** - FastAPI application with routers, middleware, and exception handlers
+- **`routers/`** - API route definitions with dependency injection (8 routers)
 - **`handlers/`** - Specialized request handlers (7 handlers)
 - **`services/`** - Business logic and data services (4 services)
 - **`templates/`** - Jinja2 templates with TailwindCSS
 - **`validators.py`** - Input validation with Pydantic
 - **`config.py`** - Type-safe configuration management
 - **`exceptions.py`** - Centralized error handling
-
-See [handlers/README.md](handlers/README.md) for detailed handler documentation.
 
 ---
 
@@ -385,7 +367,7 @@ tests/
 ├── test_handlers.py            # BaseHandler tests
 ├── test_specialized_handlers.py # Handler-specific tests
 ├── test_services.py            # Service layer tests
-├── test_routing.py             # Routing tests
+├── test_search.py              # Search functionality tests
 ├── test_template_engine.py     # Template tests
 ├── test_integration.py         # End-to-end tests
 └── mocks/                      # Test fixtures & mocks
@@ -422,10 +404,7 @@ pytest -m security
 
 ```
 multichain-explorer-2/
-├── main.py                  # Main entry point
-├── http_server.py           # HTTP server implementation
-├── routing.py               # URL routing
-├── app.py                   # Application setup
+├── main.py           # FastAPI application (single entry point)
 ├── app_state.py             # Global state management
 ├── config.py                # Configuration management
 ├── validators.py            # Input validation
@@ -433,6 +412,18 @@ multichain-explorer-2/
 ├── template_engine.py       # Template rendering
 ├── multichain.py            # MultiChain RPC client
 ├── utils.py                 # Utility functions
+│
+├── routers/                 # FastAPI routers
+│   ├── __init__.py
+│   ├── dependencies.py      # Dependency injection
+│   ├── chains.py            # Chain routes
+│   ├── blocks.py            # Block routes
+│   ├── transactions.py      # Transaction routes
+│   ├── addresses.py         # Address routes
+│   ├── assets.py            # Asset routes
+│   ├── streams.py           # Stream routes
+│   ├── permissions.py       # Permission routes
+│   └── search.py            # Search routes
 │
 ├── handlers/                # Request handlers
 │   ├── __init__.py
@@ -586,15 +577,16 @@ See [ARCHITECTURE_ROADMAP.md](ARCHITECTURE_ROADMAP.md) for detailed progress and
 #### Server won't start
 
 ```bash
-# Check if another instance is running
-python main.py multichain.ini status
-
-# Stop existing instance
-python main.py multichain.ini stop
-
-# Check port availability
+# Check if port is in use
 # Windows PowerShell:
-netstat -ano | findstr :4444
+netstat -ano | findstr :8080
+
+# Kill process using the port (replace PID)
+taskkill /PID <pid> /F
+
+# Linux/Mac:
+lsof -i :8080
+kill -9 <pid>
 ```
 
 #### Can't connect to MultiChain node

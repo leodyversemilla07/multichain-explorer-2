@@ -1,0 +1,21 @@
+<!-- Breadcrumb Navigation -->
+<nav class="text-sm text-gray-600 mb-4">
+    <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+    {% if chain_path %}
+    <span class="mx-2">/</span>
+    <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+    {% endif %}
+    {% if breadcrumb_items %}
+        {% for item in breadcrumb_items %}
+        <span class="mx-2">/</span>
+        {% if item.url %}
+        <a href="{{ item.url }}" class="hover:text-blue-600">{{ item.label }}</a>
+        {% else %}
+        <span class="text-gray-900">{{ item.label }}</span>
+        {% endif %}
+        {% endfor %}
+    {% elif current_page %}
+    <span class="mx-2">/</span>
+    <span class="text-gray-900">{{ current_page }}</span>
+    {% endif %}
+</nav>

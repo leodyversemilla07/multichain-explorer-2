@@ -61,17 +61,14 @@ clean: ## Clean up generated files
 	rm -rf .pytest_cache .coverage htmlcov/ .mypy_cache/
 	rm -f tmp.out *.log *.pid
 
-run: ## Run the explorer (requires config.ini)
-	$(PYTHON) -m explorer config.ini
+run: ## Run the explorer (requires multichain.ini)
+	uvicorn main:app --reload --port 8080
 
-run-daemon: ## Run the explorer as daemon
-	$(PYTHON) -m explorer config.ini daemon
+run-dev: ## Run the explorer in development mode
+	uvicorn main:app --reload --host 127.0.0.1 --port 8080
 
-stop: ## Stop the explorer daemon
-	$(PYTHON) -m explorer config.ini stop
-
-status: ## Check explorer status
-	$(PYTHON) -m explorer config.ini status
+run-prod: ## Run the explorer in production mode
+	uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
 
 docs: ## Generate documentation
 	cd docs && make html
@@ -90,7 +87,7 @@ docker-build: ## Build Docker image
 	docker build -t multichain-explorer:dev .
 
 docker-run: ## Run Docker container
-	docker run -p 4444:4444 -v $(PWD):/app multichain-explorer:dev
+	docker run -p 8080:8080 -v $(PWD):/app multichain-explorer:dev
 
 # Benchmarking
 benchmark: ## Run performance benchmarks
@@ -103,4 +100,4 @@ security-check: ## Run security checks
 
 # Release
 version: ## Show current version
-	@grep "version=" cfg.py | cut -d'"' -f2
+	@grep "VERSION" app_state.py | head -1 | cut -d'"' -f2

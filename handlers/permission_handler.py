@@ -6,7 +6,7 @@
 from typing import Any, Dict, Optional, Tuple
 
 import app_state
-from handlers.base import BaseHandler
+from handlers.base import BaseHandler, safe_int
 from services.blockchain_service import BlockchainService
 from services.pagination_service import PaginationService
 from template_engine import render_template
@@ -92,8 +92,8 @@ class PermissionHandler(BaseHandler):
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=len(global_permissions),
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         paginated_perms = global_permissions[

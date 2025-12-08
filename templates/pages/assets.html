@@ -3,6 +3,10 @@
 {% block title %}Assets - {{ chain_name }} - MultiChain Explorer{% endblock %}
 
 {% block content %}
+<!-- Breadcrumb -->
+{% set current_page = "Assets" %}
+{% include "components/breadcrumb.html" %}
+
 <div x-data="{
     searchQuery: '',
     filterType: 'all',

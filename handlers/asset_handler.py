@@ -6,7 +6,7 @@
 from typing import Any, Dict, Optional, Tuple
 
 import app_state
-from handlers.base import BaseHandler
+from handlers.base import BaseHandler, safe_int
 from services.blockchain_service import BlockchainService
 from services.pagination_service import PaginationService
 from template_engine import render_template
@@ -34,8 +34,8 @@ class AssetHandler(BaseHandler):
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=len(assets),
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         paginated_assets = assets[page_info["start"] : page_info["start"] + page_info["count"]]
@@ -106,8 +106,8 @@ class AssetHandler(BaseHandler):
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=total_count,
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         transactions = []
@@ -159,8 +159,8 @@ class AssetHandler(BaseHandler):
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=len(holders),
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         paginated_holders = holders[page_info["start"] : page_info["start"] + page_info["count"]]
@@ -213,8 +213,8 @@ class AssetHandler(BaseHandler):
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=len(transactions),
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         paginated_txs = transactions[page_info["start"] : page_info["start"] + page_info["count"]]
@@ -263,8 +263,8 @@ class AssetHandler(BaseHandler):
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=len(issues),
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         paginated_issues = issues[page_info["start"] : page_info["start"] + page_info["count"]]

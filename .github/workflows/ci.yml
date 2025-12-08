@@ -102,9 +102,13 @@ jobs:
 
     - name: Test installation
       run: |
-        python -c "import cfg, data, pages, server, multichain, readconf, utils, explorer"
+        python -c "import app_state, multichain, env_config, utils, main, validators, exceptions"
         echo "✅ All modules importable"
 
     - name: Verify version
       run: |
-        python -c "import cfg; print(f'Version: {cfg.version}')"
+        python -c "import app_state; print(f'Version: {app_state.VERSION}')"
+
+    - name: Verify FastAPI app
+      run: |
+        python -c "from main import create_app; app = create_app(); print(f'FastAPI app: {app.title}')"

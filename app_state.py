@@ -15,6 +15,62 @@ from typing import Any, Dict, List, Optional
 VERSION = "2.1"
 
 
+def init_from_env() -> bool:
+    """
+    Initialize application state from .env file.
+    
+    Returns:
+        True if initialization successful, False otherwise
+    """
+    from env_config import get_settings
+    import multichain
+    
+    try:
+        settings = get_settings()
+        state = get_state()
+        
+        # Set up settings dict for backward compatibility
+        state.settings = {
+            "main": {
+                "host": settings.explorer_host,
+                "port": settings.explorer_port,
+                "base": settings.base_url,
+                "ini_dir": str(Path.cwd()),
+            },
+            "chains": {
+                settings.multichain_chain_name: "on",
+            },
+            settings.multichain_chain_name: {
+                "name": settings.multichain_chain_name,
+                "display-name": settings.multichain_chain_name,  # Display name for UI
+                "rpchost": settings.multichain_rpc_host,
+                "rpcport": str(settings.multichain_rpc_port),
+                "rpcuser": settings.multichain_rpc_username,
+                "rpcpassword": settings.multichain_rpc_password,
+            },
+        }
+        
+        state.explorer_name = "multichain-explorer"
+        state.ini_dir = Path.cwd()
+        state.log_file = str(state.ini_dir / "explorer.log")
+        state.pid_file = str(state.ini_dir / "explorer.pid")
+        
+        # Initialize the chain
+        chain_name = settings.multichain_chain_name
+        chain_object = multichain.MCEChain(chain_name)
+        if not chain_object.initialize():
+            print(f"Warning: Could not initialize chain '{chain_name}'")
+            # Don't fail - chain might not be running yet
+        
+        state.chains = [chain_object]
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error initializing from .env: {e}")
+        return False
+
+
 @dataclass
 class ApplicationState:
     """
@@ -148,4 +204,5 @@ __all__ = [
     "get_chain_count",
     "get_chain_by_name",
     "reset",
+    "init_from_env",
 ]

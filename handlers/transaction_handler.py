@@ -6,7 +6,7 @@
 from typing import Any, Dict, Optional, Tuple
 
 import app_state
-from handlers.base import BaseHandler
+from handlers.base import BaseHandler, safe_int
 from services.blockchain_service import BlockchainService
 from services.pagination_service import PaginationService
 from template_engine import render_template
@@ -22,51 +22,43 @@ class TransactionHandler(BaseHandler):
         service = BlockchainService(chain)
         pagination = PaginationService()
 
-        # Get recent transactions from mempool and recent blocks - service.rpc() returns result directly
-        try:
-            mempool_data = service.rpc("getrawmempool", [True])
-            if mempool_data and isinstance(mempool_data, dict):
-                mempool_txs = []
-                for txid, data in mempool_data.items():
-                    tx = {"txid": txid}
-                    tx.update(data)
-                    # Mempool transactions don't have blockheight or confirmations
-                    # They should already have 'time' field
-                    mempool_txs.append(tx)
-            else:
-                mempool_txs = []
-        except Exception:
-            mempool_txs = []
-
-        # Get recent confirmed transactions
+        # Get recent confirmed transactions first (newest blocks first)
         info = service.get_blockchain_info()
         current_height = info.get("blocks", 0)
 
         recent_txs = []
-        # Get transactions from last 10 blocks
-        for height in range(max(0, current_height - 10), current_height + 1):
+        # Get transactions from all blocks (newest first)
+        for height in range(current_height, -1, -1):
             block = service.get_block_by_height(height)
             if block and "tx" in block:
-                for txid in block["tx"][:5]:  # First 5 from each block
+                for txid in block["tx"]:
                     tx = service.get_transaction(txid)
                     if tx:
                         # Ensure block info is present
-                        if "blockheight" not in tx and "height" in block:
-                            tx["blockheight"] = block["height"]
+                        if "blockheight" not in tx:
+                            tx["blockheight"] = block.get("height", height)
                         if "confirmations" not in tx:
-                            tx["confirmations"] = current_height - block.get("height", 0) + 1
+                            tx["confirmations"] = current_height - block.get("height", height) + 1
                         if "time" not in tx and "time" in block:
                             tx["time"] = block["time"]
                         recent_txs.append(tx)
+            # Stop if we have enough for several pages
+            if len(recent_txs) >= 200:
+                break
 
-        all_txs = mempool_txs + recent_txs
+        # Get mempool transactions (unconfirmed) - skip for now, only show confirmed
+        # Mempool transactions can be shown in a separate page if needed
+        mempool_txs = []
+
+        # Only show confirmed transactions
+        all_txs = recent_txs
 
         # Apply pagination
         query_params = query_params or {}
         page_info = pagination.get_pagination_info(
             total=len(all_txs),
-            start=int(query_params.get("start", 0)),
-            count=int(query_params.get("count", 20)),
+            page=safe_int(query_params.get("page"), 1),
+            items_per_page=safe_int(query_params.get("count"), 20),
         )
 
         paginated_txs = all_txs[page_info["start"] : page_info["start"] + page_info["count"]]
