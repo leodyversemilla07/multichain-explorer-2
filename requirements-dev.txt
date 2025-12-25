@@ -11,6 +11,7 @@ pytest-timeout==2.2.0
 responses==0.24.1
 
 # Code Quality
+ruff==0.1.9
 black==23.12.1
 flake8==6.1.0
 isort==5.13.2

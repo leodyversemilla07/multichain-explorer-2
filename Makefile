@@ -11,6 +11,7 @@ BLACK := $(PYTHON) -m black
 ISORT := $(PYTHON) -m isort
 FLAKE8 := $(PYTHON) -m flake8
 MYPY := $(PYTHON) -m mypy
+RUFF := $(PYTHON) -m ruff
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -42,11 +43,14 @@ coverage: ## Run tests with coverage report
 	@echo "Coverage report generated in htmlcov/index.html"
 
 lint: ## Run all linters
+	$(RUFF) check .
+	$(RUFF) format --check .
 	$(FLAKE8) *.py tests/
 	$(ISORT) --check-only *.py tests/
 	$(BLACK) --check *.py tests/
 
-format: ## Format code with black and isort
+format: ## Format code with ruff, black and isort
+	$(RUFF) format .
 	$(ISORT) *.py tests/
 	$(BLACK) *.py tests/
 	@echo "Code formatted successfully"
