@@ -8,8 +8,8 @@ retry logic, and connection management.
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+import httpx
 
 from config import ChainConfig
 from exceptions import ChainConnectionError, RPCError
@@ -45,6 +45,19 @@ class BlockchainService:
             raise ValueError("Invalid chain configuration object")
 
         self._request_id = 0
+        # Initialize persistent client for connection pooling
+        self.client = httpx.Client(timeout=30.0)
+
+    def close(self):
+        """Close the HTTP client."""
+        try:
+            self.client.close()
+        except Exception as e:
+            logger.warning(f"Error closing HTTP client: {e}")
+
+    def __del__(self):
+        """Destructor to ensure client is closed."""
+        self.close()
 
     def call(self, method: str, params: Optional[List[Any]] = None) -> Any:
         """
@@ -73,42 +86,49 @@ class BlockchainService:
             "params": params,
         }
 
+        # Prepare headers
+        headers = {"Content-Type": "application/json"}
+        # Use pre-configured headers (works with both old and new config)
+        for header_name, header_value in self.headers.items():
+            headers[header_name] = header_value
+
         try:
-            request = Request(
+            response = self.client.post(
                 self.rpc_url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                content=json.dumps(payload).encode("utf-8"),
+                headers=headers,
             )
+            response.raise_for_status()
 
-            # Use pre-configured headers (works with both old and new config)
-            for header_name, header_value in self.headers.items():
-                request.add_header(header_name, header_value)
+            data = response.json()
 
-            with urlopen(request, timeout=30) as response:
-                data = json.loads(response.read().decode("utf-8"))
+            if "error" in data and data["error"] is not None:
+                # Handle both dict and string error formats
+                if isinstance(data["error"], dict):
+                    error_msg = data["error"].get("message", "Unknown error")
+                    error_code = data["error"].get("code", -1)
+                else:
+                    # String error (from test mocks or legacy systems)
+                    error_msg = str(data["error"])
+                    error_code = -1
+                logger.error(f"RPC error on {self.chain_name}: {error_code} - {error_msg}")
+                raise RPCError(
+                    method=method,
+                    error_message=error_msg,
+                    error_code=error_code,
+                )
 
-                if "error" in data and data["error"] is not None:
-                    # Handle both dict and string error formats
-                    if isinstance(data["error"], dict):
-                        error_msg = data["error"].get("message", "Unknown error")
-                        error_code = data["error"].get("code", -1)
-                    else:
-                        # String error (from test mocks or legacy systems)
-                        error_msg = str(data["error"])
-                        error_code = -1
-                    logger.error(f"RPC error on {self.chain_name}: {error_code} - {error_msg}")
-                    raise RPCError(
-                        method=method,
-                        error_message=error_msg,
-                        error_code=error_code,
-                    )
+            return data.get("result")
 
-                return data.get("result")
-
-        except (HTTPError, URLError) as e:
+        except httpx.RequestError as e:
             logger.error(f"Connection error to {self.chain_name}: {e}")
             raise ChainConnectionError(
                 chain_name=self.chain_name, details={"error": str(e), "rpc_url": self.rpc_url}
+            )
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error from {self.chain_name}: {e}")
+            raise ChainConnectionError(
+                chain_name=self.chain_name, details={"error": str(e), "status_code": e.response.status_code}
             )
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from {self.config.name}: {e}")

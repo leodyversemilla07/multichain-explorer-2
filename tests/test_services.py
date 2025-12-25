@@ -9,6 +9,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 
+import httpx
 import pytest
 
 from config import ChainConfig
@@ -43,49 +44,42 @@ class TestBlockchainService:
         assert service.config == chain_config
         assert service.rpc_url == "http://localhost:8000"
         assert service._request_id == 0
+        assert isinstance(service.client, httpx.Client)
 
-    @patch("services.blockchain_service.urlopen")
-    def test_successful_rpc_call(self, mock_urlopen, service):
+    def test_successful_rpc_call(self, service):
         """Test successful RPC call."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "result": {"blocks": 100}}
-        ).encode()
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"blocks": 100}}
+        mock_response.status_code = 200
+        service.client.post = MagicMock(return_value=mock_response)
 
         result = service.call("getinfo")
 
         assert result == {"blocks": 100}
         assert service._request_id == 1
+        service.client.post.assert_called_once()
 
-    @patch("services.blockchain_service.urlopen")
-    def test_rpc_call_with_params(self, mock_urlopen, service):
+    def test_rpc_call_with_params(self, service):
         """Test RPC call with parameters."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "result": {"hash": "abc123"}}
-        ).encode()
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"hash": "abc123"}}
+        mock_response.status_code = 200
+        service.client.post = MagicMock(return_value=mock_response)
 
         result = service.call("getblock", ["abc123"])
 
         assert result == {"hash": "abc123"}
 
-    @patch("services.blockchain_service.urlopen")
-    def test_rpc_error_handling(self, mock_urlopen, service):
+    def test_rpc_error_handling(self, service):
         """Test RPC error is properly raised."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "error": {"code": -5, "message": "Block not found"},
-            }
-        ).encode()
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.json.return_value = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {"code": -5, "message": "Block not found"},
+        }
+        mock_response.status_code = 200
+        service.client.post = MagicMock(return_value=mock_response)
 
         with pytest.raises(RPCError) as exc_info:
             service.call("getblock", ["invalid"])
@@ -94,72 +88,80 @@ class TestBlockchainService:
         assert exc_info.value.method == "getblock"
         assert exc_info.value.error_code == -5
 
-    @patch("services.blockchain_service.urlopen")
-    def test_connection_error_handling(self, mock_urlopen, service):
+    def test_connection_error_handling(self, service):
         """Test connection error is properly handled."""
-        mock_urlopen.side_effect = URLError("Connection refused")
+        service.client.post = MagicMock(side_effect=httpx.RequestError("Connection refused"))
 
         with pytest.raises(ChainConnectionError) as exc_info:
             service.call("getinfo")
 
-        assert "Cannot connect to chain" in str(exc_info.value)
+        assert "Connection refused" in str(exc_info.value.details["error"])
         assert exc_info.value.chain_name == "test-chain"
 
-    @patch("services.blockchain_service.urlopen")
-    def test_json_decode_error(self, mock_urlopen, service):
+    def test_http_status_error(self, service):
+        """Test HTTP status error is properly handled."""
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+
+        # Configure raise_for_status to raise an error
+        error = httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_response)
+        mock_response.raise_for_status.side_effect = error
+
+        service.client.post = MagicMock(return_value=mock_response)
+
+        with pytest.raises(ChainConnectionError) as exc_info:
+            service.call("getinfo")
+
+        assert "Server error" in str(exc_info.value.details["error"])
+
+    def test_json_decode_error(self, service):
         """Test invalid JSON response handling."""
         mock_response = MagicMock()
-        mock_response.read.return_value = b"invalid json"
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.status_code = 200
+        mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+        service.client.post = MagicMock(return_value=mock_response)
 
         with pytest.raises(RPCError) as exc_info:
             service.call("getinfo")
 
         assert "Invalid JSON" in str(exc_info.value)
 
-    @patch("services.blockchain_service.urlopen")
-    def test_get_info(self, mock_urlopen, service):
+    def test_get_info(self, service):
         """Test get_info method."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "result": {"version": "2.0"}}
-        ).encode()
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"version": "2.0"}}
+        mock_response.status_code = 200
+        service.client.post = MagicMock(return_value=mock_response)
 
         result = service.get_info()
         assert result == {"version": "2.0"}
 
-    @patch("services.blockchain_service.urlopen")
-    def test_get_block(self, mock_urlopen, service):
+    def test_get_block(self, service):
         """Test get_block method."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "result": {"height": 100}}
-        ).encode()
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"height": 100}}
+        mock_response.status_code = 200
+        service.client.post = MagicMock(return_value=mock_response)
 
         result = service.get_block(100)
         assert result == {"height": 100}
 
-    @patch("services.blockchain_service.urlopen")
-    def test_is_healthy_success(self, mock_urlopen, service):
+    def test_is_healthy_success(self, service):
         """Test is_healthy returns True when connection works."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "result": {}}
-        ).encode()
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {}}
+        mock_response.status_code = 200
+        service.client.post = MagicMock(return_value=mock_response)
 
         assert service.is_healthy() is True
 
-    @patch("services.blockchain_service.urlopen")
-    def test_is_healthy_failure(self, mock_urlopen, service):
+    def test_is_healthy_failure(self, service):
         """Test is_healthy returns False when connection fails."""
-        mock_urlopen.side_effect = URLError("Connection refused")
+        service.client.post = MagicMock(side_effect=httpx.RequestError("Connection refused"))
+
+        # Clear cache to ensure we make a real call
+        if hasattr(service.get_info, "cache_clear"):
+            service.get_info.cache_clear()
 
         assert service.is_healthy() is False
 

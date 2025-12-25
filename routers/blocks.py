@@ -67,11 +67,20 @@ def list_blocks(
 
     start_height = page_info["start"]
     end_height = min(start_height + page_info["count"], total_blocks)
+    count = end_height - start_height
 
-    for height in range(start_height, end_height):
-        block = service.get_block_by_height(height)
-        if block:
-            blocks.append(block)
+    if count > 0:
+        # Optimization: Use list_blocks to fetch multiple blocks in one RPC call
+        # instead of making N+1 calls (getblockhash + getblock for each height)
+        try:
+            blocks = service.list_blocks(start_height, count)
+        except Exception as e:
+            # Fallback to individual fetching if list_blocks fails
+            # This ensures robustness if the RPC command is not available or fails
+            for height in range(start_height, end_height):
+                block = service.get_block_by_height(height)
+                if block:
+                    blocks.append(block)
 
     # Sort blocks by height descending (usually desired) if not already
     blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
