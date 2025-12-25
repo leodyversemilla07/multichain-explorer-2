@@ -4,7 +4,7 @@ Pagination service - Pagination logic for lists.
 Provides utilities for paginating results with proper URL generation.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Any, List, Literal, Optional, Union, overload
 from urllib.parse import urlencode
 
@@ -35,32 +35,40 @@ class PaginationInfo:
         """Get items per page (legacy compatibility)."""
         return self.items_per_page
 
-    @overload
-    def __getitem__(self, key: Literal["start"]) -> int:
-        ...
-
-    @overload
-    def __getitem__(self, key: Literal["count"]) -> int:
-        ...
-
-    @overload
-    def __getitem__(self, key: Literal["total"]) -> int:
-        ...
-
-    def __getitem__(self, key: str) -> int:
+    def __getitem__(self, key: str) -> Any:
         """
-        Dict-like access for backward compatibility.
-
-        Supports legacy keys: 'start', 'count', 'total'
+        Dict-like access for backward compatibility and template ease.
         """
+        # Legacy keys
         if key == "start":
             return self.start
         elif key == "count":
             return self.count
         elif key == "total":
             return self.total_items
-        else:
-            raise KeyError(f"Unknown key: {key}")
+
+        # New keys mapped to attributes
+        # We try to match the keys expected by the routers
+        if key == "page":
+            return self.current_page
+        if key == "page_count":
+            return self.total_pages
+        if key == "has_next":
+            return self.has_next
+        if key == "has_prev":
+            return self.has_previous
+        if key == "next_page":
+            return self.next_page
+        if key == "prev_page":
+            return self.previous_page
+        if key == "url_base":
+            return self.base_url
+
+        # Fallback to attribute access if it exists
+        if hasattr(self, key):
+            return getattr(self, key)
+
+        raise KeyError(f"Unknown key: {key}")
 
     def get_page_url(self, page: int, **extra_params: Any) -> str:
         """

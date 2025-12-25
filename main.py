@@ -12,7 +12,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -117,8 +117,31 @@ def create_app() -> FastAPI:
     
     # Register exception handlers
     _register_exception_handlers(app, templates)
+
+    # Register system routes FIRST to avoid being masked by catch-all routes
+    system_router = APIRouter(tags=["System"])
+
+    @system_router.get("/health")
+    async def health_check():
+        """Health check endpoint for monitoring."""
+        return {
+            "status": "healthy",
+            "version": app_state.VERSION,
+        }
+
+    @system_router.get("/api/info")
+    async def api_info():
+        """API information endpoint."""
+        return {
+            "name": "MultiChain Explorer 2 API",
+            "version": app_state.VERSION,
+            "docs": "/docs",
+            "redoc": "/redoc",
+        }
     
-    # Include routers
+    app.include_router(system_router)
+
+    # Include functional routers
     app.include_router(chains_router.router)
     app.include_router(blocks_router.router)
     app.include_router(transactions_router.router)
@@ -269,28 +292,6 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
 
 # Create the application instance
 app = create_app()
-
-
-# Health check endpoint
-@app.get("/health", tags=["System"])
-async def health_check():
-    """Health check endpoint for monitoring."""
-    return {
-        "status": "healthy",
-        "version": app_state.VERSION,
-    }
-
-
-# API info endpoint
-@app.get("/api/info", tags=["System"])
-async def api_info():
-    """API information endpoint."""
-    return {
-        "name": "MultiChain Explorer 2 API",
-        "version": app_state.VERSION,
-        "docs": "/docs",
-        "redoc": "/redoc",
-    }
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8080, reload: bool = False) -> None:

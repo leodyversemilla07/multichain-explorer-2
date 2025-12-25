@@ -11,14 +11,17 @@ Handles:
 - Transaction output data
 """
 
-from typing import Dict
+from typing import Dict, Any, List
 
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Depends, Path, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from handlers.transaction_handler import TransactionHandler
 from routers.dependencies import (
     ChainDep,
+    TemplatesDep,
+    BlockchainServiceDep,
+    PaginationServiceDep,
+    CommonContextDep,
     get_query_params,
 )
 
@@ -26,9 +29,13 @@ router = APIRouter(tags=["Transactions"])
 
 
 @router.get("/{chain_name}/transactions", response_class=HTMLResponse, name="transactions")
-async def list_transactions(
+def list_transactions(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    pagination: PaginationServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -36,120 +43,220 @@ async def list_transactions(
     
     Displays paginated list of transactions across the blockchain.
     """
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_transactions_list(chain, query_params)
-    return HTMLResponse(content=body, status_code=status)
+    # Get recent confirmed transactions first (newest blocks first)
+    info = service.get_blockchain_info()
+    current_height = info.get("blocks", 0)
+
+    recent_txs = []
+    # Get transactions from all blocks (newest first)
+    # NOTE: This approach of scanning blocks is inefficient for finding all transactions,
+    # but without a transaction indexer or listtransactions API for the whole chain, it's a fallback.
+    # The original handler capped at 200 items.
+
+    # We might need to cache this or improve it in a real production environment.
+    for height in range(current_height, -1, -1):
+        block = service.get_block_by_height(height)
+        if block and "tx" in block:
+            for txid in block["tx"]:
+                tx = service.get_transaction(txid)
+                if tx:
+                    # Ensure block info is present
+                    if "blockheight" not in tx:
+                        tx["blockheight"] = block.get("height", height)
+                    if "confirmations" not in tx:
+                        tx["confirmations"] = current_height - block.get("height", height) + 1
+                    if "time" not in tx and "time" in block:
+                        tx["time"] = block["time"]
+                    recent_txs.append(tx)
+        # Stop if we have enough for several pages
+        if len(recent_txs) >= 200:
+            break
+
+    # Mempool transactions (unconfirmed) - skip for now, only show confirmed
+
+    all_txs = recent_txs
+
+    # Apply pagination
+    page = int(query_params.get("page", 1))
+    count = int(query_params.get("count", 20))
+
+    page_info = pagination.get_pagination_info(
+        total=len(all_txs),
+        page=page,
+        items_per_page=count,
+    )
+
+    paginated_txs = all_txs[page_info["start"] : page_info["start"] + page_info["count"]]
+
+    pagination_context = {
+        "page": page_info["page"],
+        "page_count": page_info["page_count"],
+        "has_next": page_info["has_next"],
+        "has_prev": page_info["has_prev"],
+        "next_page": page_info["next_page"],
+        "prev_page": page_info["prev_page"],
+        "url_base": f"/{chain.config['path-name']}/transactions",
+    }
+
+    return templates.TemplateResponse(
+        name="pages/transactions.html",
+        context=context.build_context(
+            title=f"Recent Transactions - {chain.config['display-name']}",
+            transactions=paginated_txs,
+            **pagination_context
+        ),
+    )
 
 
 @router.get("/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="transaction")
-async def transaction_detail(
+def transaction_detail(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     txid: str = Path(..., min_length=64, max_length=64, description="Transaction ID"),
-    query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
     Show transaction details.
-    
-    Displays comprehensive transaction information including:
-    - Inputs and outputs
-    - Asset transfers
-    - Stream operations
-    - Permissions changes
     """
+    transaction = service.get_transaction(txid)
 
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_transaction_detail(chain, txid, query_params)
-    return HTMLResponse(content=body, status_code=status)
+    if not transaction:
+        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+
+    return templates.TemplateResponse(
+        name="pages/transaction.html",
+        context=context.build_context(
+            title=f"Transaction {txid[:16]}...",
+            txid=txid,
+            tx=transaction,
+        ),
+    )
 
 
 @router.get("/{chain_name}/tx/{txid}/raw", response_class=JSONResponse, name="raw_transaction")
-async def raw_transaction(
+def raw_transaction(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     txid: str = Path(..., min_length=64, max_length=64, description="Transaction ID"),
-    query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
     Get raw transaction data as JSON.
-    
-    Returns the complete transaction data in JSON format.
     """
+    try:
+        transaction = service.call("getrawtransaction", [txid, 1])
+        if not transaction:
+            raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
 
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_raw_transaction(chain, txid, query_params)
-    
-    # Check content type from headers
-    content_type = "application/json"
-    for header_name, header_value in headers:
-        if header_name.lower() == "content-type":
-            content_type = header_value
-            break
-    
-    if "json" in content_type.lower():
-        return JSONResponse(content=body.decode("utf-8") if isinstance(body, bytes) else body, status_code=status)
-    return HTMLResponse(content=body, status_code=status)
+    # If the client accepts JSON, return JSON. Otherwise return the HTML view of the JSON.
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept:
+        return transaction
+
+    # Default to HTML view of the raw JSON
+    return templates.TemplateResponse(
+        name="pages/raw_transaction.html",
+        context=context.build_context(
+            title=f"Raw Transaction - {txid[:16]}...",
+            txid=txid,
+            transaction=transaction,
+        ),
+    )
 
 
 @router.get("/{chain_name}/tx/{txid}/hex", response_class=HTMLResponse, name="raw_transaction_hex")
-async def raw_transaction_hex(
+def raw_transaction_hex(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     txid: str = Path(..., min_length=64, max_length=64, description="Transaction ID"),
-    query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
     Get raw transaction hex data.
-    
-    Returns the raw transaction in hexadecimal format.
     """
+    try:
+        hex_data = service.call("getrawtransaction", [txid, 0])
+        if not hex_data:
+            raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
 
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_raw_transaction_hex(chain, txid, query_params)
-    return HTMLResponse(content=body, status_code=status)
+    return templates.TemplateResponse(
+        name="pages/raw_transaction_hex.html",
+        context=context.build_context(
+            title=f"Raw TX Hex - {txid[:16]}...",
+            txid=txid,
+            hex=hex_data,
+        ),
+    )
 
 
 @router.get("/{chain_name}/tx/{txid}/output/{n}", response_class=HTMLResponse, name="tx_output_data")
-async def transaction_output(
+def transaction_output(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     txid: str = Path(..., min_length=64, max_length=64, description="Transaction ID"),
     n: int = Path(..., ge=0, description="Output index"),
-    query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
     Get transaction output data.
-    
-    Returns data for a specific output in a transaction.
     """
+    transaction = service.get_transaction(txid)
+    if not transaction:
+        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
 
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_tx_output_data(chain, txid, n, query_params)
-    return HTMLResponse(content=body, status_code=status)
+    # Get specific output
+    vouts = transaction.get("vout", [])
+    if n >= len(vouts):
+        raise HTTPException(status_code=404, detail=f"Output {n} not found in transaction")
+
+    output = vouts[n]
+
+    return templates.TemplateResponse(
+        name="pages/tx_output_data.html",
+        context=context.build_context(
+            title=f"TX Output - {txid[:16]}... #{n}",
+            txid=txid,
+            vout=n,
+            output=output,
+        ),
+    )
 
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}/transactions", response_class=HTMLResponse, name="legacy_transactions", include_in_schema=False)
-async def legacy_list_transactions(
+def legacy_list_transactions(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    pagination: PaginationServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy transactions list route."""
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_transactions_list(chain, query_params)
-    return HTMLResponse(content=body, status_code=status)
+    return list_transactions(request, chain, service, pagination, templates, context, query_params)
 
 
 @router.get("/chain/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="legacy_transaction", include_in_schema=False)
-async def legacy_transaction_detail(
+def legacy_transaction_detail(
     request: Request,
     chain: ChainDep,
+    service: BlockchainServiceDep,
+    templates: TemplatesDep,
+    context: CommonContextDep,
     txid: str = Path(..., min_length=64, max_length=64),
-    query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy transaction detail route."""
-
-    handler = TransactionHandler()
-    status, headers, body = handler.handle_transaction_detail(chain, txid, query_params)
-    return HTMLResponse(content=body, status_code=status)
+    return transaction_detail(request, chain, service, templates, context, txid)
