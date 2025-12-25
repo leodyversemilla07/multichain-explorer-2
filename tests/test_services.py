@@ -160,6 +160,9 @@ class TestBlockchainService:
     def test_is_healthy_failure(self, mock_urlopen, service):
         """Test is_healthy returns False when connection fails."""
         mock_urlopen.side_effect = URLError("Connection refused")
+        # Clear cache to ensure we make a real call
+        if hasattr(service.get_info, "cache_clear"):
+            service.get_info.cache_clear()
 
         assert service.is_healthy() is False
 
