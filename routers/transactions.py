@@ -43,42 +43,48 @@ def list_transactions(
     
     Displays paginated list of transactions across the blockchain.
     """
-    # Get recent confirmed transactions first (newest blocks first)
+    # Apply pagination first to minimize work
+    page = int(query_params.get("page", 1))
+    count = int(query_params.get("count", 20))
+    
+    # Get recent confirmed transactions (newest blocks first)
     info = service.get_blockchain_info()
     current_height = info.get("blocks", 0)
 
+    # Calculate how many transactions we need to fetch
+    # We need enough to fill the current page plus know if there's a next page
+    needed = page * count + 1
+    max_txs = min(needed, 200)  # Cap at 200 to prevent excessive fetching
+    
     recent_txs = []
-    # Get transactions from all blocks (newest first)
-    # NOTE: This approach of scanning blocks is inefficient for finding all transactions,
-    # but without a transaction indexer or listtransactions API for the whole chain, it's a fallback.
-    # The original handler capped at 200 items.
-
-    # We might need to cache this or improve it in a real production environment.
+    # Scan recent blocks only - limit to 50 blocks max for performance
+    max_blocks_to_scan = 50
+    blocks_scanned = 0
+    
     for height in range(current_height, -1, -1):
-        block = service.get_block_by_height(height)
-        if block and "tx" in block:
-            for txid in block["tx"]:
-                tx = service.get_transaction(txid)
-                if tx:
-                    # Ensure block info is present
-                    if "blockheight" not in tx:
-                        tx["blockheight"] = block.get("height", height)
-                    if "confirmations" not in tx:
-                        tx["confirmations"] = current_height - block.get("height", height) + 1
-                    if "time" not in tx and "time" in block:
-                        tx["time"] = block["time"]
-                    recent_txs.append(tx)
-        # Stop if we have enough for several pages
-        if len(recent_txs) >= 200:
+        if blocks_scanned >= max_blocks_to_scan or len(recent_txs) >= max_txs:
             break
-
-    # Mempool transactions (unconfirmed) - skip for now, only show confirmed
+            
+        block = service.get_block_by_height(height)
+        blocks_scanned += 1
+        
+        if block and "tx" in block:
+            block_time = block.get("time")
+            block_height = block.get("height", height)
+            confirmations = current_height - block_height + 1
+            
+            for txid in block["tx"]:
+                if len(recent_txs) >= max_txs:
+                    break
+                # Create lightweight tx info without fetching full tx details
+                recent_txs.append({
+                    "txid": txid,
+                    "blockheight": block_height,
+                    "confirmations": confirmations,
+                    "time": block_time,
+                })
 
     all_txs = recent_txs
-
-    # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
 
     page_info = pagination.get_pagination_info(
         total=len(all_txs),
@@ -96,6 +102,11 @@ def list_transactions(
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
         "url_base": f"/{chain.config['path-name']}/transactions",
+        "total": len(all_txs),
+        # For pagination component
+        "total_pages": page_info["page_count"],
+        "page_number": page_info["page"],
+        "base_path": f"/{chain.config['path-name']}/transactions",
     }
 
     return templates.TemplateResponse(
@@ -103,6 +114,7 @@ def list_transactions(
         context=context.build_context(
             title=f"Recent Transactions - {chain.config['display-name']}",
             transactions=paginated_txs,
+            pagination=pagination_context,
             **pagination_context
         ),
     )

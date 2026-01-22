@@ -121,6 +121,15 @@ def create_app() -> FastAPI:
     # Register system routes FIRST to avoid being masked by catch-all routes
     system_router = APIRouter(tags=["System"])
 
+    @system_router.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        """Serve favicon."""
+        from fastapi.responses import FileResponse
+        favicon_path = STATIC_DIR / "logo32.png"
+        if favicon_path.exists():
+            return FileResponse(favicon_path, media_type="image/png")
+        return FileResponse(status_code=204)
+
     @system_router.get("/health")
     async def health_check():
         """Health check endpoint for monitoring."""

@@ -57,33 +57,19 @@ def list_blocks(
         items_per_page=count,
     )
 
-    # Get blocks - this assumes sequential block heights are available
-    blocks = []
-    # Logic from BlockHandler: range based on page_info
-    # NOTE: BlockHandler logic was:
-    # range(page_info["start"], min(page_info["start"] + page_info["count"], total_blocks))
-    # This seems to be iterating UP from start. Usually blocks are shown newest first?
-    # Let's stick to the existing logic for now to avoid breaking behavior.
-
-    start_height = page_info["start"]
-    end_height = min(start_height + page_info["count"], total_blocks)
-    count = end_height - start_height
-
-    if count > 0:
-        # Optimization: Use list_blocks to fetch multiple blocks in one RPC call
-        # instead of making N+1 calls (getblockhash + getblock for each height)
-        try:
-            blocks = service.list_blocks(start_height, count)
-        except Exception as e:
-            # Fallback to individual fetching if list_blocks fails
-            # This ensures robustness if the RPC command is not available or fails
-            for height in range(start_height, end_height):
-                block = service.get_block_by_height(height)
-                if block:
-                    blocks.append(block)
-
-    # Sort blocks by height descending (usually desired) if not already
-    blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
+    # Calculate block range for newest-first display
+    # Page 1 shows the newest blocks, page 2 shows older ones, etc.
+    end_height = total_blocks - 1 - page_info["start"]
+    start_height = max(0, end_height - page_info["count"] + 1)
+    blocks_to_fetch = end_height - start_height + 1
+    
+    # Use list_blocks API for batch fetching (much faster than individual calls)
+    if blocks_to_fetch > 0 and start_height <= end_height:
+        blocks = service.list_blocks(start_height, blocks_to_fetch)
+        # Sort blocks by height descending (newest first)
+        blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
+    else:
+        blocks = []
 
     # Prepare pagination context
     pagination_context = {
@@ -116,23 +102,33 @@ def block_redirect(
     return RedirectResponse(url=f"/{chain_name}/blocks", status_code=302)
 
 
-@router.get("/{chain_name}/block/{height}", response_class=HTMLResponse, name="block")
-def block_by_height(
+@router.get("/{chain_name}/block/{identifier}", response_class=HTMLResponse, name="block")
+def block_by_identifier(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    height: int = Path(..., ge=0, description="Block height"),
+    identifier: str = Path(..., description="Block height or hash"),
 ):
     """
-    Show block details by height.
+    Show block details by height or hash.
     """
-    block = service.get_block_by_height(height)
+    # Determine if identifier is a height (numeric) or hash (64 hex chars)
+    if identifier.isdigit():
+        height = int(identifier)
+        block = service.get_block_by_height(height)
+    elif len(identifier) == 64:
+        block = service.get_block_by_hash(identifier)
+        height = block.get("height") if block else None
+    else:
+        raise HTTPException(status_code=400, detail="Invalid block identifier. Must be a height or 64-character hash.")
 
     if not block:
-        raise HTTPException(status_code=404, detail=f"Block #{height} not found")
+        raise HTTPException(status_code=404, detail=f"Block {identifier} not found")
 
+    height = block.get("height", 0)
+    
     # Fetch full transaction details including size
     tx_ids = block.get("tx", [])
     tx_details = []
@@ -262,14 +258,14 @@ def legacy_list_blocks(
     return list_blocks(request, chain, service, pagination, templates, context, query_params)
 
 
-@router.get("/chain/{chain_name}/block/{height}", response_class=HTMLResponse, name="legacy_block", include_in_schema=False)
-def legacy_block_by_height(
+@router.get("/chain/{chain_name}/block/{identifier}", response_class=HTMLResponse, name="legacy_block", include_in_schema=False)
+def legacy_block_by_identifier(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    height: int = Path(..., ge=0),
+    identifier: str = Path(...),
 ):
     """Legacy block detail route."""
-    return block_by_height(request, chain, service, templates, context, height)
+    return block_by_identifier(request, chain, service, templates, context, identifier)

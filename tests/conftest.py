@@ -26,7 +26,7 @@ def mock_chain_config():
     }
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def setup_app_state():
     """Initialize app_state settings before each test."""
     import app_state

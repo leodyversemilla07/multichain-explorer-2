@@ -208,6 +208,39 @@ def search_all(chain: Any, service: Any, query: str, limit: int = 10) -> Dict:
     except Exception:
         pass
 
+    # Search stream keys across all streams
+    try:
+        # Get all streams first
+        all_streams = service.call("liststreams", ["*", True])
+        if all_streams:
+            for stream in all_streams[:5]:  # Limit streams to check
+                stream_name = stream.get("name", "")
+                if not stream_name:
+                    continue
+                try:
+                    # Search for keys matching the query
+                    keys = service.call("liststreamkeys", [stream_name, query, False, limit, 0])
+                    if keys:
+                        for key_info in keys[:limit]:
+                            key_name = key_info.get("key", "")
+                            results["results"].append(
+                                {
+                                    "type": "stream_key",
+                                    "id": key_name,
+                                    "label": f"Key: {key_name}",
+                                    "meta": {
+                                        "stream": stream_name,
+                                        "items": key_info.get("items", 0),
+                                    },
+                                    "url": f"/{chain.config.get('path-name', '')}/stream/{stream_name}/key/{key_name}",
+                                }
+                            )
+                            results["total"] += 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     return results
 
 

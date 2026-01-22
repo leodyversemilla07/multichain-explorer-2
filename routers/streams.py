@@ -201,6 +201,10 @@ def stream_items(
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
         "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/items",
+        "total": total_count,
+        "total_pages": page_info["page_count"],
+        "page_number": page_info["page"],
+        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/items",
     }
 
     return templates.TemplateResponse(
@@ -209,6 +213,7 @@ def stream_items(
             title=f"Items - {stream_name}",
             stream_name=stream_name,
             items=items,
+            pagination=pagination_context,
             **pagination_context
         ),
     )
@@ -256,7 +261,13 @@ def stream_keys(
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
         "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/keys",
+        "total": len(keys),
+        "total_pages": page_info["page_count"],
+        "page_number": page_info["page"],
+        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/keys",
     }
+
+    show_pagination = page_info["page_count"] > 1
 
     return templates.TemplateResponse(
         name="pages/stream_keys.html",
@@ -264,6 +275,8 @@ def stream_keys(
             title=f"Keys - {stream_name}",
             stream_name=stream_name,
             keys=paginated_keys,
+            pagination=pagination_context,
+            show_pagination=show_pagination,
             **pagination_context
         ),
     )
@@ -313,7 +326,13 @@ def stream_publishers(
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
         "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/publishers",
+        "total": len(publishers),
+        "total_pages": page_info["page_count"],
+        "page_number": page_info["page"],
+        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/publishers",
     }
+
+    show_pagination = page_info["page_count"] > 1
 
     return templates.TemplateResponse(
         name="pages/stream_publishers.html",
@@ -321,6 +340,8 @@ def stream_publishers(
             title=f"Publishers - {stream_name}",
             stream_name=stream_name,
             publishers=paginated_publishers,
+            pagination=pagination_context,
+            show_pagination=show_pagination,
             **pagination_context
         ),
     )
@@ -406,26 +427,12 @@ def key_items(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}/items",
+        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}",
+        "total": total_count,
+        "total_pages": page_info["page_count"],
+        "page_number": page_info["page"],
+        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}",
     }
-    # Note: The original handler used "key/items" at end of URL base, but defined route as "key/{key}".
-    # Need to be careful about pagination links in template.
-    # The handler used: f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}/items"
-    # But the route is: @router.get("/{chain_name}/stream/{stream_name}/key/{key}")
-    # Wait, the route name is "key_items" and path is "/{chain_name}/stream/{stream_name}/key/{key}".
-    # BUT handler pagination unpacking used `.../key/{key}/items`.
-    # Let's check the route definition in the original file:
-    # `@router.get("/{chain_name}/stream/{stream_name}/key/{key}", ...)`
-    # This matches. So the URL in pagination seems to point to a non-existent path suffix "/items"?
-    # Or maybe `key` is treated as a param.
-    # Ah, if the user clicks "Next", it goes to `.../key/mykey/items?page=2`.
-    # If that path doesn't exist, it 404s.
-    # checking original file again:
-    # `@router.get("/{chain_name}/stream/{stream_name}/key/{key}", response_class=HTMLResponse, name="key_items")`
-    # So `.../key/mykey` is the URL. `.../key/mykey/items` would fail unless `key` consumes "mykey/items".
-    # I should fix the URL base to match the route.
-
-    pagination_context["url_base"] = f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}"
 
     return templates.TemplateResponse(
         name="pages/stream_key_items.html",
@@ -434,6 +441,7 @@ def key_items(
             stream_name=stream_name,
             key=key,
             items=items,
+            pagination=pagination_context,
             **pagination_context
         ),
     )
@@ -448,7 +456,7 @@ def publisher_items(
     templates: TemplatesDep,
     context: CommonContextDep,
     stream_name: str = Path(..., min_length=1, description="Stream name"),
-    publisher: str = Path(..., min_length=26, max_length=35, description="Publisher address"),
+    publisher: str = Path(..., min_length=26, max_length=52, description="Publisher address"),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -492,9 +500,11 @@ def publisher_items(
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
         "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/publisher/{publisher}",
+        "total": total_count,
+        "total_pages": page_info["page_count"],
+        "page_number": page_info["page"],
+        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/publisher/{publisher}",
     }
-    # Same fix for url_base here. Route is `.../publisher/{publisher}`. Original had `.../items`.
-    # It seems the original code might have had broken pagination links for these specific routes.
 
     return templates.TemplateResponse(
         name="pages/stream_publisher_items.html",
@@ -503,6 +513,7 @@ def publisher_items(
             stream_name=stream_name,
             publisher=publisher,
             items=items,
+            pagination=pagination_context,
             **pagination_context
         ),
     )

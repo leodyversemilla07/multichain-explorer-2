@@ -94,7 +94,7 @@ def address_detail(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=35, description="Blockchain address"),
+    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
 ):
     """
     Show address details.
@@ -152,7 +152,7 @@ def address_transactions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=35, description="Blockchain address"),
+    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -220,7 +220,7 @@ def address_assets(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=35, description="Blockchain address"),
+    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
 ):
     """
     List assets held by an address.
@@ -246,7 +246,7 @@ def address_streams(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=35, description="Blockchain address"),
+    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -324,7 +324,7 @@ def address_permissions(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=35, description="Blockchain address"),
+    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
 ):
     """
     List permissions for an address.
@@ -364,7 +364,7 @@ def legacy_address_detail(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=35),
+    address: str = Path(..., min_length=26, max_length=52),
 ):
     """Legacy address detail route."""
     return address_detail(request, chain, service, templates, context, address)

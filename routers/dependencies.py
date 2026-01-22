@@ -131,9 +131,11 @@ class CommonContext:
         self.request = request
         self.chain = chain
         self.templates = request.app.state.templates
-        self.base_url = get_base_url()
+        base = get_base_url()
+        # Remove trailing slash from base_url to avoid double slashes
+        self.base_url = base.rstrip("/")
         self.chain_name = chain.config.get("display-name", chain.config.get("name", ""))
-        self.chain_path = chain.config.get("path-name", "")
+        self.chain_path = "/" + chain.config.get("path-name", "")
     
     def build_context(self, **kwargs) -> Dict[str, Any]:
         """

@@ -332,7 +332,7 @@ def holder_transactions(
     templates: TemplatesDep,
     context: CommonContextDep,
     asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
-    address: str = Path(..., min_length=26, max_length=35, description="Holder address"),
+    address: str = Path(..., min_length=26, max_length=52, description="Holder address"),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """

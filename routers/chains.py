@@ -269,23 +269,23 @@ def list_miners(
         if block and "miner" in block:
             miner = block["miner"]
             if miner not in miner_stats:
-                miner_stats[miner] = {"count": 0, "percentage": 0}
-            miner_stats[miner]["count"] += 1
+                miner_stats[miner] = {"blocks": 0, "percentage": 0}
+            miner_stats[miner]["blocks"] += 1
 
     # Calculate percentages
     for miner in miner_stats:
-        miner_stats[miner]["percentage"] = miner_stats[miner]["count"] / block_count * 100
+        miner_stats[miner]["percentage"] = miner_stats[miner]["blocks"] / block_count * 100
 
-    # Convert to list and sort by count
+    # Convert to list and sort by blocks
     miners_list = [{"address": miner, **stats} for miner, stats in miner_stats.items()]
-    miners_list.sort(key=lambda x: x["count"], reverse=True)
+    miners_list.sort(key=lambda x: x["blocks"], reverse=True)
 
     return templates.TemplateResponse(
         name="pages/miners.html",
         context=context.build_context(
             title=f"Mining Statistics - {chain.config['display-name']}",
             miners=miners_list,
-            block_count=block_count,
+            total_blocks=block_count,
         ),
     )
 
