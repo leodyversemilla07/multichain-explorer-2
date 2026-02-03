@@ -132,8 +132,8 @@ class CommonContext:
         self.chain = chain
         self.templates = request.app.state.templates
         base = get_base_url()
-        # Remove trailing slash from base_url to avoid double slashes
-        self.base_url = base.rstrip("/")
+        # Remove trailing slash from base_url to avoid double slashes, but keep it if it's just "/"
+        self.base_url = base.rstrip("/") if len(base) > 1 else base
         self.chain_name = chain.config.get("display-name", chain.config.get("name", ""))
         self.chain_path = "/" + chain.config.get("path-name", "")
     

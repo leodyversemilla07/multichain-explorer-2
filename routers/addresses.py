@@ -13,6 +13,7 @@ Handles:
 - Address permissions
 """
 
+import asyncio
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends, Path, Request, HTTPException
@@ -31,7 +32,7 @@ router = APIRouter(tags=["Addresses"])
 
 
 @router.get("/{chain_name}/addresses", response_class=HTMLResponse, name="addresses")
-def list_addresses(
+async def list_addresses(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -47,7 +48,7 @@ def list_addresses(
     """
     # Get total address count
     try:
-        addresses = service.call("listaddresses", ["*", True])
+        addresses = await service.call("listaddresses", ["*", True])
         if not addresses:
             addresses = []
     except Exception:
@@ -88,7 +89,7 @@ def list_addresses(
 
 
 @router.get("/{chain_name}/address/{address}", response_class=HTMLResponse, name="address")
-def address_detail(
+async def address_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -99,34 +100,45 @@ def address_detail(
     """
     Show address details.
     """
-    address_info = service.get_address_info(address)
+    # Use gathers to fetch everything in parallel
+    # 1. Address Info (includes balances)
+    # 2. Permissions
+    # 3. Recent Transactions
+    # 4. Total Transaction Count
+    
+    async def fetch_transactions():
+        try:
+            txs = await service.call("listaddresstransactions", [address, 10, 0, True])
+            return txs if txs else []
+        except Exception:
+            return []
+
+    async def fetch_tx_count():
+        try:
+            # This might be heavy on some chains, consider optimization if needed
+            all_txs = await service.call("listaddresstransactions", [address, 9999999, 0, False])
+            return len(all_txs) if all_txs else 0
+        except Exception:
+            return 0
+
+    results = await asyncio.gather(
+        service.get_address_summary(address),
+        fetch_transactions(),
+        fetch_tx_count(),
+        return_exceptions=True
+    )
+    
+    address_info = results[0] if not isinstance(results[0], Exception) else None
+    transactions = results[1] if not isinstance(results[1], Exception) else []
+    transactions_count = results[2] if not isinstance(results[2], Exception) else 0
+    
+    # Extract permissions from summary
+    permissions = address_info.get("permissions", []) if address_info else []
 
     if not address_info:
         raise HTTPException(status_code=404, detail=f"Address {address} not found")
 
-    # Get balances
-    balances = service.get_address_balances(address)
-
-    # Get permissions
-    permissions = service.get_address_permissions(address)
-
-    # Get recent transactions (last 10)
-    try:
-        transactions = service.call("listaddresstransactions", [address, 10, 0, True])
-        if not transactions:
-            transactions = []
-    except Exception:
-        transactions = []
-
-    # Get total transaction count
-    # Note: listaddresstransactions behavior may vary by chain/version.
-    # Fetching all to count is expensive.
-    # The handler did this:
-    try:
-        all_transactions = service.call("listaddresstransactions", [address, 9999999, 0, False])
-        transactions_count = len(all_transactions) if all_transactions else 0
-    except Exception:
-        transactions_count = 0
+    balances = address_info.get("balances", [])
 
     return templates.TemplateResponse(
         name="pages/address.html",
@@ -145,7 +157,7 @@ def address_detail(
 
 
 @router.get("/{chain_name}/address/{address}/transactions", response_class=HTMLResponse, name="address_transactions")
-def address_transactions(
+async def address_transactions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -158,9 +170,9 @@ def address_transactions(
     """
     List transactions for an address.
     """
-    # Get all transactions to count them
+    # Get total count first
     try:
-        all_transactions = service.call("listaddresstransactions", [address, 9999999, 0, False])
+        all_transactions = await service.call("listaddresstransactions", [address, 9999999, 0, False])
         if not all_transactions:
             all_transactions = []
         total_count = len(all_transactions)
@@ -181,9 +193,8 @@ def address_transactions(
     transactions = []
     if total_count > 0:
         # Get transactions for this page
-        # listaddresstransactions args: address, count, skip, verbose
         try:
-            transactions = service.call(
+            transactions = await service.call(
                 "listaddresstransactions",
                 [address, page_info["count"], page_info["start"], True],
             )
@@ -214,7 +225,7 @@ def address_transactions(
 
 
 @router.get("/{chain_name}/address/{address}/assets", response_class=HTMLResponse, name="address_assets")
-def address_assets(
+async def address_assets(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -226,7 +237,7 @@ def address_assets(
     List assets held by an address.
     """
     # Get address balances
-    balances = service.get_address_balances(address)
+    balances = await service.get_address_balances(address)
 
     return templates.TemplateResponse(
         name="pages/address_assets.html",
@@ -239,7 +250,7 @@ def address_assets(
 
 
 @router.get("/{chain_name}/address/{address}/streams", response_class=HTMLResponse, name="address_streams")
-def address_streams(
+async def address_streams(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -259,7 +270,7 @@ def address_streams(
         # Fallback to standard liststreams? No, that lists all.
         # Check if listaddressstreams exists? usually it's liststreampublisher...
         # But let's assume the handler was correct about the method name.
-        all_streams = service.call("explorerlistaddressstreams", [address, True, 9999999, 0])
+        all_streams = await service.call("explorerlistaddressstreams", [address, True, 9999999, 0])
         if not all_streams or not isinstance(all_streams, list):
             all_streams = []
 
@@ -285,7 +296,7 @@ def address_streams(
 
         # Get streams for this page
         try:
-            streams = service.call(
+            streams = await service.call(
                 "explorerlistaddressstreams",
                 [address, True, page_info["count"], page_info["start"]],
             )
@@ -318,7 +329,7 @@ def address_streams(
 
 
 @router.get("/{chain_name}/address/{address}/permissions", response_class=HTMLResponse, name="address_permissions")
-def address_permissions(
+async def address_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -330,7 +341,7 @@ def address_permissions(
     List permissions for an address.
     """
     # Get permissions
-    permissions = service.get_address_permissions(address)
+    permissions = await service.get_address_permissions(address)
 
     return templates.TemplateResponse(
         name="pages/address_permissions.html",
@@ -344,7 +355,7 @@ def address_permissions(
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}/addresses", response_class=HTMLResponse, name="legacy_addresses", include_in_schema=False)
-def legacy_list_addresses(
+async def legacy_list_addresses(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -354,11 +365,11 @@ def legacy_list_addresses(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy addresses list route."""
-    return list_addresses(request, chain, service, pagination, templates, context, query_params)
+    return await list_addresses(request, chain, service, pagination, templates, context, query_params)
 
 
 @router.get("/chain/{chain_name}/address/{address}", response_class=HTMLResponse, name="legacy_address", include_in_schema=False)
-def legacy_address_detail(
+async def legacy_address_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -367,4 +378,4 @@ def legacy_address_detail(
     address: str = Path(..., min_length=26, max_length=52),
 ):
     """Legacy address detail route."""
-    return address_detail(request, chain, service, templates, context, address)
+    return await address_detail(request, chain, service, templates, context, address)

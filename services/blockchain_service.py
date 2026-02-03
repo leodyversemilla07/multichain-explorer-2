@@ -8,8 +8,7 @@ retry logic, and connection management.
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+import httpx
 
 from config import ChainConfig
 from exceptions import ChainConnectionError, RPCError
@@ -46,9 +45,9 @@ class BlockchainService:
 
         self._request_id = 0
 
-    def call(self, method: str, params: Optional[List[Any]] = None) -> Any:
+    async def call(self, method: str, params: Optional[List[Any]] = None) -> Any:
         """
-        Make an RPC call to the blockchain.
+        Make an asynchronous RPC call to the blockchain.
 
         Args:
             method: RPC method name (e.g., 'getinfo', 'getblock')
@@ -74,18 +73,20 @@ class BlockchainService:
         }
 
         try:
-            request = Request(
-                self.rpc_url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-            )
-
-            # Use pre-configured headers (works with both old and new config)
-            for header_name, header_value in self.headers.items():
-                request.add_header(header_name, header_value)
-
-            with urlopen(request, timeout=30) as response:
-                data = json.loads(response.read().decode("utf-8"))
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.rpc_url,
+                    json=payload,
+                    headers=self.headers,
+                )
+                
+                # Check for HTTP errors (like 401 Unauthorized, 500 Internal Server Error)
+                # Note: MultiChain might return 500 for RPC errors, so we parse JSON first if possible
+                try:
+                    data = response.json()
+                except json.JSONDecodeError:
+                    response.raise_for_status() # If not JSON and error status, raise it
+                    data = {} # Should not happen if raise_for_status passes
 
                 if "error" in data and data["error"] is not None:
                     # Handle both dict and string error formats
@@ -105,66 +106,66 @@ class BlockchainService:
 
                 return data.get("result")
 
-        except (HTTPError, URLError) as e:
+        except httpx.HTTPError as e:
             logger.error(f"Connection error to {self.chain_name}: {e}")
             raise ChainConnectionError(
                 chain_name=self.chain_name, details={"error": str(e), "rpc_url": self.rpc_url}
             )
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON response from {self.config.name}: {e}")
+            logger.error(f"Invalid JSON response from {self.chain_name}: {e}")
             raise RPCError(
                 method=method,
                 error_message=f"Invalid JSON response: {e}",
             )
 
     @cached(ttl=30, key_prefix="info")
-    def get_info(self) -> Dict[str, Any]:
+    async def get_info(self) -> Dict[str, Any]:
         """Get blockchain info. Cached for 30 seconds."""
-        return self.call("getinfo")
+        return await self.call("getinfo")
 
-    def get_blockchain_info(self) -> Dict[str, Any]:
+    async def get_blockchain_info(self) -> Dict[str, Any]:
         """Alias for get_info() for backward compatibility."""
-        return self.get_info()
+        return await self.get_info()
 
     @cached(ttl=3600, key_prefix="block")
-    def get_block(self, block_hash_or_height: Any) -> Dict[str, Any]:
+    async def get_block(self, block_hash_or_height: Any) -> Dict[str, Any]:
         """Get block by hash or height. Cached for 1 hour (blocks are immutable)."""
-        return self.call("getblock", [block_hash_or_height])
+        return await self.call("getblock", [block_hash_or_height])
 
     @cached(ttl=3600, key_prefix="blockhash")
-    def get_block_hash(self, height: int) -> str:
+    async def get_block_hash(self, height: int) -> str:
         """Get block hash by height. Cached for 1 hour (immutable)."""
-        return self.call("getblockhash", [height])
+        return await self.call("getblockhash", [height])
 
     @cached(ttl=3600, key_prefix="tx")
-    def get_transaction(self, txid: str, verbose: bool = True) -> Dict[str, Any]:
+    async def get_transaction(self, txid: str, verbose: bool = True) -> Dict[str, Any]:
         """Get transaction by ID. Cached for 1 hour (immutable)."""
-        return self.call("getrawtransaction", [txid, 1 if verbose else 0])
+        return await self.call("getrawtransaction", [txid, 1 if verbose else 0])
 
-    def list_blocks(self, start_height: int, count: int = 10) -> List[Dict[str, Any]]:
+    async def list_blocks(self, start_height: int, count: int = 10) -> List[Dict[str, Any]]:
         """List blocks starting from height."""
-        return self.call("listblocks", [f"{start_height}-{start_height + count - 1}"])
+        return await self.call("listblocks", [f"{start_height}-{start_height + count - 1}"])
 
-    def list_addresses(self, addresses: Optional[List[str]] = None) -> List[Any]:
+    async def list_addresses(self, addresses: Optional[List[str]] = None) -> List[Any]:
         """List address information."""
         params = [addresses] if addresses else []
-        return self.call("listaddresses", params)
+        return await self.call("listaddresses", params)
 
-    def get_address_balances(self, address: str) -> List[Dict[str, Any]]:
+    async def get_address_balances(self, address: str) -> List[Dict[str, Any]]:
         """Get address asset balances."""
-        return self.call("getaddressbalances", [address, 0, True])
+        return await self.call("getaddressbalances", [address, 0, True])
 
-    def list_assets(self, asset_name: Optional[str] = None, verbose: bool = True) -> List[Any]:
+    async def list_assets(self, asset_name: Optional[str] = None, verbose: bool = True) -> List[Any]:
         """List assets."""
         params = [] if asset_name is None else [asset_name, verbose]
-        return self.call("listassets", params)
+        return await self.call("listassets", params)
 
-    def list_streams(self, stream_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_streams(self, stream_name: Optional[str] = None) -> List[Dict[str, Any]]:
         """List streams."""
         params = [] if stream_name is None else [stream_name]
-        return self.call("liststreams", params)
+        return await self.call("liststreams", params)
 
-    def list_stream_items(
+    async def list_stream_items(
         self,
         stream_identifier: str,
         verbose: bool = True,
@@ -172,32 +173,32 @@ class BlockchainService:
         start: int = -10,
     ) -> List[Dict[str, Any]]:
         """List items in a stream."""
-        return self.call("liststreamitems", [stream_identifier, verbose, count, start])
+        return await self.call("liststreamitems", [stream_identifier, verbose, count, start])
 
-    def list_stream_keys(self, stream_identifier: str) -> List[Any]:
+    async def list_stream_keys(self, stream_identifier: str) -> List[Any]:
         """List keys in a stream."""
-        return self.call("liststreamkeys", [stream_identifier])
+        return await self.call("liststreamkeys", [stream_identifier])
 
-    def list_stream_publishers(self, stream_identifier: str) -> List[Any]:
+    async def list_stream_publishers(self, stream_identifier: str) -> List[Any]:
         """List publishers in a stream."""
-        return self.call("liststreampublishers", [stream_identifier])
+        return await self.call("liststreampublishers", [stream_identifier])
 
-    def list_permissions(
+    async def list_permissions(
         self, permission_type: str, addresses: Optional[List[str]] = None
     ) -> List[Any]:
         """List permissions."""
         params = [permission_type]
         if addresses:
             params.append(",".join(addresses))
-        return self.call("listpermissions", params)
+        return await self.call("listpermissions", params)
 
-    def get_address_transactions(
+    async def get_address_transactions(
         self, address: str, count: int = 10, skip: int = 0, verbose: bool = True
     ) -> List[Any]:
         """Get transactions for an address."""
-        return self.call("listaddresstransactions", [address, count, skip, verbose])
+        return await self.call("listaddresstransactions", [address, count, skip, verbose])
 
-    def is_healthy(self) -> bool:
+    async def is_healthy(self) -> bool:
         """
         Check if the blockchain connection is healthy.
 
@@ -205,42 +206,83 @@ class BlockchainService:
             True if connection is working, False otherwise
         """
         try:
-            self.get_info()
+            await self.get_info()
             return True
         except (ChainConnectionError, RPCError):
             return False
 
     # Alias for backward compatibility
-    def rpc(self, method: str, params: Optional[List[Any]] = None) -> Any:
+    async def rpc(self, method: str, params: Optional[List[Any]] = None) -> Any:
         """Alias for call() method for backward compatibility."""
-        return self.call(method, params)
+        return await self.call(method, params)
 
-    def get_block_by_height(self, height: int) -> Optional[Dict[str, Any]]:
+    async def get_block_by_height(self, height: int) -> Optional[Dict[str, Any]]:
         """Get block by height number."""
         try:
-            block_hash = self.get_block_hash(height)
-            return self.get_block(block_hash)
+            block_hash = await self.get_block_hash(height)
+            return await self.get_block(block_hash)
         except (RPCError, ChainConnectionError):
             return None
 
-    def get_block_by_hash(self, block_hash: str) -> Optional[Dict[str, Any]]:
+    async def get_block_by_hash(self, block_hash: str) -> Optional[Dict[str, Any]]:
         """Get block by hash."""
         try:
-            return self.get_block(block_hash)
+            return await self.get_block(block_hash)
         except (RPCError, ChainConnectionError):
             return None
 
-    def get_address_info(self, address: str) -> Dict[str, Any]:
+    async def get_address_info(self, address: str) -> Dict[str, Any]:
         """Get address information including balance and transactions."""
         try:
-            balances = self.get_address_balances(address)
+            balances = await self.get_address_balances(address)
             return {"address": address, "balances": balances}
         except (RPCError, ChainConnectionError):
             return {"address": address, "balances": []}
 
-    def get_address_permissions(self, address: str) -> List[Any]:
+    async def get_address_permissions(self, address: str) -> List[Any]:
         """Get permissions for an address."""
         try:
-            return self.call("listpermissions", ["*", address])
+            return await self.call("listpermissions", ["*", address])
         except (RPCError, ChainConnectionError):
             return []
+
+    async def get_address_summary(self, address: str) -> Dict[str, Any]:
+        """
+        Get comprehensive address summary in parallel.
+        Fetches info, balances, and permissions.
+        """
+        import asyncio
+        
+        # Define tasks
+        async def fetch_info():
+            return await self.get_address_info(address)
+            
+        async def fetch_permissions():
+            return await self.get_address_permissions(address)
+            
+        # Run in parallel
+        results = await asyncio.gather(
+            fetch_info(),
+            fetch_permissions(),
+            return_exceptions=True
+        )
+        
+        info = results[0]
+        permissions = results[1]
+        
+        if isinstance(info, Exception) or not info:
+             # Try validateaddress as fallback if get_address_info (balances) fails
+             try:
+                 val = await self.call("validateaddress", [address])
+                 info = val if val and val.get("isvalid") else {}
+             except Exception:
+                 info = {}
+
+        if isinstance(permissions, Exception):
+            permissions = []
+            
+        # Merge results
+        result = info.copy()
+        result["permissions"] = permissions
+        
+        return result

@@ -6,7 +6,7 @@ Pytest configuration and fixtures
 import json
 from collections import OrderedDict
 from typing import Any, Dict, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
 
@@ -292,32 +292,32 @@ def mock_chain():
 @pytest.fixture
 def mock_rpc_calls(mock_chain):
     """
-    Mock all RPC calls to use the MockChain's request method.
-
-    This patches urlopen in BlockchainService to use the mock chain's responses.
+    Patch httpx.AsyncClient to use MockChain.
     """
-
-    def mock_urlopen(request, timeout=30):
-        """Mock urlopen that uses MockChain.request()"""
-        import json
-        from unittest.mock import Mock
-
-        # Parse the request data to get method and params
-        data = json.loads(request.data.decode("utf-8"))
-        method = data.get("method")
-        params = data.get("params", [])
-
-        # Get response from mock chain
-        response_data = mock_chain.request(method, params)
-
-        # Create mock HTTP response
-        mock_response = Mock()
-        mock_response.read = Mock(return_value=json.dumps(response_data).encode("utf-8"))
-        mock_response.__enter__ = Mock(return_value=mock_response)
-        mock_response.__exit__ = Mock(return_value=False)
-
-        return mock_response
-
-    # Patch urlopen for all blockchain service calls
-    with patch("services.blockchain_service.urlopen", side_effect=mock_urlopen):
+    with patch("services.blockchain_service.httpx.AsyncClient") as MockClientClass:
+        # Create an AsyncMock for the client
+        mock_client = AsyncMock()
+        
+        # Setup context manager (async with httpx.AsyncClient() as client)
+        mock_instance = MockClientClass.return_value
+        mock_instance.__aenter__.return_value = mock_client
+        mock_instance.__aexit__.return_value = None
+        
+        # Define mock post behavior
+        async def mock_post(url, json=None, **kwargs):
+            method = json.get("method")
+            val_params = json.get("params", []) if json else []
+            
+            # Get response from mock chain logic (which is sync, but that's fine)
+            result_data = mock_chain.request(method, val_params)
+            
+            # Mock HTTP response
+            resp = Mock()
+            resp.status_code = 200
+            resp.json.return_value = result_data
+            resp.raise_for_status = Mock()
+            return resp
+            
+        mock_client.post.side_effect = mock_post
+        
         yield mock_chain

@@ -15,6 +15,7 @@ Handles:
 - Publisher items
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, List
 
@@ -36,7 +37,7 @@ router = APIRouter(tags=["Streams"])
 
 
 @router.get("/{chain_name}/streams", response_class=HTMLResponse, name="streams")
-def list_streams(
+async def list_streams(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -49,17 +50,17 @@ def list_streams(
     List all streams on the blockchain.
     """
     try:
-        streams = service.call("liststreams", ["*", True])
+        streams = await service.call("liststreams", ["*", True])
         if not streams:
             streams = []
         else:
-            # Ensure each stream has proper item counts
-            for stream in streams:
+            # Ensure each stream has proper item counts using parallel fetching
+            async def enrich_stream_info(stream):
                 # Get item count for each stream if not present
                 if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
                     try:
                         # Get actual count from liststreamitems
-                        stream_items = service.call(
+                        stream_items = await service.call(
                             "liststreamitems", [stream["name"], False, 1]
                         )
                         stream["items"] = len(stream_items) if stream_items else 0
@@ -70,6 +71,9 @@ def list_streams(
                     stream.get("confirmed"), (int, float)
                 ):
                     stream["confirmed"] = stream.get("items", 0)
+
+            # Parallel execution
+            await asyncio.gather(*[enrich_stream_info(s) for s in streams])
 
     except Exception as e:
         logger.error(f"Error fetching streams: {e}")
@@ -108,7 +112,7 @@ def list_streams(
 
 
 @router.get("/{chain_name}/stream/{stream_name}", response_class=HTMLResponse, name="stream")
-def stream_detail(
+async def stream_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -120,7 +124,7 @@ def stream_detail(
     Show stream details.
     """
     try:
-        streams = service.call("liststreams", [stream_name, True])
+        streams = await service.call("liststreams", [stream_name, True])
         if not streams or len(streams) == 0:
             raise HTTPException(status_code=404, detail=f"Stream {stream_name} not found")
         stream = streams[0]
@@ -129,7 +133,7 @@ def stream_detail(
         if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
             try:
                 # Get actual count from liststreamitems
-                stream_items = service.call("liststreamitems", [stream_name, False, 1])
+                stream_items = await service.call("liststreamitems", [stream_name, False, 1])
                 stream["items"] = len(stream_items) if stream_items else 0
             except:
                 stream["items"] = 0
@@ -151,7 +155,7 @@ def stream_detail(
 
 
 @router.get("/{chain_name}/stream/{stream_name}/items", response_class=HTMLResponse, name="stream_items")
-def stream_items(
+async def stream_items(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -166,7 +170,7 @@ def stream_items(
     """
     try:
         # liststreamitems returns a list of items
-        count_items = service.call("liststreamitems", [stream_name, False, 1, 0])
+        count_items = await service.call("liststreamitems", [stream_name, False, 1, 0])
         total_count = len(count_items) if count_items else 0
     except Exception as e:
         logger.error(f"Error getting stream item count: {e}")
@@ -185,7 +189,7 @@ def stream_items(
     items = []
     if total_count > 0:
         try:
-            items = service.call(
+            items = await service.call(
                 "liststreamitems",
                 [stream_name, True, page_info["count"], page_info["start"]],
             )
@@ -220,7 +224,7 @@ def stream_items(
 
 
 @router.get("/{chain_name}/stream/{stream_name}/keys", response_class=HTMLResponse, name="stream_keys")
-def stream_keys(
+async def stream_keys(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -234,7 +238,7 @@ def stream_keys(
     List keys in a stream.
     """
     try:
-        keys = service.call("liststreamkeys", [stream_name, "*", False, 1000, 0])
+        keys = await service.call("liststreamkeys", [stream_name, "*", False, 1000, 0])
         if not keys:
             keys = []
     except Exception as e:
@@ -283,7 +287,7 @@ def stream_keys(
 
 
 @router.get("/{chain_name}/stream/{stream_name}/publishers", response_class=HTMLResponse, name="stream_publishers")
-def stream_publishers(
+async def stream_publishers(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -297,7 +301,7 @@ def stream_publishers(
     List publishers in a stream.
     """
     try:
-        publishers = service.call("liststreampublishers", [stream_name, "*", False, 1000, 0])
+        publishers = await service.call("liststreampublishers", [stream_name, "*", False, 1000, 0])
         if not publishers:
             publishers = []
     except Exception as e:
@@ -348,7 +352,7 @@ def stream_publishers(
 
 
 @router.get("/{chain_name}/stream/{stream_name}/permissions", response_class=HTMLResponse, name="stream_permissions")
-def stream_permissions(
+async def stream_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -360,7 +364,7 @@ def stream_permissions(
     Show stream permissions.
     """
     try:
-        permissions = service.call("listpermissions", [stream_name])
+        permissions = await service.call("listpermissions", [stream_name])
         if not permissions:
             permissions = []
     except Exception as e:
@@ -378,7 +382,7 @@ def stream_permissions(
 
 
 @router.get("/{chain_name}/stream/{stream_name}/key/{key}", response_class=HTMLResponse, name="key_items")
-def key_items(
+async def key_items(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -393,7 +397,7 @@ def key_items(
     List items for a specific key in a stream.
     """
     try:
-        count_items = service.call("liststreamkeyitems", [stream_name, key, False, 1, 0])
+        count_items = await service.call("liststreamkeyitems", [stream_name, key, False, 1, 0])
         total_count = len(count_items) if count_items else 0
     except Exception as e:
         logger.error(f"Error getting key item count: {e}")
@@ -412,7 +416,7 @@ def key_items(
     items = []
     if total_count > 0:
         try:
-            items = service.call(
+            items = await service.call(
                 "liststreamkeyitems",
                 [stream_name, key, True, page_info["count"], page_info["start"]],
             )
@@ -448,7 +452,7 @@ def key_items(
 
 
 @router.get("/{chain_name}/stream/{stream_name}/publisher/{publisher}", response_class=HTMLResponse, name="publisher_items")
-def publisher_items(
+async def publisher_items(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -463,7 +467,7 @@ def publisher_items(
     List items from a specific publisher in a stream.
     """
     try:
-        count_items = service.call(
+        count_items = await service.call(
             "liststreampublisheritems", [stream_name, publisher, False, 1, 0]
         )
         total_count = len(count_items) if count_items else 0
@@ -484,7 +488,7 @@ def publisher_items(
     items = []
     if total_count > 0:
         try:
-            items = service.call(
+            items = await service.call(
                 "liststreampublisheritems",
                 [stream_name, publisher, True, page_info["count"], page_info["start"]],
             )
@@ -521,7 +525,7 @@ def publisher_items(
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}/streams", response_class=HTMLResponse, name="legacy_streams", include_in_schema=False)
-def legacy_list_streams(
+async def legacy_list_streams(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -531,11 +535,11 @@ def legacy_list_streams(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy streams list route."""
-    return list_streams(request, chain, service, pagination, templates, context, query_params)
+    return await list_streams(request, chain, service, pagination, templates, context, query_params)
 
 
 @router.get("/chain/{chain_name}/stream/{stream_name}", response_class=HTMLResponse, name="legacy_stream", include_in_schema=False)
-def legacy_stream_detail(
+async def legacy_stream_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -544,4 +548,4 @@ def legacy_stream_detail(
     stream_name: str = Path(..., min_length=1),
 ):
     """Legacy stream detail route."""
-    return stream_detail(request, chain, service, templates, context, stream_name)
+    return await stream_detail(request, chain, service, templates, context, stream_name)

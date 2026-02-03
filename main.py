@@ -34,6 +34,7 @@ from routers import (
     search as search_router,
     permissions as permissions_router,
 )
+from routers.api import api_router
 
 # Configure logging
 logging.basicConfig(
@@ -149,6 +150,7 @@ def create_app() -> FastAPI:
         }
     
     app.include_router(system_router)
+    app.include_router(api_router)
 
     # Include functional routers
     app.include_router(chains_router.router)

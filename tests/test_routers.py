@@ -3,7 +3,7 @@ Tests for FastAPI routers - endpoint integration tests.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
@@ -30,40 +30,73 @@ def mock_chain():
 
 @pytest.fixture
 def mock_blockchain_service():
-    """Create a mock blockchain service."""
+    """Create a mock blockchain service with AsyncMock methods."""
     service = Mock()
-    service.get_blockchain_info.return_value = {
+    
+    # Use AsyncMock for async methods
+    service.get_blockchain_info = AsyncMock(return_value={
         "blocks": 1000,
         "headers": 1000,
         "bestblockhash": "abc123",
         "difficulty": 1.0,
         "chainwork": "0000",
-    }
-    service.get_block_by_height.return_value = {
+    })
+    
+    service.get_block_by_height = AsyncMock(return_value={
         "hash": "blockhash123",
         "height": 100,
         "time": 1700000000,
         "tx": ["tx1", "tx2"],
         "miner": "1ABC123",
-    }
-    service.get_block_by_hash.return_value = {
+    })
+    
+    service.get_block_by_hash = AsyncMock(return_value={
         "hash": "blockhash123",
         "height": 100,
         "time": 1700000000,
         "tx": ["tx1", "tx2"],
-    }
-    service.get_transaction.return_value = {
+    })
+    
+    service.get_transaction = AsyncMock(return_value={
         "txid": "tx123",
         "confirmations": 10,
         "time": 1700000000,
         "vin": [],
         "vout": [],
-    }
-    service.call.return_value = []
-    service.get_address_info.return_value = {"address": "1ABC", "isvalid": True}
-    service.get_address_balances.return_value = []
-    service.get_address_permissions.return_value = []
+    })
+    
+    service.call = AsyncMock(return_value=[])
+    
+    service.get_address_info = AsyncMock(return_value={"address": "1ABC", "isvalid": True})
+    service.get_address_balances = AsyncMock(return_value=[])
+    service.get_address_permissions = AsyncMock(return_value=[])
+    service.get_address_transactions = AsyncMock(return_value=[])
+    service.list_blocks = AsyncMock(return_value=[])
+    
+    service.get_address_summary = AsyncMock(return_value={
+        "address": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+        "isvalid": True,
+        "balances": [],
+        "permissions": []
+    })
+    
     return service
+    
+    
+class TestAddressesRouter:
+    """Test addresses router endpoints (HTML)."""
+    
+    def test_list_addresses(self, client):
+        """Test GET /test-chain/addresses."""
+        response = client.get("/test-chain/addresses")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        
+    def test_address_detail(self, client):
+        """Test GET /test-chain/address/{address}."""
+        response = client.get("/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
 
 @pytest.fixture
@@ -126,11 +159,9 @@ class TestSearchRouter:
 
     def test_search_suggest_returns_json(self, client, mock_blockchain_service):
         """Test search suggest endpoint returns JSON."""
-        mock_blockchain_service.get_block_by_height.return_value = None
-        mock_blockchain_service.get_block_by_hash.return_value = None
-        mock_blockchain_service.get_transaction.return_value = None
-        mock_blockchain_service.call.return_value = None
-
+        mock_blockchain_service.call.return_value = {"results": [], "total": 0}
+        # Note: search algo calls specific getters which are already mocked
+        
         response = client.get("/test-chain/search/suggest?q=test")
         assert response.status_code == 200
         data = response.json()
@@ -281,7 +312,8 @@ class TestErrorHandling:
         app_state.get_state().settings = {"main": {"base": "/"}}
 
         error_service = Mock()
-        error_service.get_blockchain_info.side_effect = Exception("RPC Error")
+        # Use AsyncMock for side effects
+        error_service.get_blockchain_info = AsyncMock(side_effect=Exception("RPC Error"))
 
         with patch(
             "routers.dependencies.get_blockchain_service",

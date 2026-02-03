@@ -32,7 +32,7 @@ router = APIRouter(tags=["Assets"])
 
 
 @router.get("/{chain_name}/assets", response_class=HTMLResponse, name="assets")
-def list_assets(
+async def list_assets(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -45,7 +45,7 @@ def list_assets(
     List all assets on the blockchain.
     """
     try:
-        assets = service.call("listassets", ["*", True])
+        assets = await service.call("listassets", ["*", True])
         if not assets:
             assets = []
     except Exception as e:
@@ -85,7 +85,7 @@ def list_assets(
 
 
 @router.get("/{chain_name}/asset/{asset_name}", response_class=HTMLResponse, name="asset")
-def asset_detail(
+async def asset_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -97,7 +97,7 @@ def asset_detail(
     Show asset details.
     """
     try:
-        assets = service.call("listassets", [asset_name, True])
+        assets = await service.call("listassets", [asset_name, True])
         if not assets or len(assets) == 0:
             raise HTTPException(status_code=404, detail=f"Asset {asset_name} not found")
         asset = assets[0]
@@ -114,7 +114,7 @@ def asset_detail(
 
 
 @router.get("/{chain_name}/asset/{asset_name}/holders", response_class=HTMLResponse, name="asset_holders")
-def asset_holders(
+async def asset_holders(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -128,7 +128,7 @@ def asset_holders(
     List asset holders.
     """
     try:
-        holders = service.call("listassetholders", [asset_name])
+        holders = await service.call("listassetholders", [asset_name])
         if not holders:
             holders = []
     except Exception:
@@ -168,7 +168,7 @@ def asset_holders(
 
 
 @router.get("/{chain_name}/asset/{asset_name}/transactions", response_class=HTMLResponse, name="asset_transactions")
-def asset_transactions(
+async def asset_transactions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -183,7 +183,7 @@ def asset_transactions(
     """
     # Get transaction count
     try:
-        count_txs = service.call("listassettransactions", [asset_name, False, 1, 0])
+        count_txs = await service.call("listassettransactions", [asset_name, False, 1, 0])
         total_count = len(count_txs) if count_txs else 0
     except Exception:
         total_count = 0
@@ -201,7 +201,7 @@ def asset_transactions(
     transactions = []
     if total_count > 0:
         try:
-            transactions = service.call(
+            transactions = await service.call(
                 "listassettransactions",
                 [asset_name, True, page_info["count"], page_info["start"]],
             )
@@ -230,7 +230,7 @@ def asset_transactions(
 
 
 @router.get("/{chain_name}/asset/{asset_name}/issues", response_class=HTMLResponse, name="asset_issues")
-def asset_issues(
+async def asset_issues(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -244,7 +244,7 @@ def asset_issues(
     Show asset issuance history.
     """
     try:
-        assets = service.call("listassets", [asset_name, True])
+        assets = await service.call("listassets", [asset_name, True])
         if assets and len(assets) > 0:
             asset = assets[0]
             issues = asset.get("issues", [])
@@ -287,7 +287,7 @@ def asset_issues(
 
 
 @router.get("/{chain_name}/asset/{asset_name}/permissions", response_class=HTMLResponse, name="asset_permissions")
-def asset_permissions(
+async def asset_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -300,14 +300,14 @@ def asset_permissions(
     """
     try:
         # Verify asset exists first
-        assets = service.call("listassets", [asset_name, True])
+        assets = await service.call("listassets", [asset_name, True])
         if not assets or len(assets) == 0:
             permissions = []
         else:
             # Get addresses with permissions for this asset
             # listpermissions for asset? Usually listpermissions stream|admin...
             # The handler used `listpermissions [asset_name]`. Assuming correct.
-            permissions = service.call("listpermissions", [asset_name])
+            permissions = await service.call("listpermissions", [asset_name])
             if not permissions:
                 permissions = []
     except Exception:
@@ -324,7 +324,7 @@ def asset_permissions(
 
 
 @router.get("/{chain_name}/asset/{asset_name}/holder/{address}/transactions", response_class=HTMLResponse, name="holder_transactions")
-def holder_transactions(
+async def holder_transactions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -341,7 +341,7 @@ def holder_transactions(
     # Get transactions
     try:
         # Note: inefficient to fetch all address transactions to filter by asset.
-        all_txs = service.call("listaddresstransactions", [address, 1000, 0, True])
+        all_txs = await service.call("listaddresstransactions", [address, 1000, 0, True])
         if not all_txs:
             all_txs = []
         # Filter transactions for this specific asset
@@ -393,7 +393,7 @@ def holder_transactions(
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}/assets", response_class=HTMLResponse, name="legacy_assets", include_in_schema=False)
-def legacy_list_assets(
+async def legacy_list_assets(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -403,11 +403,11 @@ def legacy_list_assets(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy assets list route."""
-    return list_assets(request, chain, service, pagination, templates, context, query_params)
+    return await list_assets(request, chain, service, pagination, templates, context, query_params)
 
 
 @router.get("/chain/{chain_name}/asset/{asset_name}", response_class=HTMLResponse, name="legacy_asset", include_in_schema=False)
-def legacy_asset_detail(
+async def legacy_asset_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -416,4 +416,4 @@ def legacy_asset_detail(
     asset_name: str = Path(..., min_length=1, max_length=32),
 ):
     """Legacy asset detail route."""
-    return asset_detail(request, chain, service, templates, context, asset_name)
+    return await asset_detail(request, chain, service, templates, context, asset_name)

@@ -191,9 +191,9 @@ class TestCommonContext:
 
         assert context.request is mock_request
         assert context.chain is mock_chain
-        assert context.base_url == "/api/"
+        assert context.base_url == "/api"
         assert context.chain_name == "Test Chain"
-        assert context.chain_path == "test-chain"
+        assert context.chain_path == "/test-chain"
 
     def test_common_context_build_context(self, mock_request, mock_chain):
         """Test CommonContext.build_context method."""
@@ -207,7 +207,7 @@ class TestCommonContext:
         assert result["request"] is mock_request
         assert result["base_url"] == "/"
         assert result["chain_name"] == "Test Chain"
-        assert result["chain_path"] == "test-chain"
+        assert result["chain_path"] == "/test-chain"
         assert result["title"] == "Test Page"
         assert result["extra"] == "value"
 

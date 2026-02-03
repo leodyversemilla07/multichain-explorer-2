@@ -29,7 +29,7 @@ router = APIRouter(tags=["Transactions"])
 
 
 @router.get("/{chain_name}/transactions", response_class=HTMLResponse, name="transactions")
-def list_transactions(
+async def list_transactions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -48,7 +48,7 @@ def list_transactions(
     count = int(query_params.get("count", 20))
     
     # Get recent confirmed transactions (newest blocks first)
-    info = service.get_blockchain_info()
+    info = await service.get_blockchain_info()
     current_height = info.get("blocks", 0)
 
     # Calculate how many transactions we need to fetch
@@ -65,7 +65,7 @@ def list_transactions(
         if blocks_scanned >= max_blocks_to_scan or len(recent_txs) >= max_txs:
             break
             
-        block = service.get_block_by_height(height)
+        block = await service.get_block_by_height(height)
         blocks_scanned += 1
         
         if block and "tx" in block:
@@ -121,7 +121,7 @@ def list_transactions(
 
 
 @router.get("/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="transaction")
-def transaction_detail(
+async def transaction_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -132,7 +132,7 @@ def transaction_detail(
     """
     Show transaction details.
     """
-    transaction = service.get_transaction(txid)
+    transaction = await service.get_transaction(txid)
 
     if not transaction:
         raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
@@ -148,7 +148,7 @@ def transaction_detail(
 
 
 @router.get("/{chain_name}/tx/{txid}/raw", response_class=JSONResponse, name="raw_transaction")
-def raw_transaction(
+async def raw_transaction(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -160,7 +160,7 @@ def raw_transaction(
     Get raw transaction data as JSON.
     """
     try:
-        transaction = service.call("getrawtransaction", [txid, 1])
+        transaction = await service.call("getrawtransaction", [txid, 1])
         if not transaction:
             raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
     except Exception:
@@ -183,7 +183,7 @@ def raw_transaction(
 
 
 @router.get("/{chain_name}/tx/{txid}/hex", response_class=HTMLResponse, name="raw_transaction_hex")
-def raw_transaction_hex(
+async def raw_transaction_hex(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -195,7 +195,7 @@ def raw_transaction_hex(
     Get raw transaction hex data.
     """
     try:
-        hex_data = service.call("getrawtransaction", [txid, 0])
+        hex_data = await service.call("getrawtransaction", [txid, 0])
         if not hex_data:
             raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
     except Exception:
@@ -212,7 +212,7 @@ def raw_transaction_hex(
 
 
 @router.get("/{chain_name}/tx/{txid}/output/{n}", response_class=HTMLResponse, name="tx_output_data")
-def transaction_output(
+async def transaction_output(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -224,7 +224,7 @@ def transaction_output(
     """
     Get transaction output data.
     """
-    transaction = service.get_transaction(txid)
+    transaction = await service.get_transaction(txid)
     if not transaction:
         raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
 
@@ -248,7 +248,7 @@ def transaction_output(
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}/transactions", response_class=HTMLResponse, name="legacy_transactions", include_in_schema=False)
-def legacy_list_transactions(
+async def legacy_list_transactions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -258,11 +258,11 @@ def legacy_list_transactions(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy transactions list route."""
-    return list_transactions(request, chain, service, pagination, templates, context, query_params)
+    return await list_transactions(request, chain, service, pagination, templates, context, query_params)
 
 
 @router.get("/chain/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="legacy_transaction", include_in_schema=False)
-def legacy_transaction_detail(
+async def legacy_transaction_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -271,4 +271,4 @@ def legacy_transaction_detail(
     txid: str = Path(..., min_length=64, max_length=64),
 ):
     """Legacy transaction detail route."""
-    return transaction_detail(request, chain, service, templates, context, txid)
+    return await transaction_detail(request, chain, service, templates, context, txid)

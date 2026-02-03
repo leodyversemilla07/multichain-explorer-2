@@ -12,6 +12,7 @@ Handles:
 - Miners
 """
 
+import asyncio
 import logging
 from typing import Dict, Any
 
@@ -34,30 +35,35 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chains"])
 
 
-def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
+async def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
     """Helper to get summary for a single chain."""
     try:
         service = BlockchainService(chain_config)
-        info = service.get_blockchain_info()
+        info = await service.get_blockchain_info()
 
         # Get additional stats - best effort
+        # We can run these concurrently
         try:
-            listassets_result = service.call("listassets")
+            results = await asyncio.gather(
+                service.call("listassets"),
+                service.call("liststreams"),
+                # listaddresses with count=False might be slow on huge chains, beware
+                # Actually "*" means all, False means verbose=False
+                service.call("listaddresses", ["*", False]),
+                return_exceptions=True
+            )
+            
+            listassets_result = results[0] if not isinstance(results[0], Exception) else []
+            liststreams_result = results[1] if not isinstance(results[1], Exception) else []
+            listaddresses_result = results[2] if not isinstance(results[2], Exception) else []
+
             assets_count = len(listassets_result) if listassets_result else 0
-        except Exception:
-            assets_count = 0
-
-        try:
-            liststreams_result = service.call("liststreams")
             streams_count = len(liststreams_result) if liststreams_result else 0
-        except Exception:
-            streams_count = 0
-
-        try:
-            listaddresses_result = service.call("listaddresses", ["*", False])
             addresses_count = len(listaddresses_result) if listaddresses_result else 0
         except Exception:
-            addresses_count = 0
+             assets_count = 0
+             streams_count = 0
+             addresses_count = 0
 
         block_count = info.get("blocks", 0)
         transactions_count = block_count  # Simplified estimate
@@ -88,7 +94,7 @@ def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
 
 
 @router.get("/", response_class=HTMLResponse, name="chains")
-def list_chains(
+async def list_chains(
     request: Request,
     templates: TemplatesDep,
 ):
@@ -98,7 +104,9 @@ def list_chains(
     This is the main entry point of the explorer.
     """
     chains = app_state.get_state().chains or []
-    chains_data = [get_chain_summary(c) for c in chains]
+    
+    # Run all chain summaries concurrently
+    chains_data = await asyncio.gather(*[get_chain_summary(c) for c in chains])
 
     base_url = app_state.get_state().settings.get("main", {}).get("base", "/")
 
@@ -114,7 +122,7 @@ def list_chains(
 
 
 @router.get("/{chain_name}", response_class=HTMLResponse, name="chain_home")
-def chain_home(
+async def chain_home(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -128,12 +136,12 @@ def chain_home(
     Shows overview of the blockchain including recent blocks,
     transaction count, and other statistics.
     """
-    info = service.get_blockchain_info()
+    info = await service.get_blockchain_info()
 
     # Get mining info and network stats
     mining_info = {}
     try:
-        mining_info = service.call("getmininginfo")
+        mining_info = await service.call("getmininginfo")
     except Exception:
         pass
 
@@ -141,7 +149,7 @@ def chain_home(
     networkhashps = None
     try:
         # Note: getnetworkhashps returns a number directly
-        hashrate = service.call("getnetworkhashps")
+        hashrate = await service.call("getnetworkhashps")
         if hashrate:
             # Format as hash/s with appropriate unit
             if hashrate >= 1_000_000_000_000:
@@ -173,7 +181,7 @@ def chain_home(
 
 
 @router.get("/{chain_name}/chain", response_class=HTMLResponse, name="chain_dashboard")
-def chain_dashboard(
+async def chain_dashboard(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -184,11 +192,11 @@ def chain_dashboard(
     """
     Chain dashboard (alias for chain_home).
     """
-    return chain_home(request, chain, service, templates, context, query_params)
+    return await chain_home(request, chain, service, templates, context, query_params)
 
 
 @router.get("/{chain_name}/parameters", response_class=HTMLResponse, name="chain_parameters")
-def chain_parameters(
+async def chain_parameters(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -202,7 +210,7 @@ def chain_parameters(
     mining settings, permissions, etc.
     """
     try:
-        params = service.call("getblockchainparams") or {}
+        params = await service.call("getblockchainparams") or {}
     except Exception as e:
         logger.error(f"Error fetching blockchain params: {e}")
         params = {}
@@ -217,7 +225,7 @@ def chain_parameters(
 
 
 @router.get("/{chain_name}/peers", response_class=HTMLResponse, name="peers")
-def list_peers(
+async def list_peers(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -230,7 +238,7 @@ def list_peers(
     Shows connected nodes in the blockchain network.
     """
     try:
-        peers = service.call("getpeerinfo") or []
+        peers = await service.call("getpeerinfo") or []
     except Exception:
         peers = []
 
@@ -244,7 +252,7 @@ def list_peers(
 
 
 @router.get("/{chain_name}/miners", response_class=HTMLResponse, name="miners")
-def list_miners(
+async def list_miners(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -257,15 +265,22 @@ def list_miners(
     Displays information about miners/validators in the network.
     """
     # Get recent blocks to analyze miners
-    info = service.get_blockchain_info()
+    info = await service.get_blockchain_info()
     current_height = info.get("blocks", 0)
 
     # Get last 100 blocks
     miner_stats = {}
     block_count = min(100, current_height + 1)
-
+    
+    # Needs optimization! Sequential fetching 100 blocks is slow.
+    # Parallelize fetch
+    tasks = []
     for height in range(max(0, current_height - block_count + 1), current_height + 1):
-        block = service.get_block_by_height(height)
+        tasks.append(service.get_block_by_height(height))
+    
+    blocks = await asyncio.gather(*tasks)
+
+    for block in blocks:
         if block and "miner" in block:
             miner = block["miner"]
             if miner not in miner_stats:
@@ -292,7 +307,7 @@ def list_miners(
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}", response_class=HTMLResponse, name="legacy_chain_home", include_in_schema=False)
-def legacy_chain_home(
+async def legacy_chain_home(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -301,4 +316,4 @@ def legacy_chain_home(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy chain home route."""
-    return chain_home(request, chain, service, templates, context, query_params)
+    return await chain_home(request, chain, service, templates, context, query_params)
