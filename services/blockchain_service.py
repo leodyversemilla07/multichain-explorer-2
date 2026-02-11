@@ -20,29 +20,17 @@ logger = logging.getLogger(__name__)
 class BlockchainService:
     """Service for interacting with MultiChain blockchain via RPC."""
 
-    def __init__(self, chain_config):
+    def __init__(self, chain_config: ChainConfig):
         """
         Initialize blockchain service.
 
         Args:
-            chain_config: Chain configuration with RPC credentials (ChainConfig or MCEChain)
+            chain_config: Chain configuration with RPC credentials
         """
         self.config = chain_config
-
-        # Handle both new ChainConfig and old MCEChain objects
-        if hasattr(chain_config, "multichain_url"):
-            # New ChainConfig object
-            self.rpc_url = chain_config.multichain_url
-            self.headers = chain_config.multichain_headers
-            self.chain_name = chain_config.name
-        elif hasattr(chain_config, "config") and isinstance(chain_config.config, dict):
-            # Old MCEChain object - get from config dict
-            self.rpc_url = chain_config.config.get("multichain-url", "")
-            self.headers = chain_config.config.get("multichain-headers", {})
-            self.chain_name = chain_config.config.get("name", chain_config.name)
-        else:
-            raise ValueError("Invalid chain configuration object")
-
+        self.rpc_url = chain_config.multichain_url
+        self.headers = chain_config.multichain_headers
+        self.chain_name = chain_config.name
         self._request_id = 0
 
     async def call(self, method: str, params: Optional[List[Any]] = None) -> Any:

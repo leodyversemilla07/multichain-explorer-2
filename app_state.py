@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from config import ChainConfig
+
 VERSION = "2.1"
 
 
@@ -23,7 +25,6 @@ def init_from_env() -> bool:
         True if initialization successful, False otherwise
     """
     from env_config import get_settings
-    import multichain
     
     try:
         settings = get_settings()
@@ -55,14 +56,19 @@ def init_from_env() -> bool:
         state.log_file = str(state.ini_dir / "explorer.log")
         state.pid_file = str(state.ini_dir / "explorer.pid")
         
-        # Initialize the chain
-        chain_name = settings.multichain_chain_name
-        chain_object = multichain.MCEChain(chain_name)
-        if not chain_object.initialize():
-            print(f"Warning: Could not initialize chain '{chain_name}'")
-            # Don't fail - chain might not be running yet
+        # Initialize the chain configuration
+        chain_config = ChainConfig(
+            name=settings.multichain_chain_name,
+            display_name=settings.multichain_chain_name,
+            path_name=settings.multichain_chain_name,
+            ini_name=f"{settings.multichain_chain_name}.ini",
+            rpc_host=settings.multichain_rpc_host,
+            rpc_port=settings.multichain_rpc_port,
+            rpc_user=settings.multichain_rpc_username,
+            rpc_password=settings.multichain_rpc_password,
+        )
         
-        state.chains = [chain_object]
+        state.chains = [chain_config]
         
         return True
         
@@ -96,13 +102,9 @@ class ApplicationState:
     # Metadata
     explorer_name: str = ""
     action: Optional[str] = None
-    selected: Optional[Any] = None
 
     # Chains
-    chains: List[Any] = field(default_factory=list)
-
-    # Handlers (runtime)
-    page_handler: Optional[Any] = None
+    chains: List[ChainConfig] = field(default_factory=list)
 
     def get_setting(self, section: str, key: str, default: Any = None) -> Any:
         """Get configuration setting safely."""
@@ -114,12 +116,11 @@ class ApplicationState:
             self.settings[section] = {}
         self.settings[section][key] = value
 
-    def get_chain_by_name(self, name: str) -> Optional[Any]:
+    def get_chain_by_name(self, name: str) -> Optional[ChainConfig]:
         """Find chain by name or path-name."""
         for chain in self.chains:
-            if hasattr(chain, "config"):
-                if chain.config.get("name") == name or chain.config.get("path-name") == name:
-                    return chain
+            if chain.name == name or chain.path_name == name:
+                return chain
         return None
 
     def is_configured(self) -> bool:
@@ -136,9 +137,7 @@ class ApplicationState:
         self.pid_file = ""
         self.explorer_name = ""
         self.action = None
-        self.selected = None
         self.chains = []
-        self.page_handler = None
 
 
 # Singleton instance

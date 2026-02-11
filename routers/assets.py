@@ -71,13 +71,13 @@ async def list_assets(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/assets",
+        "url_base": f"/{chain.path_name}/assets",
     }
 
     return templates.TemplateResponse(
         name="pages/assets.html",
         context=context.build_context(
-            title=f"Assets - {chain.config['display-name']}",
+            title=f"Assets - {chain.display_name}",
             assets=paginated_assets,
             **pagination_context
         ),
@@ -153,7 +153,7 @@ async def asset_holders(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/asset/{asset_name}/holders",
+        "url_base": f"/{chain.path_name}/asset/{asset_name}/holders",
     }
 
     return templates.TemplateResponse(
@@ -215,7 +215,7 @@ async def asset_transactions(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/asset/{asset_name}/transactions",
+        "url_base": f"/{chain.path_name}/asset/{asset_name}/transactions",
     }
 
     return templates.TemplateResponse(
@@ -272,7 +272,7 @@ async def asset_issues(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/asset/{asset_name}/issues",
+        "url_base": f"/{chain.path_name}/asset/{asset_name}/issues",
     }
 
     return templates.TemplateResponse(
@@ -376,7 +376,7 @@ async def holder_transactions(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/asset/{asset_name}/holder/{address}/transactions",
+        "url_base": f"/{chain.path_name}/asset/{asset_name}/holder/{address}/transactions",
     }
 
     return templates.TemplateResponse(

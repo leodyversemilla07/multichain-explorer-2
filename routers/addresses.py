@@ -75,13 +75,13 @@ async def list_addresses(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/addresses",
+        "url_base": f"/{chain.path_name}/addresses",
     }
 
     return templates.TemplateResponse(
         name="pages/addresses.html",
         context=context.build_context(
-            title=f"Addresses - {chain.config['display-name']}",
+            title=f"Addresses - {chain.display_name}",
             addresses=paginated_addresses,
             **pagination_context
         ),
@@ -143,7 +143,7 @@ async def address_detail(
     return templates.TemplateResponse(
         name="pages/address.html",
         context=context.build_context(
-            title=f"Address - {chain.config['display-name']}",
+            title=f"Address - {chain.display_name}",
             address=address,
             address_info=address_info,
             address_data=address_info, # Both keys used in template?
@@ -210,7 +210,7 @@ async def address_transactions(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/address/{address}/transactions",
+        "url_base": f"/{chain.path_name}/address/{address}/transactions",
     }
 
     return templates.TemplateResponse(
@@ -314,7 +314,7 @@ async def address_streams(
             "has_prev": page_info["has_prev"],
             "next_page": page_info["next_page"],
             "prev_page": page_info["prev_page"],
-            "url_base": f"/{chain.config['path-name']}/address/{address}/streams",
+            "url_base": f"/{chain.path_name}/address/{address}/streams",
         }
 
     return templates.TemplateResponse(

@@ -98,13 +98,13 @@ async def list_streams(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/streams",
+        "url_base": f"/{chain.path_name}/streams",
     }
 
     return templates.TemplateResponse(
         name="pages/streams.html",
         context=context.build_context(
-            title=f"Streams - {chain.config['display-name']}",
+            title=f"Streams - {chain.display_name}",
             streams=paginated_streams,
             **pagination_context
         ),
@@ -204,11 +204,11 @@ async def stream_items(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/items",
+        "url_base": f"/{chain.path_name}/stream/{stream_name}/items",
         "total": total_count,
         "total_pages": page_info["page_count"],
         "page_number": page_info["page"],
-        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/items",
+        "base_path": f"/{chain.path_name}/stream/{stream_name}/items",
     }
 
     return templates.TemplateResponse(
@@ -264,11 +264,11 @@ async def stream_keys(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/keys",
+        "url_base": f"/{chain.path_name}/stream/{stream_name}/keys",
         "total": len(keys),
         "total_pages": page_info["page_count"],
         "page_number": page_info["page"],
-        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/keys",
+        "base_path": f"/{chain.path_name}/stream/{stream_name}/keys",
     }
 
     show_pagination = page_info["page_count"] > 1
@@ -329,11 +329,11 @@ async def stream_publishers(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/publishers",
+        "url_base": f"/{chain.path_name}/stream/{stream_name}/publishers",
         "total": len(publishers),
         "total_pages": page_info["page_count"],
         "page_number": page_info["page"],
-        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/publishers",
+        "base_path": f"/{chain.path_name}/stream/{stream_name}/publishers",
     }
 
     show_pagination = page_info["page_count"] > 1
@@ -431,11 +431,11 @@ async def key_items(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}",
+        "url_base": f"/{chain.path_name}/stream/{stream_name}/key/{key}",
         "total": total_count,
         "total_pages": page_info["page_count"],
         "page_number": page_info["page"],
-        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/key/{key}",
+        "base_path": f"/{chain.path_name}/stream/{stream_name}/key/{key}",
     }
 
     return templates.TemplateResponse(
@@ -503,11 +503,11 @@ async def publisher_items(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/stream/{stream_name}/publisher/{publisher}",
+        "url_base": f"/{chain.path_name}/stream/{stream_name}/publisher/{publisher}",
         "total": total_count,
         "total_pages": page_info["page_count"],
         "page_number": page_info["page"],
-        "base_path": f"/{chain.config['path-name']}/stream/{stream_name}/publisher/{publisher}",
+        "base_path": f"/{chain.path_name}/stream/{stream_name}/publisher/{publisher}",
     }
 
     return templates.TemplateResponse(

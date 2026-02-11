@@ -101,18 +101,18 @@ async def list_transactions(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/transactions",
+        "url_base": f"/{chain.path_name}/transactions",
         "total": len(all_txs),
         # For pagination component
         "total_pages": page_info["page_count"],
         "page_number": page_info["page"],
-        "base_path": f"/{chain.config['path-name']}/transactions",
+        "base_path": f"/{chain.path_name}/transactions",
     }
 
     return templates.TemplateResponse(
         name="pages/transactions.html",
         context=context.build_context(
-            title=f"Recent Transactions - {chain.config['display-name']}",
+            title=f"Recent Transactions - {chain.display_name}",
             transactions=paginated_txs,
             pagination=pagination_context,
             **pagination_context

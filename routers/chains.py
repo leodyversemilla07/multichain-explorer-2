@@ -173,7 +173,7 @@ async def chain_home(
     return templates.TemplateResponse(
         name="pages/chain_home.html",
         context=context.build_context(
-            title=f"{chain.config['display-name']} - Dashboard",
+            title=f"{chain.display_name} - Dashboard",
             info=info,
             networkhashps=networkhashps,
         ),
@@ -218,7 +218,7 @@ async def chain_parameters(
     return templates.TemplateResponse(
         name="pages/chain_parameters.html",
         context=context.build_context(
-            title=f"Parameters - {chain.config['display-name']}",
+            title=f"Parameters - {chain.display_name}",
             params=params,
         ),
     )
@@ -245,7 +245,7 @@ async def list_peers(
     return templates.TemplateResponse(
         name="pages/peers.html",
         context=context.build_context(
-            title=f"Network Peers - {chain.config['display-name']}",
+            title=f"Network Peers - {chain.display_name}",
             peers=peers,
         ),
     )
@@ -298,7 +298,7 @@ async def list_miners(
     return templates.TemplateResponse(
         name="pages/miners.html",
         context=context.build_context(
-            title=f"Mining Statistics - {chain.config['display-name']}",
+            title=f"Mining Statistics - {chain.display_name}",
             miners=miners_list,
             total_blocks=block_count,
         ),

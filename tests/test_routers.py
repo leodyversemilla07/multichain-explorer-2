@@ -15,15 +15,19 @@ def mock_chain():
     """Create a mock chain object."""
     chain = Mock()
     chain.name = "test-chain"
+    chain.path_name = "test-chain"
+    chain.display_name = "Test Chain"
+    chain.multichain_url = "http://localhost:8570"
+    chain.multichain_headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Basic dGVzdDp0ZXN0",
+    }
     chain.config = {
         "name": "test-chain",
         "path-name": "test-chain",
         "display-name": "Test Chain",
         "multichain-url": "http://localhost:8570",
-        "multichain-headers": {
-            "Content-Type": "application/json",
-            "Authorization": "Basic dGVzdDp0ZXN0",
-        },
+        "multichain-headers": chain.multichain_headers,
     }
     return chain
 
@@ -103,15 +107,21 @@ class TestAddressesRouter:
 def app_with_mocks(mock_chain):
     """Create FastAPI app with mocked dependencies."""
     from main import create_app
+    from app_state import ApplicationState
 
     app = create_app()
 
     # Set up app state with mock chain
-    app_state.get_state().chains = [mock_chain]
-    app_state.get_state().settings = {
+    # Create a proper ApplicationState object to satisfy new DI requirements
+    state = ApplicationState()
+    state.chains = [mock_chain]
+    state.settings = {
         "main": {"base": "/"},
         "test-chain": {"name": "test-chain"},
     }
+    
+    # IMPORTANT: Set state in app.state.config as required by updated dependencies
+    app.state.config = state
 
     return app
 
@@ -200,9 +210,15 @@ class TestChainNotFoundHandling:
     def client_no_chains(self):
         """Create client with no chains configured."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
-        app_state.get_state().chains = []
+        
+        # Set empty state
+        state = ApplicationState()
+        state.chains = []
+        app.state.config = state
+        
         return TestClient(app, raise_server_exceptions=False)
 
     def test_nonexistent_chain_returns_404(self, client_no_chains):

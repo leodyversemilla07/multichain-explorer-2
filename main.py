@@ -63,11 +63,12 @@ async def lifespan(app: FastAPI):
     logger.info("Loading configuration from .env")
     if app_state.init_from_env():
         logger.info("Configuration loaded successfully")
-        chains = app_state.get_state().chains
+        state = app_state.get_state()
+        app.state.config = state
+        chains = state.chains
         if chains:
             for chain in chains:
-                chain_name = chain.config.get("name", "unknown")
-                logger.info(f"Chain configured: {chain_name}")
+                logger.info(f"Chain configured: {chain.name}")
     else:
         logger.warning("Could not load configuration from .env - using defaults")
     
@@ -202,7 +203,7 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
     @app.exception_handler(ChainNotFoundError)
     async def chain_not_found_handler(request: Request, exc: ChainNotFoundError):
         """Handle chain not found errors."""
-        state = app_state.get_state()
+        state = request.app.state.config
         base_url = state.get_setting("main", "base", "/")
         
         context = {
@@ -222,7 +223,7 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
     @app.exception_handler(ResourceNotFoundError)
     async def resource_not_found_handler(request: Request, exc: ResourceNotFoundError):
         """Handle resource not found errors."""
-        state = app_state.get_state()
+        state = request.app.state.config
         base_url = state.get_setting("main", "base", "/")
         
         context = {
@@ -242,7 +243,7 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
     @app.exception_handler(MCEException)
     async def mce_exception_handler(request: Request, exc: MCEException):
         """Handle general MCE exceptions."""
-        state = app_state.get_state()
+        state = request.app.state.config
         base_url = state.get_setting("main", "base", "/")
         
         context = {
@@ -262,7 +263,7 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
     @app.exception_handler(404)
     async def not_found_handler(request: Request, exc):
         """Handle 404 errors."""
-        state = app_state.get_state()
+        state = request.app.state.config
         base_url = state.get_setting("main", "base", "/")
         
         context = {
@@ -283,7 +284,7 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
     @app.exception_handler(500)
     async def server_error_handler(request: Request, exc):
         """Handle 500 errors."""
-        state = app_state.get_state()
+        state = request.app.state.config
         base_url = state.get_setting("main", "base", "/")
         
         context = {

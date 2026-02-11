@@ -18,9 +18,23 @@ from fastapi import Depends, Path, Query, Request
 from fastapi.templating import Jinja2Templates
 
 import app_state
+from app_state import ApplicationState
+from config import ChainConfig
 from exceptions import ChainNotFoundError
 from services.blockchain_service import BlockchainService
 from services.pagination_service import PaginationService
+
+
+def get_state(request: Request) -> ApplicationState:
+    """
+    Dependency to get the application state.
+    
+    Returns:
+        ApplicationState instance from app state or singleton as fallback.
+    """
+    if hasattr(request.app.state, "config"):
+        return request.app.state.config
+    return app_state.get_state()
 
 
 def get_templates(request: Request) -> Jinja2Templates:
@@ -36,18 +50,20 @@ def get_templates(request: Request) -> Jinja2Templates:
     return request.app.state.templates
 
 
-def get_base_url() -> str:
+def get_base_url(state: ApplicationState = Depends(get_state)) -> str:
     """
     Get the base URL from application settings.
     
     Returns:
         Base URL string
     """
-    state = app_state.get_state()
     return state.get_setting("main", "base", "/")
 
 
-def get_chain(chain_name: str = Path(..., description="Chain path name")):
+def get_chain(
+    chain_name: str = Path(..., description="Chain path name"),
+    state: ApplicationState = Depends(get_state),
+) -> ChainConfig:
     """
     Get chain object by name.
     
@@ -56,29 +72,26 @@ def get_chain(chain_name: str = Path(..., description="Chain path name")):
     
     Args:
         chain_name: The path name of the chain
+        state: Application state dependency
         
     Returns:
-        Chain object (MCEChain)
+        ChainConfig object
         
     Raises:
         ChainNotFoundError: If chain doesn't exist
     """
-    state = app_state.get_state()
-    chains = state.chains or []
-    
-    for chain in chains:
-        if chain.config.get("path-name") == chain_name:
-            return chain
-    
-    raise ChainNotFoundError(chain_name)
+    chain = state.get_chain_by_name(chain_name)
+    if not chain:
+        raise ChainNotFoundError(chain_name)
+    return chain
 
 
-def get_blockchain_service(chain = Depends(get_chain)) -> BlockchainService:
+def get_blockchain_service(chain: ChainConfig = Depends(get_chain)) -> BlockchainService:
     """
     Get BlockchainService instance for a chain.
     
     Args:
-        chain: Chain object from get_chain dependency
+        chain: Chain configuration from get_chain dependency
         
     Returns:
         BlockchainService instance
@@ -126,16 +139,17 @@ class CommonContext:
     def __init__(
         self,
         request: Request,
-        chain = Depends(get_chain),
+        chain: ChainConfig = Depends(get_chain),
+        state: ApplicationState = Depends(get_state),
     ):
         self.request = request
         self.chain = chain
         self.templates = request.app.state.templates
-        base = get_base_url()
+        base = get_base_url(state)
         # Remove trailing slash from base_url to avoid double slashes, but keep it if it's just "/"
         self.base_url = base.rstrip("/") if len(base) > 1 else base
-        self.chain_name = chain.config.get("display-name", chain.config.get("name", ""))
-        self.chain_path = "/" + chain.config.get("path-name", "")
+        self.chain_name = chain.display_name
+        self.chain_path = "/" + chain.path_name
     
     def build_context(self, **kwargs) -> Dict[str, Any]:
         """
@@ -158,7 +172,8 @@ class CommonContext:
 
 
 # Type aliases for cleaner dependency injection
-ChainDep = Annotated[Any, Depends(get_chain)]
+StateDep = Annotated[ApplicationState, Depends(get_state)]
+ChainDep = Annotated[ChainConfig, Depends(get_chain)]
 BlockchainServiceDep = Annotated[BlockchainService, Depends(get_blockchain_service)]
 PaginationServiceDep = Annotated[PaginationService, Depends(get_pagination_service)]
 PaginationDep = Annotated[PaginationParams, Depends()]

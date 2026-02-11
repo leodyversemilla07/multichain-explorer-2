@@ -69,7 +69,7 @@ def list_permissions(
     return templates.TemplateResponse(
         name="pages/permissions.html",
         context=context.build_context(
-            title=f"Permissions - {chain.config['display-name']}",
+            title=f"Permissions - {chain.display_name}",
             permissions=permissions,
             global_count=global_count,
             address_count=len(unique_addresses),
@@ -128,13 +128,13 @@ def global_permissions(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/permissions/global",
+        "url_base": f"/{chain.path_name}/permissions/global",
     }
 
     return templates.TemplateResponse(
         name="pages/global_permissions.html",
         context=context.build_context(
-            title=f"Global Permissions - {chain.config['display-name']}",
+            title=f"Global Permissions - {chain.display_name}",
             permissions=paginated_perms,
             **pagination_context
         ),

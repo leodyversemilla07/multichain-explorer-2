@@ -27,7 +27,7 @@ router = APIRouter(tags=["Search"])
 
 def _get_result_url(chain: Any, result_type: str, result_id: str) -> str:
     """Generate URL for search result."""
-    chain_path = chain.config.get("path-name", "")
+    chain_path = chain.path_name
 
     # Note: Using standard routes defined in other routers
     url_map = {
@@ -251,7 +251,7 @@ async def search_all(chain: Any, service: Any, query: str, limit: int = 10) -> D
                                             "stream": stream_name,
                                             "items": key_info.get("items", 0),
                                         },
-                                        "url": f"/{chain.config.get('path-name', '')}/stream/{stream_name}/key/{key_name}",
+                                        "url": f"/{chain.path_name}/stream/{stream_name}/key/{key_name}",
                                     }
                                 )
                     except:
@@ -312,7 +312,7 @@ async def search(
     return templates.TemplateResponse(
         name="pages/search_results.html",
         context=context.build_context(
-            title=f"Search: {query} - {chain.config['display-name']}",
+            title=f"Search: {query} - {chain.display_name}",
             query=query,
             results=results.get("results", []),
             total=results.get("total", 0),
@@ -345,7 +345,7 @@ async def search_get(
     return templates.TemplateResponse(
         name="pages/search_results.html",
         context=context.build_context(
-            title=f"Search: {query} - {chain.config['display-name']}",
+            title=f"Search: {query} - {chain.display_name}",
             query=query,
             results=results.get("results", []),
             total=results.get("total", 0),

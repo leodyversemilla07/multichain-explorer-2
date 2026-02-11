@@ -16,85 +16,85 @@ class TestGetBaseUrl:
     def test_get_base_url_default(self):
         """Test get_base_url returns default when not set."""
         from routers.dependencies import get_base_url
+        from app_state import ApplicationState
 
-        # Save original settings
-        original = app_state.get_state().settings.copy()
-        app_state.get_state().settings = {}
-        try:
-            result = get_base_url()
-            assert result == "/"
-        finally:
-            app_state.get_state().settings = original
+        # Mock state
+        mock_state = Mock(spec=ApplicationState)
+        mock_state.get_setting.return_value = "/"
+        
+        result = get_base_url(mock_state)
+        assert result == "/"
 
     def test_get_base_url_custom(self):
         """Test get_base_url returns custom value."""
         from routers.dependencies import get_base_url
+        from app_state import ApplicationState
 
-        original = app_state.get_state().settings.copy()
-        app_state.get_state().settings = {"main": {"base": "/explorer/"}}
-        try:
-            result = get_base_url()
-            assert result == "/explorer/"
-        finally:
-            app_state.get_state().settings = original
+        # Mock state
+        mock_state = Mock(spec=ApplicationState)
+        mock_state.get_setting.return_value = "/explorer/"
+        
+        result = get_base_url(mock_state)
+        assert result == "/explorer/"
 
 
 class TestGetChain:
     """Test get_chain dependency."""
 
     @pytest.fixture
-    def mock_chains(self):
-        """Set up mock chains in app_state."""
-        chain1 = Mock()
-        chain1.config = {
-            "name": "chain1",
-            "path-name": "chain1",
-            "display-name": "Chain One",
-        }
+    def mock_chain_config(self):
+        """Create a mock ChainConfig."""
+        mock = Mock()
+        mock.name = "chain1"
+        mock.path_name = "chain1"
+        mock.display_name = "Chain One"
+        return mock
 
-        chain2 = Mock()
-        chain2.config = {
-            "name": "chain2",
-            "path-name": "chain2",
-            "display-name": "Chain Two",
-        }
-
-        app_state.get_state().chains = [chain1, chain2]
-        return [chain1, chain2]
-
-    def test_get_chain_found(self, mock_chains):
+    def test_get_chain_found(self, mock_chain_config):
         """Test get_chain finds existing chain."""
         from routers.dependencies import get_chain
+        from app_state import ApplicationState
 
-        result = get_chain("chain1")
-        assert result.config["name"] == "chain1"
+        mock_state = Mock(spec=ApplicationState)
+        mock_state.get_chain_by_name.return_value = mock_chain_config
 
-    def test_get_chain_not_found(self, mock_chains):
+        result = get_chain("chain1", state=mock_state)
+        assert result.name == "chain1"
+
+    def test_get_chain_not_found(self):
         """Test get_chain raises error for nonexistent chain."""
         from routers.dependencies import get_chain
+        from app_state import ApplicationState
+
+        mock_state = Mock(spec=ApplicationState)
+        mock_state.get_chain_by_name.return_value = None
 
         with pytest.raises(ChainNotFoundError) as exc_info:
-            get_chain("nonexistent")
+            get_chain("nonexistent", state=mock_state)
 
         assert exc_info.value.chain_name == "nonexistent"
 
     def test_get_chain_empty_chains(self):
         """Test get_chain with no chains configured."""
         from routers.dependencies import get_chain
+        from app_state import ApplicationState
 
-        app_state.get_state().chains = []
+        mock_state = Mock(spec=ApplicationState)
+        mock_state.get_chain_by_name.return_value = None
 
         with pytest.raises(ChainNotFoundError):
-            get_chain("anychain")
+            get_chain("anychain", state=mock_state)
 
     def test_get_chain_none_chains(self):
         """Test get_chain with chains set to None."""
         from routers.dependencies import get_chain
+        from app_state import ApplicationState
 
-        app_state.get_state().chains = None
+        mock_state = Mock(spec=ApplicationState)
+        mock_state.get_chain_by_name.return_value = None
 
         with pytest.raises(ChainNotFoundError):
-            get_chain("anychain")
+            get_chain("anychain", state=mock_state)
 
 
 class TestGetBlockchainService:
@@ -104,13 +104,12 @@ class TestGetBlockchainService:
         """Test get_blockchain_service returns BlockchainService instance."""
         from routers.dependencies import get_blockchain_service
         from services.blockchain_service import BlockchainService
+        from config import ChainConfig
 
-        mock_chain = Mock()
-        mock_chain.config = {
-            "name": "test",
-            "multichain-url": "http://localhost:8570",
-            "multichain-headers": {"Content-Type": "application/json"},
-        }
+        mock_chain = Mock(spec=ChainConfig)
+        mock_chain.multichain_url = "http://localhost:8570"
+        mock_chain.multichain_headers = {"Content-Type": "application/json"}
+        mock_chain.name = "test"
 
         service = get_blockchain_service(mock_chain)
         assert isinstance(service, BlockchainService)
@@ -174,20 +173,24 @@ class TestCommonContext:
     def mock_chain(self):
         """Create mock chain."""
         chain = Mock()
-        chain.config = {
-            "name": "test-chain",
-            "path-name": "test-chain",
-            "display-name": "Test Chain",
-        }
+        chain.name = "test-chain"
+        chain.path_name = "test-chain"
+        chain.display_name = "Test Chain"
         return chain
+        
+    @pytest.fixture
+    def mock_state(self):
+        """Create mock state."""
+        from app_state import ApplicationState
+        state = Mock(spec=ApplicationState)
+        state.get_setting.return_value = "/api/"
+        return state
 
-    def test_common_context_initialization(self, mock_request, mock_chain):
+    def test_common_context_initialization(self, mock_request, mock_chain, mock_state):
         """Test CommonContext initialization."""
         from routers.dependencies import CommonContext
 
-        app_state.get_state().settings = {"main": {"base": "/api/"}}
-
-        context = CommonContext(mock_request, mock_chain)
+        context = CommonContext(mock_request, mock_chain, state=mock_state)
 
         assert context.request is mock_request
         assert context.chain is mock_chain
@@ -195,13 +198,13 @@ class TestCommonContext:
         assert context.chain_name == "Test Chain"
         assert context.chain_path == "/test-chain"
 
-    def test_common_context_build_context(self, mock_request, mock_chain):
+    def test_common_context_build_context(self, mock_request, mock_chain, mock_state):
         """Test CommonContext.build_context method."""
         from routers.dependencies import CommonContext
+        
+        mock_state.get_setting.return_value = "/"
 
-        app_state.get_state().settings = {"main": {"base": "/"}}
-
-        context = CommonContext(mock_request, mock_chain)
+        context = CommonContext(mock_request, mock_chain, state=mock_state)
         result = context.build_context(title="Test Page", extra="value")
 
         assert result["request"] is mock_request
@@ -211,20 +214,21 @@ class TestCommonContext:
         assert result["title"] == "Test Page"
         assert result["extra"] == "value"
 
-    def test_common_context_fallback_chain_name(self, mock_request):
+    def test_common_context_fallback_chain_name(self, mock_request, mock_state):
         """Test CommonContext falls back to 'name' if 'display-name' missing."""
+        # Note: With type-safe ChainConfig, display_name is always present
+        # This test ensures it uses the display_name property
         from routers.dependencies import CommonContext
 
         chain = Mock()
-        chain.config = {
-            "name": "fallback-name",
-            "path-name": "fallback-path",
-        }
+        chain.name = "fallback-name"
+        chain.path_name = "fallback-path"
+        chain.display_name = "Fallback Chain" # ChainConfig always has display_name
 
-        app_state.get_state().settings = {"main": {"base": "/"}}
+        mock_state.get_setting.return_value = "/"
 
-        context = CommonContext(mock_request, chain)
-        assert context.chain_name == "fallback-name"
+        context = CommonContext(mock_request, chain, state=mock_state)
+        assert context.chain_name == "Fallback Chain"
 
 
 class TestGetQueryParams:

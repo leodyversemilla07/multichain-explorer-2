@@ -80,13 +80,13 @@ async def list_blocks(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/blocks",
+        "url_base": f"/{chain.path_name}/blocks",
     }
 
     return templates.TemplateResponse(
         name="pages/blocks.html",
         context=context.build_context(
-            title=f"Blocks - {chain.config['display-name']}",
+            title=f"Blocks - {chain.display_name}",
             blocks=blocks,
             **pagination_context
         ),
@@ -229,7 +229,7 @@ async def block_transactions(
         "has_prev": page_info["has_prev"],
         "next_page": page_info["next_page"],
         "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.config['path-name']}/block/{height}/transactions",
+        "url_base": f"/{chain.path_name}/block/{height}/transactions",
     }
 
     return templates.TemplateResponse(
