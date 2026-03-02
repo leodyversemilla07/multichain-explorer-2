@@ -264,6 +264,7 @@ class TestHelperFunctions:
 class TestProcessOperations:
     """Test process-related utilities."""
 
+    @pytest.mark.timeout(2)
     def test_is_process_running_current(self):
         """Test is_process_running with current process."""
         from utils import is_process_running
@@ -271,6 +272,7 @@ class TestProcessOperations:
         current_pid = os.getpid()
         assert is_process_running(current_pid) is True
 
+    @pytest.mark.timeout(2)
     def test_is_process_running_nonexistent(self):
         """Test is_process_running with nonexistent process."""
         from utils import is_process_running
@@ -278,6 +280,7 @@ class TestProcessOperations:
         # Use a very high PID that likely doesn't exist
         assert is_process_running(999999999) is False
 
+    @pytest.mark.timeout(2)
     def test_kill_process_nonexistent(self):
         """Test kill_process with nonexistent process."""
         from utils import kill_process

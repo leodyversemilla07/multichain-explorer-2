@@ -215,3 +215,96 @@ def invalidate_pattern(pattern: str) -> int:
         del provider._cache[key]
         provider._stats["deletes"] += 1
     return len(keys_to_delete)
+
+
+class RedisCacheProvider(CacheProvider):
+    """
+    Async Redis cache provider using redis.asyncio.
+
+    Requires: pip install redis[asyncio]
+    Activate via: CACHE_BACKEND=redis  REDIS_URL=redis://localhost:6379/0
+    """
+
+    def __init__(self, redis_url: str = "redis://localhost:6379/0"):
+        try:
+            import redis.asyncio as aioredis
+        except ImportError as exc:
+            raise ImportError(
+                "redis package is required for CACHE_BACKEND=redis. "
+                "Install it with: pip install 'redis[asyncio]'"
+            ) from exc
+        self._client = aioredis.from_url(redis_url, decode_responses=False)
+        self._stats: Dict[str, int] = {"hits": 0, "misses": 0, "sets": 0, "deletes": 0}
+
+    async def get(self, key: str):
+        import json
+        raw = await self._client.get(key)
+        if raw is None:
+            self._stats["misses"] += 1
+            return None
+        self._stats["hits"] += 1
+        return json.loads(raw)
+
+    async def set(self, key: str, value: Any, ttl: int = 60) -> None:
+        import json
+        encoded = json.dumps(value)
+        if ttl > 0:
+            await self._client.setex(key, ttl, encoded)
+        else:
+            await self._client.set(key, encoded)
+        self._stats["sets"] += 1
+
+    async def delete(self, key: str) -> None:
+        deleted = await self._client.delete(key)
+        if deleted:
+            self._stats["deletes"] += 1
+
+    async def clear(self) -> None:
+        await self._client.flushdb()
+
+    def get_stats(self) -> Dict[str, Any]:
+        total = self._stats["hits"] + self._stats["misses"]
+        return {
+            **self._stats,
+            "hit_rate": self._stats["hits"] / total if total > 0 else 0.0,
+            "size": -1,
+        }
+
+    def reset_stats(self) -> None:
+        self._stats = {"hits": 0, "misses": 0, "sets": 0, "deletes": 0}
+
+    async def close(self) -> None:
+        """Close the Redis connection pool."""
+        await self._client.aclose()
+
+
+def create_cache_provider(
+    backend: str = "memory",
+    redis_url: str = "redis://localhost:6379/0",
+) -> CacheProvider:
+    """
+    Factory — selects and instantiates the correct cache provider.
+
+    Args:
+        backend: 'memory' (default) or 'redis'
+        redis_url: Redis connection URL (ignored for memory backend)
+
+    Returns:
+        CacheProvider instance ready to use
+    """
+    if backend == "redis":
+        logger.info(f"Initializing Redis cache provider: {redis_url}")
+        return RedisCacheProvider(redis_url=redis_url)
+    logger.info("Using in-memory cache provider")
+    return MemoryCacheProvider()
+
+
+def _replace_global_cache(new_cache: "CacheService") -> None:
+    """
+    Replace the module-level global cache instance.
+
+    Called from the app lifespan to swap in a provider selected from env config
+    before the first request arrives.
+    """
+    global _cache
+    _cache = new_cache

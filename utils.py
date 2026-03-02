@@ -115,6 +115,10 @@ def file_exists(filename):
 
 
 def is_process_running(process_id):
+    # Guard against invalid/out-of-range PIDs to prevent kernel hangs
+    # (especially on Windows with very large PID values)
+    if not isinstance(process_id, int) or process_id <= 0 or process_id > 4194304:
+        return False
     try:
         os.kill(process_id, 0)
         return True
@@ -123,6 +127,9 @@ def is_process_running(process_id):
 
 
 def kill_process(process_id):
+    # Guard against invalid/out-of-range PIDs
+    if not isinstance(process_id, int) or process_id <= 0 or process_id > 4194304:
+        return False
     try:
         # On Windows, signal.SIGKILL doesn't exist, use os.kill or taskkill
         if hasattr(signal, "SIGKILL"):

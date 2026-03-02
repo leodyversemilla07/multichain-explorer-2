@@ -18,11 +18,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import app_state
+from env_config import get_settings
 from exceptions import (
     ChainNotFoundError,
     ResourceNotFoundError,
     MCEException,
 )
+from services.cache_service import CacheService, create_cache_provider, _replace_global_cache
 
 # Import routers
 from routers import (
@@ -59,12 +61,22 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting MultiChain Explorer 2 (FastAPI)")
-    
+
     # Create a shared HTTP client for all blockchain RPC calls
     # This enables connection pooling (one client reused across requests)
     app.state.http_client = httpx.AsyncClient(timeout=30.0)
     logger.info("Shared HTTP client created")
-    
+
+    # Select and initialise cache provider from env config
+    settings = get_settings()
+    cache_provider = create_cache_provider(
+        backend=settings.cache_backend,
+        redis_url=settings.redis_url,
+    )
+    _replace_global_cache(CacheService(cache_provider))
+    app.state.cache_provider = cache_provider
+    logger.info(f"Cache backend initialised: {settings.cache_backend}")
+
     # Initialize from .env
     logger.info("Loading configuration from .env")
     if app_state.init_from_env():
@@ -77,16 +89,20 @@ async def lifespan(app: FastAPI):
                 logger.info(f"Chain configured: {chain.name}")
     else:
         logger.warning("Could not load configuration from .env - using defaults")
-    
+
     logger.info(f"Templates directory: {TEMPLATES_DIR}")
     logger.info(f"Static directory: {STATIC_DIR}")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down MultiChain Explorer 2")
     await app.state.http_client.aclose()
     logger.info("Shared HTTP client closed")
+    # Close Redis connection pool if applicable
+    if hasattr(app.state.cache_provider, "close"):
+        await app.state.cache_provider.close()
+        logger.info("Cache provider closed")
 
 
 def create_app() -> FastAPI:

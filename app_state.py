@@ -20,17 +20,22 @@ VERSION = "2.1.0"
 def init_from_env() -> bool:
     """
     Initialize application state from .env file.
-    
+
+    Supports both single-chain (MULTICHAIN_*) and multi-chain (CHAIN_N_*)
+    environment variable patterns.
+
     Returns:
         True if initialization successful, False otherwise
     """
-    from env_config import get_settings
-    
+    from env_config import get_settings, get_all_chain_settings
+
     try:
         settings = get_settings()
+        chain_defs = get_all_chain_settings()  # returns 1..N chains
         state = get_state()
-        
-        # Set up settings dict for backward compatibility
+
+        # Build settings dict for backward compatibility
+        chains_section = {cd["name"]: "on" for cd in chain_defs}
         state.settings = {
             "main": {
                 "host": settings.explorer_host,
@@ -38,40 +43,41 @@ def init_from_env() -> bool:
                 "base": settings.base_url,
                 "ini_dir": str(Path.cwd()),
             },
-            "chains": {
-                settings.multichain_chain_name: "on",
-            },
-            settings.multichain_chain_name: {
-                "name": settings.multichain_chain_name,
-                "display-name": settings.multichain_chain_name,  # Display name for UI
-                "rpchost": settings.multichain_rpc_host,
-                "rpcport": str(settings.multichain_rpc_port),
-                "rpcuser": settings.multichain_rpc_username,
-                "rpcpassword": settings.multichain_rpc_password,
-            },
+            "chains": chains_section,
         }
-        
+        # Add per-chain sections
+        for cd in chain_defs:
+            state.settings[cd["name"]] = {
+                "name": cd["name"],
+                "display-name": cd["name"],
+                "rpchost": cd["host"],
+                "rpcport": cd["port"],
+                "rpcuser": cd["user"],
+                "rpcpassword": cd["password"],
+            }
+
         state.explorer_name = "multichain-explorer"
         state.ini_dir = Path.cwd()
         state.log_file = str(state.ini_dir / "explorer.log")
         state.pid_file = str(state.ini_dir / "explorer.pid")
-        
-        # Initialize the chain configuration
-        chain_config = ChainConfig(
-            name=settings.multichain_chain_name,
-            display_name=settings.multichain_chain_name,
-            path_name=settings.multichain_chain_name,
-            ini_name=f"{settings.multichain_chain_name}.ini",
-            rpc_host=settings.multichain_rpc_host,
-            rpc_port=settings.multichain_rpc_port,
-            rpc_user=settings.multichain_rpc_username,
-            rpc_password=settings.multichain_rpc_password,
-        )
-        
-        state.chains = [chain_config]
-        
+
+        # Build ChainConfig objects for every discovered chain
+        state.chains = [
+            ChainConfig(
+                name=cd["name"],
+                display_name=cd["name"],
+                path_name=cd["name"],
+                ini_name=f"{cd['name']}.ini",
+                rpc_host=cd["host"],
+                rpc_port=int(cd["port"]),
+                rpc_user=cd["user"],
+                rpc_password=cd["password"],
+            )
+            for cd in chain_defs
+        ]
+
         return True
-        
+
     except Exception as e:
         print(f"Error initializing from .env: {e}")
         return False
