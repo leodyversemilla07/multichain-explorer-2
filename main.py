@@ -25,6 +25,13 @@ from exceptions import (
     MCEException,
 )
 from services.cache_service import CacheService, create_cache_provider, _replace_global_cache
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+# Rate limiter — keyed by client IP, 60 requests/minute default
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 # Import routers
 from routers import (
@@ -143,6 +150,12 @@ def create_app() -> FastAPI:
     
     # Register exception handlers
     _register_exception_handlers(app, templates)
+
+    # Rate limiting — attach limiter to app state and add middleware + 429 handler
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    logger.info("Rate limiting enabled (60 req/min per IP by default)")
 
     # Register system routes FIRST to avoid being masked by catch-all routes
     system_router = APIRouter(tags=["System"])

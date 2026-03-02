@@ -217,3 +217,106 @@ class TestSettingsEdgeCases:
                 settings = Settings(_env_file=None)
 
             assert settings.debug is True, f"Failed for value: {true_val}"
+
+
+class TestGetAllChainSettings:
+    """Test get_all_chain_settings() multi-chain env parsing."""
+
+    def test_single_chain_fallback(self):
+        """Falls back to MULTICHAIN_* when no CHAIN_N_* vars present."""
+        from env_config import get_all_chain_settings, reload_settings
+
+        env_vars = {
+            "MULTICHAIN_CHAIN_NAME": "solo",
+            "MULTICHAIN_RPC_HOST": "10.0.0.1",
+            "MULTICHAIN_RPC_PORT": "7000",
+            "MULTICHAIN_RPC_USERNAME": "admin",
+            "MULTICHAIN_RPC_PASSWORD": "pass",
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            reload_settings()
+            chains = get_all_chain_settings()
+
+        assert len(chains) == 1
+        assert chains[0]["name"] == "solo"
+        assert chains[0]["host"] == "10.0.0.1"
+        assert chains[0]["port"] == "7000"
+
+    def test_multi_chain_discovery(self):
+        """Discovers multiple chains from CHAIN_N_* vars."""
+        from env_config import get_all_chain_settings
+
+        env_vars = {
+            "CHAIN_1_NAME": "alpha",
+            "CHAIN_1_HOST": "10.0.0.1",
+            "CHAIN_1_PORT": "7001",
+            "CHAIN_1_USER": "user1",
+            "CHAIN_1_PASSWORD": "pw1",
+            "CHAIN_2_NAME": "beta",
+            "CHAIN_2_HOST": "10.0.0.2",
+            "CHAIN_2_PORT": "7002",
+            "CHAIN_2_USER": "user2",
+            "CHAIN_2_PASSWORD": "pw2",
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            chains = get_all_chain_settings()
+
+        assert len(chains) == 2
+        assert chains[0]["name"] == "alpha"
+        assert chains[0]["port"] == "7001"
+        assert chains[1]["name"] == "beta"
+        assert chains[1]["port"] == "7002"
+
+    def test_multi_chain_ordered_by_index(self):
+        """Chains are returned in ascending numeric index order."""
+        from env_config import get_all_chain_settings
+
+        # Define out of order to verify sorting
+        env_vars = {
+            "CHAIN_3_NAME": "third",
+            "CHAIN_3_HOST": "10.0.0.3",
+            "CHAIN_3_PORT": "7003",
+            "CHAIN_1_NAME": "first",
+            "CHAIN_1_HOST": "10.0.0.1",
+            "CHAIN_1_PORT": "7001",
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            chains = get_all_chain_settings()
+
+        assert chains[0]["name"] == "first"
+        assert chains[1]["name"] == "third"
+
+    def test_multi_chain_defaults_for_missing_fields(self):
+        """Missing HOST/PORT/USER/PASSWORD fall back to sensible defaults."""
+        from env_config import get_all_chain_settings
+
+        env_vars = {
+            "CHAIN_1_NAME": "minimal",
+            # HOST, PORT, USER, PASSWORD omitted
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            chains = get_all_chain_settings()
+
+        assert chains[0]["name"] == "minimal"
+        assert chains[0]["host"] == "127.0.0.1"
+        assert chains[0]["port"] == "8000"
+        assert chains[0]["user"] == "multichainrpc"
+        assert chains[0]["password"] == ""
+
+    def test_numbered_chains_take_priority_over_multichain_vars(self):
+        """When CHAIN_N_* exists, MULTICHAIN_* fallback is NOT used."""
+        from env_config import get_all_chain_settings, reload_settings
+
+        env_vars = {
+            "CHAIN_1_NAME": "primary",
+            "CHAIN_1_HOST": "10.0.0.1",
+            # Also set MULTICHAIN_* to ensure they are ignored
+            "MULTICHAIN_CHAIN_NAME": "ignored",
+        }
+        with patch.dict(os.environ, env_vars, clear=True):
+            reload_settings()
+            chains = get_all_chain_settings()
+
+        names = [c["name"] for c in chains]
+        assert "primary" in names
+        assert "ignored" not in names

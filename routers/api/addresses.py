@@ -19,7 +19,17 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Addresses"])
 
 
-@router.get("/{chain_name}/addresses/{address}", response_model=AddressResponse, name="api_get_address")
+@router.get(
+    "/{chain_name}/addresses/{address}",
+    response_model=AddressResponse,
+    name="api_get_address",
+    summary="Get address",
+    description="Fetch balances, permissions, and transaction count for a wallet address.",
+    responses={
+        200: {"description": "Address details"},
+        404: {"description": "Address not found or invalid"},
+    },
+)
 async def get_address(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -45,7 +55,17 @@ async def get_address(
     return AddressResponse(**summary)
 
 
-@router.get("/{chain_name}/addresses/{address}/transactions", response_model=List[TransactionResponse], name="api_list_address_transactions")
+@router.get(
+    "/{chain_name}/addresses/{address}/transactions",
+    response_model=List[TransactionResponse],
+    name="api_list_address_transactions",
+    summary="List address transactions",
+    description="Returns a paginated list of transactions involving this address. Accepts `start` and `count` query params.",
+    responses={
+        200: {"description": "Transactions for the address"},
+        404: {"description": "Address not found"},
+    },
+)
 async def list_address_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,

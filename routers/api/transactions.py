@@ -18,7 +18,17 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Transactions"])
 
 
-@router.get("/{chain_name}/transactions/{txid}", response_model=TransactionResponse, name="api_get_transaction")
+@router.get(
+    "/{chain_name}/transactions/{txid}",
+    response_model=TransactionResponse,
+    name="api_get_transaction",
+    summary="Get transaction",
+    description="Fetch full transaction details by TXID.",
+    responses={
+        200: {"description": "Transaction details"},
+        404: {"description": "Transaction not found"},
+    },
+)
 async def get_transaction(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -35,7 +45,17 @@ async def get_transaction(
     return TransactionResponse(**tx)
 
 
-@router.get("/{chain_name}/blocks/{height}/transactions", response_model=List[TransactionResponse], name="api_list_block_transactions")
+@router.get(
+    "/{chain_name}/blocks/{height}/transactions",
+    response_model=List[TransactionResponse],
+    name="api_list_block_transactions",
+    summary="List transactions in a block",
+    description="Returns a paginated list of transactions in a block by height. Accepts `start` and `count` query params.",
+    responses={
+        200: {"description": "Transactions in the specified block"},
+        404: {"description": "Block not found"},
+    },
+)
 async def list_block_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,

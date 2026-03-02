@@ -18,7 +18,17 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Assets"])
 
 
-@router.get("/{chain_name}/assets", response_model=List[AssetResponse], name="api_list_assets")
+@router.get(
+    "/{chain_name}/assets",
+    response_model=List[AssetResponse],
+    name="api_list_assets",
+    summary="List assets",
+    description="Returns a paginated list of all assets on the chain, sorted by name. Accepts `page` and `count` query params.",
+    responses={
+        200: {"description": "Paginated list of assets"},
+        404: {"description": "Chain not found"},
+    },
+)
 async def list_assets(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -50,7 +60,17 @@ async def list_assets(
     return [AssetResponse(**a) for a in paginated_assets]
 
 
-@router.get("/{chain_name}/assets/{asset_ref}", response_model=AssetResponse, name="api_get_asset")
+@router.get(
+    "/{chain_name}/assets/{asset_ref}",
+    response_model=AssetResponse,
+    name="api_get_asset",
+    summary="Get asset",
+    description="Fetch details for a single asset by name or reference.",
+    responses={
+        200: {"description": "Asset details"},
+        404: {"description": "Asset not found"},
+    },
+)
 async def get_asset(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -72,7 +92,17 @@ async def get_asset(
     return AssetResponse(**asset)
 
 
-@router.get("/{chain_name}/assets/{asset_ref}/transactions", response_model=List[TransactionResponse], name="api_list_asset_transactions")
+@router.get(
+    "/{chain_name}/assets/{asset_ref}/transactions",
+    response_model=List[TransactionResponse],
+    name="api_list_asset_transactions",
+    summary="List asset transactions",
+    description="Returns a paginated list of transactions involving a specific asset. Accepts `start` and `count` query params.",
+    responses={
+        200: {"description": "Transactions for the asset"},
+        404: {"description": "Asset not found"},
+    },
+)
 async def list_asset_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,

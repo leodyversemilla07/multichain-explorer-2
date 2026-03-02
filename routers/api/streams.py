@@ -18,7 +18,17 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Streams"])
 
 
-@router.get("/{chain_name}/streams", response_model=List[StreamResponse], name="api_list_streams")
+@router.get(
+    "/{chain_name}/streams",
+    response_model=List[StreamResponse],
+    name="api_list_streams",
+    summary="List streams",
+    description="Returns a paginated list of all streams on the chain, sorted by name. Accepts `page` and `count` query params.",
+    responses={
+        200: {"description": "Paginated list of streams"},
+        404: {"description": "Chain not found"},
+    },
+)
 async def list_streams(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -78,7 +88,17 @@ async def list_streams(
     return [StreamResponse(**s) for s in paginated_streams]
 
 
-@router.get("/{chain_name}/streams/{stream_ref}", response_model=StreamResponse, name="api_get_stream")
+@router.get(
+    "/{chain_name}/streams/{stream_ref}",
+    response_model=StreamResponse,
+    name="api_get_stream",
+    summary="Get stream",
+    description="Fetch details for a single stream by name or reference.",
+    responses={
+        200: {"description": "Stream details"},
+        404: {"description": "Stream not found"},
+    },
+)
 async def get_stream(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -96,7 +116,17 @@ async def get_stream(
     return StreamResponse(**streams[0])
 
 
-@router.get("/{chain_name}/streams/{stream_ref}/items", response_model=List[StreamItemResponse], name="api_list_stream_items")
+@router.get(
+    "/{chain_name}/streams/{stream_ref}/items",
+    response_model=List[StreamItemResponse],
+    name="api_list_stream_items",
+    summary="List stream items",
+    description="Returns a paginated list of items published to a stream. Accepts `start` and `count` query params.",
+    responses={
+        200: {"description": "Stream items"},
+        404: {"description": "Stream not found"},
+    },
+)
 async def list_stream_items(
     chain: ChainDep,
     service: BlockchainServiceDep,

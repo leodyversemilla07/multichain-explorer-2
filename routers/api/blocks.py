@@ -18,7 +18,17 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Blocks"])
 
 
-@router.get("/{chain_name}/blocks", response_model=List[BlockResponse], name="api_list_blocks")
+@router.get(
+    "/{chain_name}/blocks",
+    response_model=List[BlockResponse],
+    name="api_list_blocks",
+    summary="List blocks",
+    description="Returns a paginated list of blocks in the chain, newest first. Accepts `page` and `count` query params.",
+    responses={
+        200: {"description": "Paginated list of blocks"},
+        404: {"description": "Chain not found"},
+    },
+)
 async def list_blocks(
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -70,7 +80,18 @@ async def list_blocks(
     return blocks
 
 
-@router.get("/{chain_name}/blocks/{identifier}", response_model=BlockResponse, name="api_get_block")
+@router.get(
+    "/{chain_name}/blocks/{identifier}",
+    response_model=BlockResponse,
+    name="api_get_block",
+    summary="Get block",
+    description="Fetch a single block by height (integer) or hash (64-char hex string).",
+    responses={
+        200: {"description": "Block details"},
+        400: {"description": "Invalid block identifier format"},
+        404: {"description": "Block not found"},
+    },
+)
 async def get_block(
     chain: ChainDep,
     service: BlockchainServiceDep,

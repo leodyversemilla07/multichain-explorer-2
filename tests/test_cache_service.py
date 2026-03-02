@@ -334,3 +334,159 @@ class TestGlobalCache:
         cache2 = get_cache()
         result = await cache2.get("test_key")
         assert result == "test_value"
+
+
+class TestRedisCacheProvider:
+    """Test RedisCacheProvider using a mocked redis.asyncio client."""
+
+    def _make_provider(self):
+        """Build a RedisCacheProvider with a fully-mocked Redis client."""
+        from unittest.mock import AsyncMock, MagicMock
+        import sys
+        import types
+
+        # Fabricate a minimal redis.asyncio stub so the lazy import works
+        aioredis_mod = types.ModuleType("redis.asyncio")
+        mock_client = AsyncMock()
+        aioredis_mod.from_url = MagicMock(return_value=mock_client)
+
+        redis_mod = types.ModuleType("redis")
+        redis_mod.asyncio = aioredis_mod
+        sys.modules.setdefault("redis", redis_mod)
+        sys.modules.setdefault("redis.asyncio", aioredis_mod)
+
+        from services.cache_service import RedisCacheProvider
+        provider = RedisCacheProvider(redis_url="redis://localhost:6379/0")
+        provider._client = mock_client
+        return provider, mock_client
+
+    async def test_get_cache_hit(self):
+        """get() returns deserialised value on cache hit."""
+        import json
+        provider, client = self._make_provider()
+        client.get.return_value = json.dumps("hello").encode()
+
+        result = await provider.get("key1")
+        assert result == "hello"
+        assert provider._stats["hits"] == 1
+        assert provider._stats["misses"] == 0
+
+    async def test_get_cache_miss(self):
+        """get() returns None on cache miss."""
+        provider, client = self._make_provider()
+        client.get.return_value = None
+
+        result = await provider.get("missing")
+        assert result is None
+        assert provider._stats["misses"] == 1
+
+    async def test_set_with_ttl(self):
+        """set() calls setex when ttl > 0."""
+        import json
+        provider, client = self._make_provider()
+
+        await provider.set("k", {"x": 1}, ttl=30)
+        client.setex.assert_called_once_with("k", 30, json.dumps({"x": 1}))
+        assert provider._stats["sets"] == 1
+
+    async def test_set_no_ttl(self):
+        """set() calls set (no expiry) when ttl == 0."""
+        import json
+        provider, client = self._make_provider()
+
+        await provider.set("k", "val", ttl=0)
+        client.set.assert_called_once_with("k", json.dumps("val"))
+
+    async def test_delete(self):
+        """delete() removes key and increments deletes stat."""
+        provider, client = self._make_provider()
+        client.delete.return_value = 1  # 1 key deleted
+
+        await provider.delete("k")
+        client.delete.assert_called_once_with("k")
+        assert provider._stats["deletes"] == 1
+
+    async def test_delete_nonexistent(self):
+        """delete() on missing key does not increment deletes."""
+        provider, client = self._make_provider()
+        client.delete.return_value = 0  # nothing deleted
+
+        await provider.delete("ghost")
+        assert provider._stats["deletes"] == 0
+
+    async def test_clear(self):
+        """clear() calls flushdb."""
+        provider, client = self._make_provider()
+
+        await provider.clear()
+        client.flushdb.assert_called_once()
+
+    async def test_get_stats(self):
+        """get_stats() returns correct hit_rate."""
+        provider, _ = self._make_provider()
+        provider._stats = {"hits": 3, "misses": 1, "sets": 4, "deletes": 0}
+
+        stats = provider.get_stats()
+        assert stats["hits"] == 3
+        assert stats["misses"] == 1
+        assert stats["hit_rate"] == pytest.approx(0.75)
+        assert stats["size"] == -1  # Redis doesn't track locally
+
+    def test_get_stats_empty(self):
+        """get_stats() returns 0.0 hit_rate when no requests made."""
+        provider, _ = self._make_provider()
+
+        stats = provider.get_stats()
+        assert stats["hit_rate"] == 0.0
+
+    def test_reset_stats(self):
+        """reset_stats() zeroes all counters."""
+        provider, _ = self._make_provider()
+        provider._stats = {"hits": 5, "misses": 2, "sets": 7, "deletes": 3}
+
+        provider.reset_stats()
+        assert all(v == 0 for v in provider._stats.values())
+
+    async def test_close(self):
+        """close() calls aclose on the Redis client."""
+        provider, client = self._make_provider()
+
+        await provider.close()
+        client.aclose.assert_called_once()
+
+
+class TestCreateCacheProvider:
+    """Test create_cache_provider factory."""
+
+    def test_returns_memory_provider_by_default(self):
+        from services.cache_service import create_cache_provider, MemoryCacheProvider
+
+        provider = create_cache_provider(backend="memory")
+        assert isinstance(provider, MemoryCacheProvider)
+
+    def test_returns_redis_provider_when_requested(self):
+        """create_cache_provider('redis') returns a RedisCacheProvider (mocked)."""
+        from unittest.mock import MagicMock, AsyncMock
+        import sys, types
+
+        aioredis_mod = types.ModuleType("redis.asyncio")
+        aioredis_mod.from_url = MagicMock(return_value=AsyncMock())
+        redis_mod = types.ModuleType("redis")
+        redis_mod.asyncio = aioredis_mod
+        sys.modules.setdefault("redis", redis_mod)
+        sys.modules.setdefault("redis.asyncio", aioredis_mod)
+
+        from services.cache_service import create_cache_provider, RedisCacheProvider
+        provider = create_cache_provider(backend="redis", redis_url="redis://localhost:6379/0")
+        assert isinstance(provider, RedisCacheProvider)
+
+    def test_replace_global_cache(self):
+        """_replace_global_cache() changes what get_cache() returns."""
+        from services.cache_service import (
+            CacheService, MemoryCacheProvider,
+            _replace_global_cache, get_cache,
+        )
+
+        new_service = CacheService(MemoryCacheProvider())
+        _replace_global_cache(new_service)
+        assert get_cache() is new_service
