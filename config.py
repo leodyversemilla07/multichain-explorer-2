@@ -88,7 +88,11 @@ class ServerConfig:
 
 @dataclass
 class AppConfig:
-    """Main application configuration"""
+    """Main application configuration
+
+    TODO: AppConfig is largely superseded by ApplicationState (app_state.py) which
+    acts as the active singleton. Consider consolidating these two in a future refactor.
+    """
 
     version: str = "2.1"
 

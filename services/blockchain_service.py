@@ -20,18 +20,28 @@ logger = logging.getLogger(__name__)
 class BlockchainService:
     """Service for interacting with MultiChain blockchain via RPC."""
 
-    def __init__(self, chain_config: ChainConfig):
+    def __init__(self, chain_config: ChainConfig, client: Optional[httpx.AsyncClient] = None):
         """
         Initialize blockchain service.
 
         Args:
             chain_config: Chain configuration with RPC credentials
+            client: Optional shared httpx.AsyncClient. When provided, the client
+                    is NOT closed by this service (caller manages its lifecycle).
+                    When omitted, an internal client is created and closed on close().
         """
         self.config = chain_config
         self.rpc_url = chain_config.multichain_url
         self.headers = chain_config.multichain_headers
         self.chain_name = chain_config.name
         self._request_id = 0
+        self._owns_client = client is None
+        self._client = client if client is not None else httpx.AsyncClient(timeout=30.0)
+
+    async def close(self):
+        """Close the underlying HTTP client (only if owned by this service)."""
+        if self._owns_client:
+            await self._client.aclose()
 
     async def call(self, method: str, params: Optional[List[Any]] = None) -> Any:
         """
@@ -61,38 +71,37 @@ class BlockchainService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.rpc_url,
-                    json=payload,
-                    headers=self.headers,
+            response = await self._client.post(
+                self.rpc_url,
+                json=payload,
+                headers=self.headers,
+            )
+            
+            # Check for HTTP errors (like 401 Unauthorized, 500 Internal Server Error)
+            # Note: MultiChain might return 500 for RPC errors, so we parse JSON first if possible
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                response.raise_for_status() # If not JSON and error status, raise it
+                data = {} # Should not happen if raise_for_status passes
+
+            if "error" in data and data["error"] is not None:
+                # Handle both dict and string error formats
+                if isinstance(data["error"], dict):
+                    error_msg = data["error"].get("message", "Unknown error")
+                    error_code = data["error"].get("code", -1)
+                else:
+                    # String error (from test mocks or legacy systems)
+                    error_msg = str(data["error"])
+                    error_code = -1
+                logger.error(f"RPC error on {self.chain_name}: {error_code} - {error_msg}")
+                raise RPCError(
+                    method=method,
+                    error_message=error_msg,
+                    error_code=error_code,
                 )
-                
-                # Check for HTTP errors (like 401 Unauthorized, 500 Internal Server Error)
-                # Note: MultiChain might return 500 for RPC errors, so we parse JSON first if possible
-                try:
-                    data = response.json()
-                except json.JSONDecodeError:
-                    response.raise_for_status() # If not JSON and error status, raise it
-                    data = {} # Should not happen if raise_for_status passes
 
-                if "error" in data and data["error"] is not None:
-                    # Handle both dict and string error formats
-                    if isinstance(data["error"], dict):
-                        error_msg = data["error"].get("message", "Unknown error")
-                        error_code = data["error"].get("code", -1)
-                    else:
-                        # String error (from test mocks or legacy systems)
-                        error_msg = str(data["error"])
-                        error_code = -1
-                    logger.error(f"RPC error on {self.chain_name}: {error_code} - {error_msg}")
-                    raise RPCError(
-                        method=method,
-                        error_message=error_msg,
-                        error_code=error_code,
-                    )
-
-                return data.get("result")
+            return data.get("result")
 
         except httpx.HTTPError as e:
             logger.error(f"Connection error to {self.chain_name}: {e}")

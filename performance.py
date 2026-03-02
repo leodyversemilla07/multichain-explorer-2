@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 
 # MultiChain Explorer 2 - Performance Module
-# Provides caching, compression, and performance monitoring
+# Provides compression, cache headers, and performance monitoring utilities.
+#
+# NOTE: For async caching (used by BlockchainService and routers), use
+# services/cache_service.py which provides an async CacheService and
+# @cached decorator with proper TTL and key management.
 
 import gzip
 import logging
 import time
-from functools import wraps
 from typing import Any, Callable, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -108,43 +111,6 @@ def get_cache() -> SimpleCache:
     return _cache
 
 
-def cached(ttl: int = 60, key_prefix: str = ""):
-    """
-    Decorator to cache function results.
-
-    Args:
-        ttl: Time-to-live in seconds
-        key_prefix: Prefix for cache key
-
-    Example:
-        @cached(ttl=300, key_prefix='block')
-        def get_block(chain_name, height):
-            # expensive operation
-            return block_data
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Build cache key from function name and arguments
-            key_parts = [key_prefix or func.__name__]
-            key_parts.extend(str(arg) for arg in args)
-            key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = ":".join(key_parts)
-
-            # Try to get from cache
-            cached_value = _cache.get(cache_key)
-            if cached_value is not None:
-                return cached_value
-
-            # Call function and cache result
-            result = func(*args, **kwargs)
-            _cache.set(cache_key, result, ttl)
-            return result
-
-        return wrapper
-
-    return decorator
 
 
 def compress_response(content: bytes, min_size: int = 1024) -> Tuple[bytes, bool]:
@@ -261,7 +227,6 @@ def log_performance_stats():
 __all__ = [
     "SimpleCache",
     "get_cache",
-    "cached",
     "compress_response",
     "get_cache_headers",
     "RequestTimer",

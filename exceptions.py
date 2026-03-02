@@ -4,7 +4,7 @@ Structured error handling for better debugging and user experience
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -229,66 +229,3 @@ def log_exception(exception: Exception, context: Optional[Dict[str, Any]] = None
         logger.error(f"Unexpected exception: {str(exception)}", exc_info=True, extra=context)
 
 
-def handle_exception(
-    exception: Exception,
-    chain: Optional[Any] = None,
-    params: Optional[List[Any]] = None,
-    nparams: Optional[Dict[str, Any]] = None,
-    debug: bool = False,
-) -> Tuple[int, List[Tuple[str, str]], bytes]:
-    """
-    Global exception handler that converts exceptions to HTTP responses
-
-    Args:
-        exception: The exception to handle
-        chain: Current chain context (optional)
-        params: URL parameters (optional)
-        nparams: Query parameters (optional)
-        debug: Whether to include debug information
-
-    Returns:
-        Tuple of (status_code, headers, body)
-    """
-    # Log the exception with context
-    context = {
-        "chain": chain.config["name"] if chain else None,
-        "params": params,
-        "nparams": nparams,
-    }
-    log_exception(exception, context)
-
-    # Get appropriate HTTP status code
-    status_code = get_http_status(exception)
-
-    # Format error as HTML (this will be improved when we add templating)
-    error_html = format_error_html(exception, debug=debug)
-
-    # Build simple error page
-    title = exception.__class__.__name__ if isinstance(exception, MCEException) else "Error"
-
-    body = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{title}</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-50">
-        <div class="container mx-auto px-4 py-8 max-w-4xl">
-            <div class="bg-white rounded-lg shadow-lg p-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-6">MultiChain Explorer</h1>
-                {error_html}
-                <div class="mt-6">
-                    <a href="/" class="text-blue-600 hover:text-blue-800 underline">← Back to Home</a>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    headers = [("Content-type", "text/html; charset=utf-8")]
-
-    return (status_code, headers, body.encode("utf-8"))

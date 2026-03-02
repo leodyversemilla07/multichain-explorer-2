@@ -111,7 +111,12 @@ class TestGetBlockchainService:
         mock_chain.multichain_headers = {"Content-Type": "application/json"}
         mock_chain.name = "test"
 
-        service = get_blockchain_service(mock_chain)
+        # Provide a mock request with no http_client (falls back to creating its own)
+        mock_request = Mock()
+        mock_request.app = Mock()
+        mock_request.app.state = Mock(spec=[])  # no http_client attr → falls back
+
+        service = get_blockchain_service(mock_request, mock_chain)
         assert isinstance(service, BlockchainService)
 
 
@@ -190,7 +195,7 @@ class TestCommonContext:
         """Test CommonContext initialization."""
         from routers.dependencies import CommonContext
 
-        context = CommonContext(mock_request, mock_chain, state=mock_state)
+        context = CommonContext(mock_request, mock_chain, mock_state)
 
         assert context.request is mock_request
         assert context.chain is mock_chain
@@ -204,7 +209,7 @@ class TestCommonContext:
         
         mock_state.get_setting.return_value = "/"
 
-        context = CommonContext(mock_request, mock_chain, state=mock_state)
+        context = CommonContext(mock_request, mock_chain, mock_state)
         result = context.build_context(title="Test Page", extra="value")
 
         assert result["request"] is mock_request

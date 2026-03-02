@@ -22,7 +22,6 @@ from exceptions import (
     ValidationError,
     format_error_html,
     get_http_status,
-    handle_exception,
     log_exception,
 )
 
@@ -441,80 +440,3 @@ class TestExceptionLogging:
         assert extra["chain"] == "chain1"
 
 
-class TestExceptionHandler:
-    """Test global exception handler"""
-
-    def test_handle_mce_exception(self):
-        """Test handling MCEException"""
-        exc = BlockNotFoundError("12345")
-        status, headers, body = handle_exception(exc)
-
-        assert status == 404
-        assert ("Content-type", "text/html; charset=utf-8") in headers
-        assert b"BlockNotFoundError" in body
-        assert b"12345" in body
-
-    def test_handle_chain_connection_error(self):
-        """Test handling chain connection error"""
-        exc = ChainConnectionError("chain1")
-        status, headers, body = handle_exception(exc)
-
-        assert status == 503
-        assert b"ChainConnectionError" in body
-
-    def test_handle_generic_exception(self):
-        """Test handling generic exception"""
-        exc = ValueError("Something went wrong")
-        status, headers, body = handle_exception(exc)
-
-        assert status == 500
-        assert b"Error" in body
-        assert b"Something went wrong" in body
-
-    def test_handle_exception_with_chain_context(self):
-        """Test exception handler with chain context"""
-        exc = BlockNotFoundError("12345")
-
-        # Mock chain object
-        chain = MagicMock()
-        chain.config = {"name": "testchain"}
-
-        with patch("exceptions.log_exception") as mock_log:
-            status, headers, body = handle_exception(exc, chain=chain)
-
-            # Should pass chain context to logger
-            mock_log.assert_called_once()
-            context = mock_log.call_args[0][1]
-            assert context["chain"] == "testchain"
-
-    def test_handle_exception_debug_mode(self):
-        """Test exception handler in debug mode"""
-        exc = MCEException("Test error", {"detail1": "value1"})
-        status, headers, body = handle_exception(exc, debug=True)
-
-        # Debug details should be in response
-        assert b"Debug Details" in body
-        assert b"detail1" in body
-
-    def test_handle_exception_no_debug(self):
-        """Test exception handler without debug mode"""
-        exc = MCEException("Test error", {"detail1": "value1"})
-        status, headers, body = handle_exception(exc, debug=False)
-
-        # Debug details should NOT be in response
-        assert b"Debug Details" not in body
-        assert b"detail1" not in body
-
-    def test_handle_exception_with_params(self):
-        """Test exception handler with parameters"""
-        exc = InvalidParameterError("height", "abc", "must be numeric")
-        params = ["block", "abc"]
-        nparams = {"count": "10"}
-
-        with patch("exceptions.log_exception") as mock_log:
-            status, headers, body = handle_exception(exc, params=params, nparams=nparams)
-
-            # Should pass params to logger
-            context = mock_log.call_args[0][1]
-            assert context["params"] == params
-            assert context["nparams"] == nparams

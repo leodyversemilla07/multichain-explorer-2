@@ -6,7 +6,7 @@ Type-safe validation for all request parameters
 import re
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class BlockHeightParams(BaseModel):

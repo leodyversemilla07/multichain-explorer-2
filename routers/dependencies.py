@@ -86,17 +86,25 @@ def get_chain(
     return chain
 
 
-def get_blockchain_service(chain: ChainConfig = Depends(get_chain)) -> BlockchainService:
+def get_blockchain_service(
+    request: Request,
+    chain: ChainConfig = Depends(get_chain),
+) -> BlockchainService:
     """
     Get BlockchainService instance for a chain.
-    
+
+    Injects the shared httpx.AsyncClient from app.state when available,
+    enabling connection pooling across all requests.
+
     Args:
+        request: FastAPI request (used to access app.state.http_client)
         chain: Chain configuration from get_chain dependency
-        
+
     Returns:
         BlockchainService instance
     """
-    return BlockchainService(chain)
+    http_client = getattr(request.app.state, "http_client", None)
+    return BlockchainService(chain, client=http_client)
 
 
 def get_pagination_service() -> PaginationService:
@@ -195,6 +203,14 @@ def get_query_params(request: Request) -> Dict[str, str]:
 
 
 QueryParamsDep = Annotated[Dict[str, str], Depends(get_query_params)]
+
+
+def safe_int(value: Any, default: int = 0) -> int:
+    """Safely cast a value to int, returning default on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 
 # Optional version for routes where query params might not be needed

@@ -12,6 +12,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -59,6 +60,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting MultiChain Explorer 2 (FastAPI)")
     
+    # Create a shared HTTP client for all blockchain RPC calls
+    # This enables connection pooling (one client reused across requests)
+    app.state.http_client = httpx.AsyncClient(timeout=30.0)
+    logger.info("Shared HTTP client created")
+    
     # Initialize from .env
     logger.info("Loading configuration from .env")
     if app_state.init_from_env():
@@ -79,6 +85,8 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down MultiChain Explorer 2")
+    await app.state.http_client.aclose()
+    logger.info("Shared HTTP client closed")
 
 
 def create_app() -> FastAPI:
@@ -186,10 +194,10 @@ def _register_template_filters(templates: Jinja2Templates) -> None:
     
     def format_timestamp(value: int) -> str:
         """Format a Unix timestamp to human-readable date."""
-        from datetime import datetime
+        from datetime import datetime, timezone
         if not value:
             return "N/A"
-        return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
+        return datetime.fromtimestamp(value, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     
     # Register filters
     templates.env.filters["format_hash"] = format_hash
