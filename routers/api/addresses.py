@@ -13,6 +13,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["API Addresses"])
@@ -56,8 +57,8 @@ async def list_address_transactions(
     List transactions for a specific address (JSON).
     """
     # Apply pagination
-    start = int(query_params.get("start", 0))
-    count = int(query_params.get("count", 20))
+    start = safe_int(query_params.get("start", 0), 0)
+    count = safe_int(query_params.get("count", 20), 20)
     
     # Fetch transactions - simplified list
     # get_address_transactions usually returns list of {txid, balance_change, ...}

@@ -6,7 +6,7 @@ serialization, and documentation.
 """
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
@@ -53,7 +53,7 @@ class Block(BaseModel):
     def datetime(self) -> Optional[datetime]:
         """Get block time as datetime object."""
         if self.time:
-            return datetime.fromtimestamp(self.time)
+            return datetime.fromtimestamp(self.time, tz=timezone.utc)
         return None
 
     @property
@@ -131,7 +131,7 @@ class Transaction(BaseModel):
     def datetime(self) -> Optional[datetime]:
         """Get transaction time as datetime object."""
         if self.time:
-            return datetime.fromtimestamp(self.time)
+            return datetime.fromtimestamp(self.time, tz=timezone.utc)
         return None
 
 
@@ -226,7 +226,7 @@ class StreamItem(BaseModel):
     @property
     def datetime(self) -> datetime:
         """Get item time as datetime object."""
-        return datetime.fromtimestamp(self.blocktime)
+        return datetime.fromtimestamp(self.blocktime, tz=timezone.utc)
 
 
 @dataclass

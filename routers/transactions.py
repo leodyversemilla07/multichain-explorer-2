@@ -11,6 +11,7 @@ Handles:
 - Transaction output data
 """
 
+import asyncio
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends, Path, Request, HTTPException
@@ -23,6 +24,7 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["Transactions"])
@@ -44,8 +46,8 @@ async def list_transactions(
     Displays paginated list of transactions across the blockchain.
     """
     # Apply pagination first to minimize work
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
     
     # Get recent confirmed transactions (newest blocks first)
     info = await service.get_blockchain_info()
@@ -57,26 +59,28 @@ async def list_transactions(
     max_txs = min(needed, 200)  # Cap at 200 to prevent excessive fetching
     
     recent_txs = []
-    # Scan recent blocks only - limit to 50 blocks max for performance
+    # Scan recent blocks — fetch in parallel batches for performance
     max_blocks_to_scan = 50
-    blocks_scanned = 0
-    
-    for height in range(current_height, -1, -1):
-        if blocks_scanned >= max_blocks_to_scan or len(recent_txs) >= max_txs:
+    scan_end = max(current_height - max_blocks_to_scan, -1)
+    heights_to_scan = list(range(current_height, scan_end, -1))
+
+    # Fetch blocks in parallel
+    block_results = await asyncio.gather(
+        *[service.get_block_by_height(h) for h in heights_to_scan]
+    )
+
+    for i, block in enumerate(block_results):
+        if len(recent_txs) >= max_txs:
             break
-            
-        block = await service.get_block_by_height(height)
-        blocks_scanned += 1
-        
+
         if block and "tx" in block:
             block_time = block.get("time")
-            block_height = block.get("height", height)
+            block_height = block.get("height", heights_to_scan[i])
             confirmations = current_height - block_height + 1
-            
+
             for txid in block["tx"]:
                 if len(recent_txs) >= max_txs:
                     break
-                # Create lightweight tx info without fetching full tx details
                 recent_txs.append({
                     "txid": txid,
                     "blockheight": block_height,

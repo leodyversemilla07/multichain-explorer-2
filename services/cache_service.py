@@ -196,5 +196,22 @@ def cached(ttl: int = 60, key_prefix: str = "") -> Callable:
 
 
 def invalidate_pattern(pattern: str) -> int:
-    """Invalidate cache entries matching a pattern."""
-    pass
+    """Invalidate cache entries matching a pattern.
+    
+    Args:
+        pattern: Substring pattern to match against cache keys.
+        
+    Returns:
+        Number of invalidated entries.
+    """
+    cache = get_cache()
+    provider = cache.provider
+    if not isinstance(provider, MemoryCacheProvider):
+        return 0
+    keys_to_delete = [
+        key for key in provider._cache if pattern in key
+    ]
+    for key in keys_to_delete:
+        del provider._cache[key]
+        provider._stats["deletes"] += 1
+    return len(keys_to_delete)

@@ -12,6 +12,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["API Assets"])
@@ -35,8 +36,8 @@ async def list_assets(
     assets.sort(key=lambda x: x.get("name", ""))
     
     # Pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
     
     page_info = pagination.get_pagination_info(
         total=len(assets),
@@ -83,8 +84,8 @@ async def list_asset_transactions(
     List transactions involving a specific asset (JSON).
     """
     # Apply pagination
-    count = int(query_params.get("count", 20))
-    start = int(query_params.get("start", 0))
+    count = safe_int(query_params.get("count", 20), 20)
+    start = safe_int(query_params.get("start", 0), 0)
     
     # listassettransactions
     tx_list = await service.call("listassettransactions", [asset_ref, True, count, start])

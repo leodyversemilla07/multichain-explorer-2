@@ -254,7 +254,7 @@ async def search_all(chain: Any, service: Any, query: str, limit: int = 10) -> D
                                         "url": f"/{chain.path_name}/stream/{stream_name}/key/{key_name}",
                                     }
                                 )
-                    except:
+                    except Exception:
                         pass
                     return s_found
 

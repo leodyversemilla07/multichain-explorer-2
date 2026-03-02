@@ -12,6 +12,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["API Transactions"])
@@ -56,8 +57,8 @@ async def list_block_transactions(
         return []
 
     # Apply pagination
-    start = int(query_params.get("start", 0))
-    count = int(query_params.get("count", 20))
+    start = safe_int(query_params.get("start", 0), 0)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(tx_ids),

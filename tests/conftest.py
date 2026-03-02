@@ -293,15 +293,16 @@ def mock_chain():
 def mock_rpc_calls(mock_chain):
     """
     Patch httpx.AsyncClient to use MockChain.
+    
+    Since BlockchainService creates the client in __init__, we patch the
+    AsyncClient constructor to return a mock that routes requests through MockChain.
     """
     with patch("services.blockchain_service.httpx.AsyncClient") as MockClientClass:
         # Create an AsyncMock for the client
         mock_client = AsyncMock()
         
-        # Setup context manager (async with httpx.AsyncClient() as client)
-        mock_instance = MockClientClass.return_value
-        mock_instance.__aenter__.return_value = mock_client
-        mock_instance.__aexit__.return_value = None
+        # The constructor now returns the client directly (no context manager)
+        MockClientClass.return_value = mock_client
         
         # Define mock post behavior
         async def mock_post(url, json=None, **kwargs):

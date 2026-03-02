@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multichain-explorer-2"
-version = "2.0.0"
+version = "2.1.0"
 description = "Web-based explorer for MultiChain blockchains"
 readme = "README.md"
 license = {text = "BSD-3-Clause"}

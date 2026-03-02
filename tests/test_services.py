@@ -45,39 +45,31 @@ class TestBlockchainService:
         assert service.rpc_url == "http://localhost:8000"
         assert service._request_id == 0
 
-    @patch("services.blockchain_service.httpx.AsyncClient")
-    async def test_successful_rpc_call(self, mock_client_cls, service):
+    async def test_successful_rpc_call(self, service):
         """Test successful RPC call."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client_cls.return_value.__aexit__.return_value = None
-        
         mock_response = Mock()
         mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"blocks": 100}}
         mock_response.status_code = 200
-        mock_client.post.return_value = mock_response
+        
+        service._client = AsyncMock()
+        service._client.post.return_value = mock_response
 
-        # Need to clear cache or use non-cached method for raw call?
-        # call() is not cached.
         result = await service.call("getinfo")
 
         assert result == {"blocks": 100}
         assert service._request_id == 1
 
-    @patch("services.blockchain_service.httpx.AsyncClient")
-    async def test_rpc_error_handling(self, mock_client_cls, service):
+    async def test_rpc_error_handling(self, service):
         """Test RPC error is properly raised."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__.return_value = mock_client
-        mock_client_cls.return_value.__aexit__.return_value = None
-        
         mock_response = Mock()
         mock_response.json.return_value = {
             "jsonrpc": "2.0", 
             "id": 1, 
             "error": {"code": -5, "message": "Block not found"}
         }
-        mock_client.post.return_value = mock_response
+        
+        service._client = AsyncMock()
+        service._client.post.return_value = mock_response
 
         with pytest.raises(RPCError) as exc_info:
             await service.call("getblock", ["invalid"])

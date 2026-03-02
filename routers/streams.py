@@ -29,6 +29,7 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
+    safe_int,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ async def list_streams(
                             "liststreamitems", [stream["name"], False, 1]
                         )
                         stream["items"] = len(stream_items) if stream_items else 0
-                    except:
+                    except Exception:
                         stream["items"] = 0
 
                 if "confirmed" not in stream or not isinstance(
@@ -80,8 +81,8 @@ async def list_streams(
         streams = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(streams),
@@ -135,7 +136,7 @@ async def stream_detail(
                 # Get actual count from liststreamitems
                 stream_items = await service.call("liststreamitems", [stream_name, False, 1])
                 stream["items"] = len(stream_items) if stream_items else 0
-            except:
+            except Exception:
                 stream["items"] = 0
 
         if "confirmed" not in stream or not isinstance(stream.get("confirmed"), (int, float)):
@@ -177,8 +178,8 @@ async def stream_items(
         total_count = 0
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -246,8 +247,8 @@ async def stream_keys(
         keys = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(keys),
@@ -309,8 +310,8 @@ async def stream_publishers(
         publishers = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(publishers),
@@ -404,8 +405,8 @@ async def key_items(
         total_count = 0
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -476,8 +477,8 @@ async def publisher_items(
         total_count = 0
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=total_count,

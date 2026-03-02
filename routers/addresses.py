@@ -26,6 +26,7 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["Addresses"])
@@ -55,8 +56,8 @@ async def list_addresses(
         addresses = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(addresses),
@@ -115,8 +116,8 @@ async def address_detail(
 
     async def fetch_tx_count():
         try:
-            # This might be heavy on some chains, consider optimization if needed
-            all_txs = await service.call("listaddresstransactions", [address, 9999999, 0, False])
+            # Use a smaller batch to estimate count efficiently
+            all_txs = await service.call("listaddresstransactions", [address, 10000, 0, False])
             return len(all_txs) if all_txs else 0
         except Exception:
             return 0
@@ -172,7 +173,7 @@ async def address_transactions(
     """
     # Get total count first
     try:
-        all_transactions = await service.call("listaddresstransactions", [address, 9999999, 0, False])
+        all_transactions = await service.call("listaddresstransactions", [address, 10000, 0, False])
         if not all_transactions:
             all_transactions = []
         total_count = len(all_transactions)
@@ -181,8 +182,8 @@ async def address_transactions(
         total_count = 0
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -285,8 +286,8 @@ async def address_streams(
 
     if total_count > 0:
         # Apply pagination
-        page = int(query_params.get("page", 1))
-        count = int(query_params.get("count", 20))
+        page = safe_int(query_params.get("page", 1), 1)
+        count = safe_int(query_params.get("count", 20), 20)
 
         page_info = pagination.get_pagination_info(
             total=total_count,

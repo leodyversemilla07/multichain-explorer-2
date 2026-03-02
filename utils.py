@@ -73,7 +73,7 @@ def log_error(data):
 def check_directory(dir_name):
     try:
         os.mkdir(dir_name)
-    except:
+    except Exception:
         pass
     if not os.path.exists(dir_name):
         return False
@@ -89,7 +89,7 @@ def directory_exists(dir_name):
 def remove_file(file_name):
     try:
         os.remove(file_name)
-    except:
+    except Exception:
         pass
 
 
@@ -97,18 +97,16 @@ def file_write(filename, data, append=False):
     mode = "w"
     if append:
         mode = "a"
-    f = open(filename, mode)
-    f.write(str(data))
-    f.close
+    with open(filename, mode) as f:
+        f.write(str(data))
     return True
 
 
 def file_read(filename):
     result = None
     if os.path.isfile(filename):
-        f = open(filename, "r")
-        result = f.read()
-        f.close
+        with open(filename, "r") as f:
+            result = f.read()
     return result
 
 

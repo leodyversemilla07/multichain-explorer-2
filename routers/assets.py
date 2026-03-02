@@ -26,6 +26,7 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["Assets"])
@@ -53,8 +54,8 @@ async def list_assets(
         assets = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(assets),
@@ -135,8 +136,8 @@ async def asset_holders(
         holders = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(holders),
@@ -189,8 +190,8 @@ async def asset_transactions(
         total_count = 0
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -254,8 +255,8 @@ async def asset_issues(
         issues = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(issues),
@@ -358,8 +359,8 @@ async def holder_transactions(
         transactions = []
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(transactions),

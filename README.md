@@ -2,7 +2,7 @@
 
 **Version:** 2.1.0  
 **License:** BSD-3-Clause  
-**Python:** 3.8+  
+**Python:** 3.9+  
 **Framework:** FastAPI + Uvicorn
 
 A modern, web-based explorer for MultiChain blockchains with a clean architecture, comprehensive testing, and professional UI. **Now powered by FastAPI** for async performance and modern API design.

@@ -6,7 +6,7 @@ timestamps, etc.) used throughout the application.
 """
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
 
@@ -62,7 +62,7 @@ class FormattingService:
             Formatted datetime string
         """
         try:
-            dt = datetime.fromtimestamp(timestamp)
+            dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
             return dt.strftime(fmt)
         except (ValueError, OSError, TypeError):
             return str(timestamp)
@@ -79,8 +79,8 @@ class FormattingService:
             Human-readable relative time string
         """
         try:
-            dt = datetime.fromtimestamp(timestamp)
-            now = datetime.now()
+            dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            now = datetime.now(tz=timezone.utc)
             diff = now - dt
 
             seconds = diff.total_seconds()

@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from config import ChainConfig
 
-VERSION = "2.1"
+VERSION = "2.1.0"
 
 
 def init_from_env() -> bool:

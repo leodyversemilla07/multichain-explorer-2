@@ -12,6 +12,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["API Streams"])
@@ -34,8 +35,8 @@ async def list_streams(
     streams.sort(key=lambda x: x.get("name", ""))
     
     # Pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
     
     page_info = pagination.get_pagination_info(
         total=len(streams),
@@ -107,8 +108,8 @@ async def list_stream_items(
     List items in a stream (JSON).
     """
     # Apply pagination
-    count = int(query_params.get("count", 20))
-    start = int(query_params.get("start", 0))
+    count = safe_int(query_params.get("count", 20), 20)
+    start = safe_int(query_params.get("start", 0), 0)
     
     # liststreamqueryitems or liststreamitems
     # liststreamitems(stream, verbose=True, count=10, start=-10, local-ordering=False)

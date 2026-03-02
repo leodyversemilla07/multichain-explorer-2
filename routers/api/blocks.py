@@ -12,6 +12,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["API Blocks"])
@@ -32,8 +33,8 @@ async def list_blocks(
     total_blocks = info.get("blocks", 0)
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=total_blocks,

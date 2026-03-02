@@ -21,13 +21,14 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
+    safe_int,
 )
 
 router = APIRouter(tags=["Permissions"])
 
 
 @router.get("/{chain_name}/permissions", response_class=HTMLResponse, name="permissions")
-def list_permissions(
+async def list_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -41,7 +42,7 @@ def list_permissions(
     """
     # Get all global permissions
     try:
-        permissions = service.call("listpermissions", ["*"])
+        permissions = await service.call("listpermissions", ["*"])
         if not permissions:
             permissions = []
     except Exception:
@@ -79,7 +80,7 @@ def list_permissions(
 
 
 @router.get("/{chain_name}/permissions/global", response_class=HTMLResponse, name="global_permissions")
-def global_permissions(
+async def global_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -94,7 +95,7 @@ def global_permissions(
     Shows only global (blockchain-level) permissions.
     """
     try:
-        all_permissions = service.call("listpermissions", ["*"])
+        all_permissions = await service.call("listpermissions", ["*"])
         if not all_permissions:
             all_permissions = []
     except Exception:
@@ -108,8 +109,8 @@ def global_permissions(
     ]
 
     # Apply pagination
-    page = int(query_params.get("page", 1))
-    count = int(query_params.get("count", 20))
+    page = safe_int(query_params.get("page", 1), 1)
+    count = safe_int(query_params.get("count", 20), 20)
 
     page_info = pagination.get_pagination_info(
         total=len(global_permissions),
@@ -143,7 +144,7 @@ def global_permissions(
 
 # Legacy routes for backward compatibility
 @router.get("/chain/{chain_name}/permissions", response_class=HTMLResponse, name="legacy_permissions", include_in_schema=False)
-def legacy_list_permissions(
+async def legacy_list_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
@@ -152,4 +153,4 @@ def legacy_list_permissions(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy permissions list route."""
-    return list_permissions(request, chain, service, templates, context)
+    return await list_permissions(request, chain, service, templates, context)
