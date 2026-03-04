@@ -1,0 +1,69 @@
+Command Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Create and Switch Branch,branch create switch checkout -b new feature develop,Create a new branch and switch to it in one step. Modern Git uses git switch -c; older git uses git checkout -b. Both work — switch -c is clearer.,"Starting work on a new feature, bug fix, or experiment","# Modern (Git 2.23+)
+git switch -c feature/add-cors-middleware
+
+# Classic
+git checkout -b feature/add-cors-middleware
+
+# From a specific starting point
+git switch -c hotfix/login-bug origin/main",Always branch from the correct base (main vs develop). Running git switch -c from a partially-merged branch creates messy history.,https://git-scm.com/docs/git-switch
+Branch Naming Conventions,branch name convention prefix feature bugfix hotfix release slash slash description,Use structured prefixes for branch names so intent is clear at a glance: feature/ bugfix/ hotfix/ release/ chore/. Include ticket numbers when available.,"Whenever creating a new branch in a team setting","feature/GH-123-add-cors-middleware
+bugfix/GH-456-fix-miners-semaphore
+hotfix/GH-789-login-crash
+release/v2.1.0
+chore/update-dependencies
+docs/improve-readme",Avoid spaces and uppercase — they cause problems in URLs and some shells. Maximum 50 chars is a good guideline. Avoid generic names like fix or update.,https://git-scm.com/book/en/v2/Git-Branching-Branch-Management
+Delete Branch,delete branch -d -D merged dangling local remote,Delete a local branch with -d (safe — fails if unmerged) or -D (force). Delete a remote branch with git push origin --delete.,"After a feature branch is merged and no longer needed","# Delete local branch (safe — fails if not merged)
+git branch -d feature/add-cors-middleware
+
+# Force delete unmerged branch
+git branch -D feature/experiment-abandoned
+
+# Delete remote branch
+git push origin --delete feature/add-cors-middleware
+
+# Prune stale remote-tracking refs
+git fetch --prune",-D force-deletes even unmerged branches — you will lose those commits unless they are reachable from another ref. Always double-check before force deleting.,https://git-scm.com/docs/git-branch#Documentation/git-branch.txt--d
+List Branches,list branch ls remote all verbose tracking,List local and remote branches. Use -a for all branches -r for remote-only -vv to show tracking information and last commit.,"Before creating a branch (check if it already exists) or to audit stale branches","# List local branches
+git branch
+
+# All branches (local + remote)
+git branch -a
+
+# Verbose: show tracking and last commit
+git branch -vv
+
+# List merged branches (safe to delete)
+git branch --merged main",Remote-tracking refs (remotes/origin/...) are local cache copies — they update on fetch/pull. git branch -a shows them but they may be stale.,https://git-scm.com/docs/git-branch#Documentation/git-branch.txt--v
+Rename Branch,rename move branch -m current new local remote update,Rename a local branch with git branch -m. Then update the remote by pushing with the new name and deleting the old remote branch.,"When a branch name has a typo or its scope changed","# Rename the current branch
+git branch -m new-branch-name
+
+# Rename a different branch
+git branch -m old-name new-name
+
+# Push new name and delete old on remote
+git push origin HEAD
+git push origin --delete old-name",GitHub/GitLab may have the old branch name in PR titles or protection rules — update those manually after renaming.,https://git-scm.com/docs/git-branch#Documentation/git-branch.txt--m
+Branch Protection,protect main branch rules force push restrictions review required CI status,Configure branch protection rules on GitHub/GitLab to prevent force-pushes, require PR reviews, and require CI status checks before merging.,"For main develop and release branches in team projects — prevent accidental damage","# GitHub: Settings > Branches > Add rule
+# Protect main with:
+# - Require pull request reviews (1+ approvals)
+# - Require status checks (CI must pass)
+# - Restrict who can push
+
+# Locally: git hooks can help enforce (see hooks domain)
+git config branch.main.rebase true",Branch protection is server-side (GitHub/GitLab config). Git hooks can help locally but are not enforced server-side unless used with a hook server.,https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
+Orphan Branch,orphan branch gh-pages docs unrelated history new root detached,Create a branch with no parent commits — a completely fresh history tree. Used for GitHub Pages or storing unrelated artifacts alongside code.,"Creating a GitHub Pages branch, storing documentation, or starting a clean history","# Create a completely clean branch
+git switch --orphan gh-pages
+
+# Add files with no prior history
+echo 'hello' > index.html
+git add .
+git commit -m 'Initial gh-pages commit'",Orphan branches share no history with other branches. Merging them back is not straightforward — use with intent. Run git rm -rf . first to clear the working tree.,https://git-scm.com/docs/git-switch#Documentation/git-switch.txt---orphanltnew-branchgt
+Track Remote Branch,tracking remote upstream set-upstream -u origin fetch,Set a local branch to track a remote branch so git pull and git push work without specifying remote/branch names each time.,"After cloning a repo, or when you pushed a branch for the first time","# Push and set tracking in one command
+git push -u origin feature/my-branch
+
+# Set tracking on an existing branch
+git branch --set-upstream-to=origin/feature/my-branch
+
+# Check tracking info
+git branch -vv",If tracking is wrong git pull will merge the wrong branch. Always verify with git branch -vv. Remove tracking with git branch --unset-upstream.,https://git-scm.com/docs/git-branch#Documentation/git-branch.txt---set-upstream-toltupstreamgt

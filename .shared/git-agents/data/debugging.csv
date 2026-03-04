@@ -1,0 +1,110 @@
+Command Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Git Reset,reset undo soft mixed hard HEAD commit staged unstaged restore,"Move HEAD (and optionally the index and working tree) to a previous commit. Modes per official docs: --soft (leaves index and working tree unchanged); --mixed (default — leaves working tree unchanged, resets index to new HEAD); --hard (rewrites both working tree and index to match commit — may overwrite untracked files, removes tracked files not in commit).","Undoing commits, unstaging files, or reverting the working tree to a known state","# Undo last commit but KEEP changes staged (soft)
+git reset --soft HEAD~1
+
+# Undo last commit and UNSTAGE changes, keep working tree (mixed — default)
+git reset HEAD~1
+
+# Undo last commit and DISCARD all changes (hard — DANGEROUS)
+git reset --hard HEAD~1
+
+# Unstage a file (modern preferred alternative: git restore --staged)
+git restore --staged forgotten_file.py
+# Legacy equivalent:
+git reset HEAD -- forgotten_file.py","git reset --hard overwrites working tree files and MAY overwrite untracked files. Working tree changes lost this way are GONE — commits can be recovered via reflog for ~90 days but uncommitted changes cannot. Always stash before a hard reset.",https://git-scm.com/docs/git-reset
+Git Revert,revert undo commit safe public shared branch new commit,Create a new commit that inverts the changes of a specific commit. Safe for shared branches because it adds a commit rather than rewriting history.,"Undoing a commit that has already been pushed to a shared branch — the safe alternative to reset","# Revert the last commit
+git revert HEAD
+
+# Revert a specific commit (creates a new undo commit)
+git revert a1b2c3d
+
+# Revert without opening editor
+git revert --no-edit HEAD~2
+
+# Revert a merge commit (specify parent to revert to)
+git revert -m 1 HEAD",Reverting a merge commit requires -m to specify which parent is the 'mainline'. Reverting a revert creates a double-revert — use cautiously.,https://git-scm.com/docs/git-revert
+Git Stash Advanced,stash push pop apply drop list branch recover named stash create store export import,"Stash stores uncommitted changes in a stack of stash entries. Modern syntax: git stash push (git stash save is deprecated). git stash branch creates and checks out a new branch starting from the stash's base commit then applies the stash — very useful when git stash apply would conflict.","Managing multiple in-progress work items without committing placeholder code","# Named stash (modern syntax)
+git stash push -m 'WIP: CORS implementation'
+
+# List all stashes
+git stash list
+
+# Apply specific stash (keep it in list)
+git stash apply stash@{2}
+
+# Pop (apply and remove — fails gracefully on conflict: stash NOT dropped)
+git stash pop
+
+# Create a branch from a stash (applies stash then drops it automatically)
+git stash branch feature/recovered stash@{0}
+
+# Drop a stash
+git stash drop stash@{1}","git stash save is deprecated — use git stash push. git stash pop applies AND removes the stash. If apply causes a conflict the stash is NOT dropped automatically — you must resolve conflicts then run git stash drop manually. Stashes are local — not pushed to remote. git stash branch can also transfer stashes between worktrees.",https://git-scm.com/docs/git-stash
+Recover Deleted Branch,reflog recover deleted branch lost commit SHA git log -g,"When a branch is deleted its commits are still reachable via reflog for ~90 days (configurable). git reflog show is an alias for git log -g --abbrev-commit --pretty=oneline. Find the SHA and create a new branch pointing to it.","After accidentally deleting a branch that contained unmerged work","# View reflog (show is the default subcommand, alias for git log -g)
+git reflog
+
+# Search reflog for branch name
+git reflog show --all | grep 'feature/deleted-branch'
+
+# Recreate the branch at the recovered SHA
+git switch -c feature/recovered a1b2c3d
+
+# Or use HEAD@{N} notation
+git switch -c feature/recovered HEAD@{7}","The reflog is LOCAL — if the branch was only on a remote and you removed the remote tracking ref use git fetch to restore it. Reflog entries expire: reachable commits ~90 days, unreachable ~30 days (configured by gc.reflogExpire and gc.reflogExpireUnreachable).",https://git-scm.com/docs/git-reflog
+Recover Lost Uncommitted Changes,recover lost stash drop hard reset undo uncommitted discard fsck,If you ran git reset --hard or git stash drop changes may still be recoverable through git's object database (dangling objects) via git fsck.,"Emergency recovery when git reset --hard or git stash drop lost important uncommitted work","# Find dangling blobs (recent uncommitted files)
+git fsck --lost-found
+
+# List dangling commits
+git fsck --no-reflogs | grep 'dangling commit'
+
+# Recover dangling commit
+git show a1b2c3d
+
+# Check .git/lost-found/other/ for lost blob objects
+ls .git/lost-found/other/",git fsck recovery is not guaranteed — object garbage collection (git gc) permanently removes unreferenced objects. If gc ran after the loss recovery is impossible. Use git stash before any destructive operation.,https://git-scm.com/docs/git-fsck
+Git Clean,clean untracked remove delete build artifacts temporary files,Remove untracked files and directories from the working tree. Use -n for dry run first. Use -f to force. Use -d to include untracked directories.,"Cleaning build artifacts, removing untracked generated files, or getting to a pristine state","# Dry run — see what would be deleted
+git clean -n
+
+# Remove untracked files
+git clean -f
+
+# Remove untracked files AND directories
+git clean -fd
+
+# Remove ignored files too (build artifacts)
+git clean -fdx
+
+# Interactive mode
+git clean -i",git clean -fdx is VERY destructive — it removes .gitignored files including .env virtual environments and build output. Run -n first EVERY time. Irreversible.,https://git-scm.com/docs/git-clean
+Git Bisect,bisect binary search good bad regression bug commit run script exit code,"Perform a binary search through commit history to find which commit introduced a bug. Mark commits as 'good' (old) or 'bad' (new). Script mode: exit 0 = good; exit 1-127 (except 125) = bad; exit 125 = skip this commit (cannot be tested). Exit codes 126 and 127 are POSIX shell errors and abort bisect.","When a bug exists now but didn't before — you know the last good commit (e.g. a tag) and need to find the culprit","# Start bisect
+git bisect start
+git bisect bad HEAD
+git bisect good v1.0.0
+
+# Test current checkout, then mark it
+git bisect good   # or: git bisect bad
+
+# After Git finds the bad commit
+git bisect reset    # returns to original HEAD
+
+# Automate with a test script (exit 0=good, 1-127=bad, 125=skip)
+git bisect run python -m pytest tests/test_auth.py -q","git bisect leaves you on a detached HEAD — always run git bisect reset after. Exit code 125 skips the current commit. Exit codes 126/127 are treated as normal test errors. Requires a clean working tree to start.",https://git-scm.com/docs/git-bisect
+Git Worktree,worktree multiple checkout parallel branch simultaneously work repair move prune lock,"git worktree allows checking out multiple branches simultaneously in separate directories. Each worktree shares the same .git database. Key subcommands per docs: add, list, lock, move, prune, remove, repair. The main worktree cannot be removed. remove requires --force for unclean worktrees or those with submodules.","Working on a hotfix urgently while mid-feature, or running tests on main while developing on feature","# Add a second worktree for a hotfix (from official docs example)
+git worktree add -b emergency-fix ../temp master
+cd ../temp
+# ... hack hack hack ...
+git commit -a -m 'emergency fix for boss'
+cd -
+git worktree remove ../temp
+
+# List all worktrees
+git worktree list
+
+# Lock a portable worktree to prevent pruning
+git worktree lock --reason 'USB drive' ../my-worktree
+
+# Repair after moving main worktree manually
+git worktree repair
+
+# Prune stale worktree references
+git worktree prune","Each worktree checkout is exclusive — you cannot check out the same branch in two worktrees simultaneously. Multiple checkout is still experimental for submodules per official docs. git worktree remove only works on clean worktrees — use --force for unclean ones. Use worktree.useRelativePaths=true for portable setups (requires Git extension; incompatible with older Git).",https://git-scm.com/docs/git-worktree

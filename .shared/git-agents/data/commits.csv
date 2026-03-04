@@ -1,0 +1,70 @@
+Command Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Conventional Commits,conventional commits feat fix chore docs refactor type scope message format,Write commit messages in the format: type(scope): description. Types include feat fix docs style refactor perf test chore build ci. Enables automated changelogs and semantic versioning.,Every commit in a team project or any project using semantic-release,"feat(auth): add JWT refresh token endpoint
+
+fix(blocks): cap miners fetch to 100 concurrent RPC calls
+
+docs(readme): update installation steps
+
+chore(deps): upgrade httpx to 0.27",Using vague messages like 'fix stuff' or 'WIP'. Skipping the type prefix breaks automated tooling like semantic-release and commitizen.,https://www.conventionalcommits.org/
+Amend Last Commit,amend last commit message edit fix typo staged index,Change the last commit message or add staged files to it without creating a new commit. The new commit has the same parents and author as the current one (use --reset-author to change authorship). Rewrites the tip of the current branch.,"When you spot a typo in the last commit message, or forgot to stage a file","# Fix just the message
+git commit --amend -m 'feat(auth): add JWT refresh token endpoint'
+
+# Add a forgotten file and keep the original message
+git add forgotten_file.py
+git commit --amend --no-edit
+
+# Change message and reset authorship to committer
+git commit --amend --reset-author",Only amend commits that have NOT been pushed to a shared branch. Amending rewrites the commit SHA — collaborators who have the old SHA will have diverged history. See 'RECOVERING FROM UPSTREAM REBASE' in git-rebase docs.,https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---amend
+Interactive Rebase Squash,squash fixup rebase interactive squash commits clean history,Use git rebase -i to squash multiple local commits into one clean commit before merging. Replace 'pick' with 'squash' (keeps message) or 'fixup' (drops message). The 'reword' action lets you edit just the message without squashing.,"Before merging a feature branch — squash WIP commits into one meaningful commit","# Squash last 4 commits
+git rebase -i HEAD~4
+
+# In editor change 'pick' to the desired action:
+# pick  a1b2c3 feat: start feature
+# squash d4e5f6 wip           <- keeps message, merges into above
+# fixup  g7h8i9 more wip      <- drops message, merges into above
+# reword j0k1l2 tests          <- edit commit message only",Never squash commits already on a shared branch (main/develop). This rewrites history and forces collaborators to hard-reset. Only squash LOCAL or private branch commits.,https://git-scm.com/docs/git-rebase#_interactive_mode
+Git Fixup + Autosquash,fixup autosquash --fixup amend reword commit squash interactive rebase,"Create a fixup commit that targets an earlier commit. Three variants per official docs: plain --fixup patches content only (title prefixed 'fixup!'); --fixup=amend: patches content AND replaces commit message; --fixup=reword: replaces message only (no content change, shorthand for --fixup=amend: --only). Use git rebase --autosquash to fold all fixup commits.","When you need to fix content or reword the message of an earlier commit that is not the most recent one","# Fix content of an earlier commit (keeps original message)
+git commit --fixup=a1b2c3d
+
+# Fix content AND rewrite message (opens editor for new message)
+git commit --fixup=amend:a1b2c3d
+
+# Reword message only — no content changes consumed from index
+git commit --fixup=reword:a1b2c3d
+
+# Auto-fold all fixup/amend commits during interactive rebase
+git rebase -i --autosquash HEAD~5
+
+# Or set permanently in config to always autosquash
+git config --global rebase.autosquash true","--fixup=amend: opens an editor for the new message. --fixup=reword: uses the 'amend!' prefix message as the replacement. Neither variant changes the original commit's authorship when autosquashed. The --squash= flag creates a 'squash!' prefix commit instead, which merges messages.",https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---fixupamaborerewordltcommitgt
+GPG Signed Commits,gpg sign commit verified signature key signing identity,Sign commits with a GPG key so platforms like GitHub show a 'Verified' badge. Proves authorship and integrity. Required by some enterprise policies.,"In security-sensitive repos or when organization policy requires verified commits","# Configure Git to sign all commits
+git config --global user.signingkey YOUR_KEY_ID
+git config --global commit.gpgsign true
+
+# Sign a single commit
+git commit -S -m 'feat: something important'",Requires a valid GPG key configured with your Git email. On macOS use pinentry-mac. Missing the key causes commit failure — always test on a scratch branch first.,https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits
+Empty Commit,empty commit trigger CI pipeline placeholder message --allow-empty,Create a commit with no file changes using --allow-empty. Useful for triggering CI pipelines or marking a point in history. Normally Git prevents committing when no changes exist for safety.,"When you need to trigger a CI/CD pipeline without code changes, or to create a milestone marker","git commit --allow-empty -m 'chore: trigger deployment pipeline'",Empty commits appear in git log and can clutter history if overused. Avoid using them as a regular practice — document why the empty commit was needed.,https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---allow-empty
+Commit Message Template,template gitmessage commit format team standard configuration,Set a default commit message template via git config commit.template. Helps teams maintain consistent message format.,"When onboarding a team or enforcing message standards project-wide","# Create a template file
+cat > ~/.gitmessage << 'EOF'
+# type(scope): Short summary (max 72 chars)
+#
+# Body: What and WHY (not how)
+#
+# Footer: Refs #issue, Breaking: description
+EOF
+
+git config --global commit.template ~/.gitmessage","The template only applies to the editor-opened commit message — it is skipped when using git commit -m. Remind teams to omit -m to get the template. This is configured via the commit.template config variable.",https://git-scm.com/book/en/v2/Customizing-Git-Git-Configuration#_core_editor
+Stash Before Commit,stash push pop apply dirty working tree uncommitted changes,"Temporarily shelve uncommitted changes with git stash push so you can work on something else then restore the changes later. Note: git stash save is deprecated — use git stash push instead.","When you need to switch context (urgent hotfix) but aren't ready to commit current work","# Save current changes (modern syntax — save is deprecated)
+git stash push -m 'WIP: feature/auth half done'
+
+# List stashes
+git stash list
+
+# Restore latest stash and drop it
+git stash pop
+
+# Apply a specific stash without dropping it from the list
+git stash apply stash@{2}
+
+# Create a branch from a stash (applies stash and drops it automatically)
+git stash branch feature/recovered stash@{0}","git stash pop applies AND removes the stash from the list. If apply causes conflicts the stash is NOT dropped — you must resolve conflicts and then run git stash drop manually. Always name stashes with -m for clarity. git stash save is deprecated — use git stash push.",https://git-scm.com/docs/git-stash

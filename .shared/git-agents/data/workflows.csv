@@ -1,0 +1,107 @@
+Workflow Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Trunk-Based Development,trunk based development main short-lived branches feature flags CI,All developers commit frequently to a single main branch (trunk). Feature branches live for <1 day. Feature flags control rollout. Requires strong CI.,"High-velocity teams with strong CI/CD — enables continuous deployment to production","# Short-lived feature branch (same day merge)
+git switch -c feature/add-trusted-host-middleware
+# ... make changes, commit
+git push -u origin feature/add-trusted-host-middleware
+# Open PR -> must pass CI -> squash merge -> delete branch
+# Main is always deployable -- no long-lived branches",Requires mature CI and feature flag infrastructure. Without fast automated tests trunk-based development leads to broken deployments.,https://trunkbaseddevelopment.com/
+Gitflow Workflow,gitflow feature develop release hotfix tags long-lived Vincent Vincent Driessen,Gitflow uses long-lived main and develop branches with feature release and hotfix branches. Releases are tagged on main. Developed by Vincent Driessen.,"Projects with scheduled releases and multiple parallel versions — common in library and product development","# Initialize gitflow
+git flow init
+
+# Start a feature
+git flow feature start add-cors-middleware
+
+# Finish a feature (merges to develop)
+git flow feature finish add-cors-middleware
+
+# Create a release
+git flow release start 2.1.0
+git flow release finish 2.1.0  # merges to main + develop + tags",Gitflow adds overhead for small teams. Long-lived branches increase merge conflict risk. Modern teams often prefer trunk-based for faster iteration.,https://nvie.com/posts/a-successful-git-branching-model/
+Semantic Versioning and Tags,semver version tag release major minor patch annotated git tag,Use semantic versioning (MAJOR.MINOR.PATCH) for release tags. Create annotated tags on main for releases. Push tags separately from commits.,"Every production release — semver communicates breaking changes (major) features (minor) or fixes (patch)","# Create an annotated release tag
+git tag -a v2.1.0 -m 'Release v2.1.0
+- Add CORSMiddleware (configurable via env)
+- Add bare Exception guard
+- Add semaphore to list_miners'
+
+# Push tag to remote
+git push origin v2.1.0
+
+# List all tags sorted by version
+git tag --sort=version:refname
+
+# Delete a wrong tag
+git tag -d v2.1.0-draft
+git push origin --delete v2.1.0-draft",Lightweight tags (git tag v2.1.0) have no message or tagger info. Always use annotated tags (-a) for releases. Semver pre-releases: v2.1.0-rc.1.,https://semver.org/
+Pull Request Workflow,PR pull request review merge branch fork GitHub GitLab code review,Open a Pull Request (PR) from a feature branch to main/develop. Require code review CI checks and approval before merging. The standard collaborative workflow.,"Any change to a shared codebase — PRs enable code review, discussion, and CI gating","# 1. Branch from main
+git switch -c feature/GH-42-add-exception-guard
+
+# 2. Commit changes with conventional messages
+git commit -m 'feat(errors): add bare Exception catch-all handler'
+
+# 3. Push and open PR
+git push -u origin feature/GH-42-add-exception-guard
+# -> Open PR on GitHub -> request review -> CI must pass -> squash merge
+
+# 4. After merge — delete remote branch
+git push origin --delete feature/GH-42-add-exception-guard
+git branch -d feature/GH-42-add-exception-guard",PR titles should follow Conventional Commits format — many platforms use it for automated changelogs. Keep PRs small (<400 lines) for better review quality.,https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests
+GitHub Flow,github flow simple main feature branch CI continuous deploy,GitHub Flow is a simplified workflow: branch from main. work. open PR. review. merge to main. Deploy immediately. No develop branch or release branches.,"Small teams deploying continuously — simpler than Gitflow with fewer branch types","# GitHub Flow in 5 steps:
+# 1. Branch from main
+git switch -c feature/add-semaphore-to-miners
+
+# 2. Make atomic commits
+git commit -m 'perf(miners): cap RPC fan-out at 10 concurrent calls'
+
+# 3. Push often
+git push origin feature/add-semaphore-to-miners
+
+# 4. Open PR, get review, CI must pass
+
+# 5. Merge to main -> deploy
+# (use squash merge for clean history)",GitHub Flow assumes you deploy from main immediately. If you need staging or release branches you need a more complex workflow.,https://docs.github.com/en/get-started/using-github/github-flow
+Changelog Generation,changelog automated conventional commits semantic-release git log,Generate changelogs automatically from commit history using tools like conventional-changelog or semantic-release based on Conventional Commits messages.,"Before every release — saves manual changelog writing and keeps it accurate","# Install conventional-changelog
+npm install -g conventional-changelog-cli
+
+# Generate CHANGELOG.md from last tag to HEAD
+conventional-changelog -p angular -i CHANGELOG.md -s
+
+# Or use semantic-release for fully automated versioning + changelog
+npx semantic-release
+
+# Manual: extract from git log
+git log v1.0.0..HEAD --pretty='- %s' | grep '^- feat\|^- fix'",Requires ALL commits to follow Conventional Commits format — one non-compliant commit breaks categorization. Enforce with commit-msg hook.,https://github.com/conventional-changelog/conventional-changelog
+Release Branch Strategy,release branch stabilize hotfix fix freeze merge back,Create a release branch from develop when stabilizing a release. Only bug fixes go into the release branch. After release merge back to main and develop.,"Projects that need a stabilization period before release — common in products with QA cycles","# Cut a release branch
+git switch -c release/2.1.0 develop
+
+# Only bug fixes during stabilization
+git commit -m 'fix(auth): handle expired token edge case'
+
+# Finish release: merge to main and develop
+git switch main
+git merge --no-ff release/2.1.0
+git tag -a v2.1.0 -m 'Release v2.1.0'
+
+git switch develop
+git merge --no-ff release/2.1.0
+git branch -d release/2.1.0",Release branches require discipline — no features allowed. Feature freeze must be enforced through PR rules. Complex for small teams.,https://git-scm.com/book/en/v2/Git-Branching-Branching-Workflows
+.gitignore Patterns,gitignore ignore patterns exclude files secrets env build artifacts tracked,Configure .gitignore to exclude files that should never be tracked: secrets env files build output compiled binaries logs. Use .gitignore.io to generate templates.,"Every new project — set up .gitignore before the first commit to avoid tracking secrets","# Common patterns for a Python web project
+# .gitignore
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+
+# Generate at gitignore.io
+curl -L https://www.toptal.com/developers/gitignore/api/python,fastapi > .gitignore
+
+# Remove already-tracked files that should be ignored
+git rm --cached path/to/secret.env",If secrets are accidentally committed they are in history FOREVER — even if removed. You MUST rotate all leaked secrets immediately and consider the breach permanent.,https://git-scm.com/docs/gitignore

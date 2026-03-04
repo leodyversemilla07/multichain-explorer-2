@@ -1,0 +1,82 @@
+Command Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Add Remote,remote add origin upstream fork URL configure push pull,Add a named remote to the repository. origin is the convention for your primary remote. upstream is used for the original repo when working with forks.,"Connecting a local repo to GitHub/GitLab, or adding the upstream for a fork","# Add origin
+git remote add origin https://github.com/leodyversemilla07/multichain-explorer-2.git
+
+# Add upstream for a fork
+git remote add upstream https://github.com/original-owner/repo.git
+
+# List remotes
+git remote -v
+
+# Remove a remote
+git remote remove old-remote",A remote is just a name and URL — it doesn't pull or push automatically. After adding a remote you still need git fetch or git push.,https://git-scm.com/docs/git-remote
+Push to Remote,push origin branch -u upstream force set-upstream tracking,Push local commits to a remote. Use -u on first push to set tracking. Use --force-with-lease instead of --force to avoid clobbering others' work.,"After committing locally and wanting to share or back up your branch","# First push: set tracking
+git push -u origin feature/add-cors-middleware
+
+# Subsequent pushes (tracking set)
+git push
+
+# Safer force push (fails if remote changed since your last fetch)
+git push --force-with-lease
+
+# Delete a remote branch
+git push origin --delete old-feature-branch",Never use git push --force on shared branches (main/develop). --force-with-lease is always safer. Force push rewrites remote history and strands collaborators.,https://git-scm.com/docs/git-push
+Fetch vs Pull,fetch pull remote update local merge rebase download,git fetch downloads remote changes without applying them. git pull fetches then merges (or rebases). Use fetch to inspect before merging.,"Use fetch to review what changed on the remote before merging. Use pull when ready to integrate","# Fetch all remotes without merging
+git fetch --all
+
+# Fetch and prune stale remote refs
+git fetch --prune
+
+# Pull with rebase instead of merge
+git pull --rebase
+
+# Check what will be pulled before merging
+git fetch origin
+git log HEAD..origin/main --oneline",git pull --rebase can cause conflicts just like regular rebase. Set pull.rebase=true in git config to always rebase instead of merge on pull.,https://git-scm.com/docs/git-fetch
+Clone Repository,clone shallow depth partial sparse filter large repo,Clone a remote repository. Use --depth for shallow clone (faster). Use --filter=blob:none for blobless clone of large repos.,"Starting work on an existing project or creating a local copy of a remote","# Standard clone
+git clone https://github.com/leodyversemilla07/multichain-explorer-2.git
+
+# Shallow clone (last 1 commit — fastest CI usage)
+git clone --depth=1 https://github.com/owner/repo.git
+
+# Clone and immediately checkout a branch
+git clone -b develop https://github.com/owner/repo.git
+
+# Blobless clone (all history but no blobs — good balance)
+git clone --filter=blob:none https://github.com/owner/repo.git",Shallow clones break some Git operations like git bisect and full blame. For development always use a full clone. Use shallow only in CI.,https://git-scm.com/docs/git-clone
+Sync Fork with Upstream,fork upstream sync update behind ahead diverged rebase merge,Keep your fork in sync with the original repository's main branch. Fetch upstream changes then merge or rebase your fork's main onto them.,"Before starting new work on a fork, or when a PR shows 'this branch is behind upstream'","# Add upstream once
+git remote add upstream https://github.com/original/repo.git
+
+# Sync your fork's main with upstream
+git fetch upstream
+git switch main
+git rebase upstream/main
+
+# Push the updated main to your fork
+git push origin main --force-with-lease",If your fork's main has diverged (you committed directly to it) rebase may conflict. Keep fork's main clean — only push to feature branches.,https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork
+Git Push Tags,tag push remote annotated lightweight release version,Push tags to the remote. Tags are NOT pushed automatically with git push — they must be pushed explicitly.,"After creating a release tag, to publish it to GitHub so the release appears","# Push a single tag
+git push origin v2.0.0
+
+# Push all local tags
+git push origin --tags
+
+# Create an annotated tag and push
+git tag -a v2.0.0 -m 'Release v2.0.0: adds CORS and exception guard'
+git push origin v2.0.0
+
+# Delete a remote tag
+git push origin --delete v1.9.0-rc",git push --tags pushes ALL tags including old or draft ones. Push specific tags individually for better control. Use annotated tags (-a) for releases.,https://git-scm.com/docs/git-push#Documentation/git-push.txt---tags
+Set Remote URL,remote set-url change update https ssh url migrate,Change the URL of an existing remote — useful when switching from HTTPS to SSH or when a repository is moved.,"Switching authentication method from HTTPS to SSH, or after a repo rename on GitHub","# Change from HTTPS to SSH
+git remote set-url origin git@github.com:leodyversemilla07/multichain-explorer-2.git
+
+# Verify the change
+git remote -v
+
+# Add a push-only URL (different from fetch URL)
+git remote set-url --push origin git@github.com:leodyversemilla07/backup.git",After changing to SSH ensure your SSH key is configured in GitHub Settings > SSH Keys. Test with ssh -T git@github.com before pushing.,https://git-scm.com/docs/git-remote#Documentation/git-remote.txt-emset-urlem
+Sparse Checkout,sparse checkout partial clone large monorepo subdirectory only,Check out only a specific subdirectory of a large repository rather than the entire working tree. Useful for monorepos.,"Working in a large monorepo where you only need a specific service or package","# Enable sparse checkout
+git clone --no-checkout https://github.com/owner/monorepo.git
+cd monorepo
+git sparse-checkout init --cone
+git sparse-checkout set services/auth services/api
+git checkout main",Sparse checkout complicates cross-service refactoring since you can't see other directories. Use only for read-heavy / CI scenarios.,https://git-scm.com/docs/git-sparse-checkout

@@ -1,0 +1,69 @@
+Command Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Merge vs Rebase,merge rebase integrate changes linear history preserve context,Merge creates a merge commit preserving full branch history. Rebase replays commits on top of the target for a linear history. Both integrate changes — choose based on team preference and history clarity.,Use merge to preserve full context; use rebase for linear clean history before merging,"# Merge (preserves branch context)
+git switch main
+git merge feature/add-cors-middleware
+
+# Rebase (linear history)
+git switch feature/add-cors-middleware
+git rebase main
+git switch main
+git merge --ff-only feature/add-cors-middleware",Never rebase commits that have been pushed to a shared branch — it rewrites SHAs and diverges collaborators' history.,https://git-scm.com/book/en/v2/Git-Branching-Rebasing
+Squash Merge,squash merge PR clean history single commit pr,Merge an entire feature branch as a single squashed commit onto the target. Keeps main history clean — each feature = one commit.,"In teams that prefer linear clean history on main — common GitHub PR workflow","# Squash-merge feature into main
+git switch main
+git merge --squash feature/add-cors-middleware
+git commit -m 'feat(cors): add configurable CORS middleware'
+
+# Or via GitHub PR: select 'Squash and merge' button",Squash merge loses individual commit authorship and granularity. The feature branch SHA is not in main history — deleting the branch loses the detail forever.,https://git-scm.com/docs/git-merge#Documentation/git-merge.txt---squash
+Resolve Merge Conflicts,conflict resolve merge rebase abort continue markers ours theirs,When Git detects conflicting changes it inserts conflict markers (<<<<< ===== >>>>>) in the file. Edit files to resolve then mark with git add and continue the merge/rebase.,"Whenever git merge or git rebase stops with 'CONFLICT (content)'","# After conflict is detected
+# 1. Open conflicted file and resolve markers
+# 2. Stage the resolved file
+git add path/to/resolved_file.py
+
+# Continue merge
+git merge --continue
+
+# OR continue rebase
+git rebase --continue
+
+# Abort and undo
+git merge --abort
+git rebase --abort",Use a visual merge tool (git mergetool) for complex conflicts. Always test after resolving. A resolved conflict file that doesn't compile is worse than an abort.,https://git-scm.com/docs/git-merge#_how_conflicts_are_presented
+Cherry Pick,cherry-pick pick specific commit apply another branch hotfix,Apply one or more specific commits from any branch onto the current branch. Creates new commits with the same changes but different SHAs.,"Backporting a bug fix from main to a release branch, or pulling a single commit from a feature branch","# Apply a single commit
+git cherry-pick a1b2c3d
+
+# Apply a range of commits
+git cherry-pick a1b2c3d^..e4f5g6h
+
+# Cherry-pick without committing (stage only)
+git cherry-pick --no-commit a1b2c3d",Cherry-pick duplicates commits — the same logical change now exists in two places with different SHAs. This can cause conflicts later when the source branch is eventually merged.,https://git-scm.com/docs/git-cherry-pick
+Fast-Forward Merge,fast-forward merge ff linear no branch commit,When main has not diverged from the feature branch Git can just move the pointer (fast-forward). Use --ff-only to require this — fail if diverged.,"After a rebase to enforce linear history — block merge if someone has added commits to main","# Force fast-forward (fail if not possible)
+git merge --ff-only feature/my-branch
+
+# Always create a merge commit (no fast-forward)
+git merge --no-ff feature/my-branch",--no-ff always creates a merge commit even when fast-forward is possible. Some teams prefer this to preserve branch topology in history.,https://git-scm.com/docs/git-merge#Documentation/git-merge.txt---ff-only
+Interactive Rebase Reorder,rebase interactive reorder edit drop reword pick commits reorganize,Use git rebase -i to reorder drop edit or reword individual commits. Change 'pick' to the desired action in the editor.,"Before merging to clean up a messy commit sequence — reorder fix-first commits or drop debug commits","git rebase -i HEAD~6
+
+# In editor:
+# pick  a1b2c3 feat: start feature
+# reword d4e5f6 wip: temporary debug
+# drop   g7h8i9 debug: remove print statements
+# pick  j0k1l2 tests: add coverage",Drop irreversibly removes commits. Use git reflog within 90 days to recover dropped commits if needed. Always work on a copy branch first.,https://git-scm.com/docs/git-rebase#_interactive_mode
+Merge Strategy Ours Theirs,strategy ours theirs recursive merge conflict resolution prefer,Use -X ours or -X theirs to automatically resolve all conflicts in one direction during a merge or rebase.,"When you know definitively that one side is correct for all conflicts (e.g. applying a hotfix over outdated config)","# Prefer current branch in all conflicts
+git merge -X ours feature/config-update
+
+# Prefer incoming branch in all conflicts  
+git merge -X theirs feature/config-update
+
+# For rebase (reversed: ours=incoming, theirs=current)
+git rebase -X theirs main",-X ours/-X theirs on rebase is reversed from merge. In rebase 'ours' is the incoming replayed commit and 'theirs' is the branch. This frequently causes confusion.,https://git-scm.com/docs/git-merge#Documentation/git-merge.txt--Xltoptiongt
+Abort Ongoing Merge Rebase,abort undo cancel merge rebase in-progress reset recover,Cancel an in-progress merge or rebase operation and return to the state before it started. Safe to use at any point during conflict resolution.,"When a merge or rebase went wrong and you want to start over or take a different approach","# Abort a merge
+git merge --abort
+
+# Abort a rebase
+git rebase --abort
+
+# Abort a cherry-pick
+git cherry-pick --abort
+
+# Check current state
+git status",git merge --abort restores the working tree but only works during an active merge. If you made commits after starting use git reset instead.,https://git-scm.com/docs/git-merge#Documentation/git-merge.txt---abort

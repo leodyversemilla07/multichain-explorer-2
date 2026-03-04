@@ -1,0 +1,100 @@
+Command Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+Pretty Git Log,log oneline graph decorate format pretty history visualize,View commit history with various formatting options. --oneline for compact view --graph for branch topology --pretty=format for custom output.,"Reviewing recent commits, understanding branch structure, or preparing a changelog","# One line per commit
+git log --oneline -20
+
+# Branch graph
+git log --oneline --graph --decorate --all
+
+# Author + date
+git log --format='%h %an %ar %s' -15
+
+# Filter by author
+git log --author='Leodyver' --oneline",Pipe git log into less by default. Set core.pager=cat in git config to disable paging. --all shows all refs including remotes.,https://git-scm.com/docs/git-log
+Git Blame,blame annotate who wrote line author change file,Show which commit and author last modified each line of a file. Essential for understanding why code was written a certain way.,"When investigating a bug or trying to understand the intent behind specific code","# Blame a file
+git blame src/main.py
+
+# Blame specific line range
+git blame -L 50,80 src/main.py
+
+# Ignore whitespace changes
+git blame -w src/main.py
+
+# Show full commit hash
+git blame --abbrev=40 src/main.py",git blame shows the LAST person who touched a line — not the original author. Use git log -p -- file to see all changes over time.,https://git-scm.com/docs/git-blame
+Git Bisect,bisect binary search good bad regression find bug commit run script exit code,"Perform a binary search through commit history to find which commit introduced a bug. Mark commits as 'good' or 'bad'. Per official docs for bisect run mode: exit 0 = good; exit 1-127 (except 125) = bad; exit 125 = skip (cannot test this commit). Exit codes 126 and 127 are POSIX shell errors for command-not-found and abort the bisect.","When a bug exists now but didn't before — you know the good commit (e.g. last tag) and need to find the culprit","# Start bisect
+git bisect start
+git bisect bad HEAD
+git bisect good v1.0.0
+
+# Test current checkout, then mark it
+git bisect good   # or: git bisect bad
+
+# After Git finds the bad commit, reset to original HEAD
+git bisect reset
+
+# Automate with a test script (exit 0=good, 1-127=bad, 125=skip)
+git bisect run python -m pytest tests/test_auth.py -q","git bisect leaves you on a detached HEAD — always run git bisect reset after. Exit code 125 skips the current commit (used when commit cannot be built/tested). Exit codes 126/127 abort bisect entirely. git bisect start also cleans up old bisection state.",https://git-scm.com/docs/git-bisect
+Git Reflog,reflog recover lost commit SHA detached head reference log git log -g,"Reflog records when branch tips and other references were updated locally. Per official docs: git reflog show is the default subcommand and is an alias for git log -g --abbrev-commit --pretty=oneline. Use it to recover commits lost after rebase, reset, or branch deletion. Entries expire: reachable ~90 days, unreachable ~30 days.","When you accidentally deleted a branch, reset too far, or lost commits during a rebase","# View full reflog
+git reflog
+
+# Reflog for a specific branch
+git reflog show feature/lost-branch
+
+# Recover a lost commit
+git checkout -b recovery-branch HEAD@{5}
+
+# Or reset to a previous HEAD position
+git reset --hard HEAD@{3}",Reflog entries expire — by default 90 days for reachable commits and 30 days for unreachable. Use git gc --prune=now with caution as it clears expired entries.,https://git-scm.com/docs/git-reflog
+Log Filter by File or String,log grep pickaxe -S -G search commit string change code,Find commits that changed a specific string or touched a specific file. -S (pickaxe) finds commits that added/removed an exact string. -G uses regex.,"Finding when a function was added, a variable was renamed, or a specific bug was introduced","# Find commits that changed a specific string
+git log -S 'get_blockchain_service' --oneline
+
+# Regex version
+git log -G 'def get_.*_service' --oneline
+
+# Commits that touched a file
+git log --oneline -- routers/chains.py
+
+# Show the patch too
+git log -p -S 'CORSMiddleware'",--S finds commits where the count of the string changed. It won't find a commit that added and removed the same string in equal amounts. Use -G for regex.,https://git-scm.com/docs/git-log#Documentation/git-log.txt--Sltgt
+Git Diff,diff staged unstaged changes compare branches files working tree index,Show differences between working tree, index (staged), commits, or branches. Essential for reviewing changes before committing.,"Before committing to review what you're about to commit, or comparing branches","# Unstaged changes (working tree vs index)
+git diff
+
+# Staged changes (index vs last commit)
+git diff --staged
+
+# Compare two branches
+git diff main..feature/my-branch
+
+# Specific file
+git diff HEAD~3 -- routers/chains.py
+
+# Summary only (stats)
+git diff --stat main",git diff without arguments shows nothing if all changes are staged. Always check both git diff and git diff --staged before committing.,https://git-scm.com/docs/git-diff
+Show Commit Details,show commit details patch tree object files changed,Display the details of a specific commit including its diff patch author date and message.,"Reviewing exactly what changed in a specific commit, or inspecting a tagged release","# Show latest commit
+git show
+
+# Show a specific commit
+git show a1b2c3d
+
+# Show a tagged release
+git show v2.0.0
+
+# Show only the file names changed
+git show --stat HEAD
+
+# Show a specific file at a commit
+git show HEAD~2:routers/chains.py",git show on a merge commit shows the combined diff which can be large and confusing. Use git diff MERGE_HEAD^ MERGE_HEAD for clarity.,https://git-scm.com/docs/git-show
+Git Grep,grep search pattern code repository all commits find string,Search across all tracked files in the repository for a pattern. Faster than filesystem grep because it uses the Git index.,"Finding all usages of a function, class, or string across the codebase","# Search current working tree
+git grep 'CORSMiddleware'
+
+# Case-insensitive
+git grep -i 'cors'
+
+# Show line numbers
+git grep -n 'get_blockchain_service'
+
+# Search across specific commits
+git grep 'semaphore' HEAD~10
+
+# Count matches per file
+git grep -c 'async def'",git grep only searches TRACKED files. Untracked files and .gitignore patterns are excluded. Use grep -r for untracked files.,https://git-scm.com/docs/git-grep

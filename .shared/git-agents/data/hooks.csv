@@ -1,0 +1,103 @@
+Hook Name,Keywords,Description,When to Use,Command Example,Gotchas,Docs URL
+pre-commit Hook,pre-commit hook lint format validate check staged files --no-verify bypass,"Run automatically before git commit. Per official docs: can be bypassed with git commit --no-verify. Ideal for running linters, formatters and fast tests on staged files to block bad commits locally. Receives no parameters.","Enforcing code style and catching obvious errors before they enter the history","# .git/hooks/pre-commit (chmod +x)
+#!/bin/sh
+# Run ruff linter on staged Python files
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
+if [ -n ""$STAGED"" ]; then
+    echo ""$STAGED"" | xargs ruff check --fix
+    echo ""$STAGED"" | xargs ruff format
+    echo ""$STAGED"" | xargs git add
+fi
+
+# Or use pre-commit framework
+pip install pre-commit
+pre-commit install",Hooks are not committed by default (.git/hooks/ is excluded). Use the pre-commit framework or lefthook to version-control and share hooks across the team.,https://git-scm.com/docs/githooks#_pre_commit
+commit-msg Hook,commit-msg hook conventional message format validate regex enforce,Run after the commit message is written but before the commit is finalized. Use it to enforce message format (e.g. Conventional Commits).,"Enforcing a team commit message standard — blocks commits with non-compliant messages","# .git/hooks/commit-msg (chmod +x)
+#!/bin/sh
+MSG=$(cat ""$1"")
+PATTERN='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?: .{1,72}$'
+if ! echo ""$MSG"" | grep -qE ""$PATTERN""; then
+    echo 'ERROR: Commit message does not follow Conventional Commits format.'
+    echo 'Example: feat(auth): add JWT refresh token'
+    exit 1
+fi",The hook receives the commit message file path as $1 — read it with cat. If the script exits non-zero the commit is aborted.,https://git-scm.com/docs/githooks#_commit_msg
+pre-push Hook,pre-push hook test run CI validate before push remote,Run before git push executes. Ideal for running the test suite or build to prevent broken code from reaching the remote.,"Blocking pushes that break tests — a local CI gate before code reaches the server","# .git/hooks/pre-push (chmod +x)
+#!/bin/sh
+echo 'Running tests before push...'
+python -m pytest tests/ -q --timeout=30
+STATUS=$?
+if [ $STATUS -ne 0 ]; then
+    echo 'Tests failed — push aborted. Run pytest to see failures.'
+    exit 1
+fi
+echo 'Tests passed. Pushing...'",pre-push can be bypassed with git push --no-verify. For enforcement add the same check in CI. Slow hooks will frustrate developers — keep them fast (<30s).,https://git-scm.com/docs/githooks#_pre_push
+pre-commit Framework,pre-commit framework hooks yaml config yaml version controlled shared team,.pre-commit-config.yaml stores hook configurations that are version-controlled and shared. Hooks run in isolated environments — no global tool requirements.,"Team projects that need consistent hooks across developer machines","# Install
+pip install pre-commit
+
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+# Install and run
+pre-commit install
+pre-commit run --all-files",Hooks run in isolated virtualenvs — first run is slow while environments are built. Add .pre-commit-config.yaml to version control and document in README.,https://pre-commit.com/
+post-merge Hook,post-merge hook after pull merge sync dependencies install packages,Run after a successful git merge (including git pull). Useful for auto-running dependency installs when lock files change.,"Auto-installing dependencies when package lock files are updated on pull","# .git/hooks/post-merge (chmod +x)
+#!/bin/sh
+CHANGED=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD)
+if echo ""$CHANGED"" | grep -q 'requirements.txt'; then
+    echo 'requirements.txt changed — reinstalling...'
+    pip install -r requirements.txt
+fi
+if echo ""$CHANGED"" | grep -q 'package-lock.json'; then
+    echo 'package-lock.json changed — running npm install...'
+    npm install
+fi",post-merge does NOT run on rebase. Use post-rewrite hook for rebase-triggered installs. Avoid slow operations that block the developer workflow.,https://git-scm.com/docs/githooks#_post_merge
+prepare-commit-msg Hook,prepare-commit-msg hook template auto-fill branch ticket jira,"Run before the commit message editor opens. Per official docs: this hook is NOT suppressed by --no-verify (unlike pre-commit). Takes 1-3 params: (1) commit log message file, (2) source of message (message/template/merge/squash/commit), (3) commit SHA if -c/-C/--amend. Non-zero exit aborts the commit.","Auto-inserting a Jira/GitHub issue number from the branch name into the commit message","# .git/hooks/prepare-commit-msg (chmod +x)
+#!/bin/sh
+# Extract ticket from branch: feature/GH-123-add-cors -> GH-123
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TICKET=$(echo ""$BRANCH"" | grep -o '[A-Z]\+-[0-9]\+' | head -1)
+if [ -n ""$TICKET"" ] && [ -z ""$(head -1 $1)"" ]; then
+    sed -i.bak ""1s/^/[$TICKET] /"" ""$1""
+fi",Only fires when the user will see the editor. Not triggered by git commit -m (which skips the editor). Check $2 argument to know the message source (message/template/merge etc).,https://git-scm.com/docs/githooks#_prepare_commit_msg
+lefthook,lefthook hooks manager yaml parallel fast performance,Lefthook is a fast Git hooks manager written in Go. Runs hooks in parallel. Config is version-controlled in lefthook.yml. No runtime dependencies for hook runners.,"Teams that want pre-commit-like hook management but with better performance and simpler config","# Install (via npm, brew, or direct binary)
+npm install @arkweid/lefthook --save-dev
+
+# lefthook.yml
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: '*.py'
+      run: ruff check {staged_files}
+    format:
+      glob: '*.py'
+      run: ruff format {staged_files}
+pre-push:
+  commands:
+    tests:
+      run: python -m pytest tests/ -q
+
+lefthook install",Lefthook uses {staged_files} {push_files} placeholders — not available in all versions. Check the version compatibility before using.  Add lefthook.yml to .gitignore exclusions.,https://github.com/evilmartians/lefthook
+post-checkout Hook,post-checkout hook environment setup after branch switch virtualenv activate clone worktree,"Run after git checkout or git switch. Per official docs: also runs after git clone (unless --no-checkout/-n is used) and after git worktree add (unless --no-checkout). Receives 3 params: $1=old HEAD ref, $2=new HEAD ref, $3=1 for branch checkout / 0 for file checkout. Cannot affect the outcome of checkout/switch.","Reminding developers to activate a virtualenv or run migrations after switching branches, or running setup after fresh clone","# .git/hooks/post-checkout (chmod +x)
+#!/bin/sh
+# $1=old HEAD, $2=new HEAD, $3=1 if branch checkout 0 if file checkout
+# After git clone: $1=null-ref, $2=new HEAD, $3=1
+if [ ""$3"" = '1' ]; then
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    echo ""Switched to branch: $BRANCH""
+    if [ -f '.env' ]; then
+        echo 'Reminder: .env file exists. Activate your virtualenv.'
+    fi
+fi","post-checkout fires on file checkout too (git checkout -- file) — check $3 to distinguish. Also fires after git clone (with $1=null-ref $3=1) and after git worktree add. This hook cannot affect the outcome of checkout or switch.",https://git-scm.com/docs/githooks#_post_checkout
