@@ -14,7 +14,7 @@ Handles:
 import asyncio
 from typing import Dict, Any, List
 
-from fastapi import APIRouter, Depends, Path, Request, HTTPException
+from fastapi import APIRouter, Depends, Path, Request, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from routers.dependencies import (
@@ -30,7 +30,8 @@ from routers.dependencies import (
 router = APIRouter(tags=["Transactions"])
 
 
-@router.get("/{chain_name}/transactions", response_class=HTMLResponse, name="transactions")
+@router.get("/{chain_name}/transactions", response_class=HTMLResponse, name="transactions",
+            summary="List recent transactions")
 async def list_transactions(
     request: Request,
     chain: ChainDep,
@@ -124,7 +125,8 @@ async def list_transactions(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="transaction")
+@router.get("/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="transaction",
+            summary="Transaction details")
 async def transaction_detail(
     request: Request,
     chain: ChainDep,
@@ -139,7 +141,7 @@ async def transaction_detail(
     transaction = await service.get_transaction(txid)
 
     if not transaction:
-        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
 
     return templates.TemplateResponse(
         name="pages/transaction.html",
@@ -151,7 +153,8 @@ async def transaction_detail(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}/raw", response_class=JSONResponse, name="raw_transaction")
+@router.get("/{chain_name}/tx/{txid}/raw", response_class=JSONResponse, name="raw_transaction",
+            summary="Raw transaction JSON")
 async def raw_transaction(
     request: Request,
     chain: ChainDep,
@@ -166,9 +169,9 @@ async def raw_transaction(
     try:
         transaction = await service.call("getrawtransaction", [txid, 1])
         if not transaction:
-            raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
     except Exception:
-        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
 
     # If the client accepts JSON, return JSON. Otherwise return the HTML view of the JSON.
     accept = request.headers.get("accept", "")
@@ -186,7 +189,8 @@ async def raw_transaction(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}/hex", response_class=HTMLResponse, name="raw_transaction_hex")
+@router.get("/{chain_name}/tx/{txid}/hex", response_class=HTMLResponse, name="raw_transaction_hex",
+            summary="Raw transaction hex")
 async def raw_transaction_hex(
     request: Request,
     chain: ChainDep,
@@ -201,9 +205,9 @@ async def raw_transaction_hex(
     try:
         hex_data = await service.call("getrawtransaction", [txid, 0])
         if not hex_data:
-            raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
     except Exception:
-        raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
 
     return templates.TemplateResponse(
         name="pages/raw_transaction_hex.html",
@@ -215,7 +219,8 @@ async def raw_transaction_hex(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}/output/{n}", response_class=HTMLResponse, name="tx_output_data")
+@router.get("/{chain_name}/tx/{txid}/output/{n}", response_class=HTMLResponse, name="tx_output_data",
+            summary="Transaction output data")
 async def transaction_output(
     request: Request,
     chain: ChainDep,
@@ -235,7 +240,7 @@ async def transaction_output(
     # Get specific output
     vouts = transaction.get("vout", [])
     if n >= len(vouts):
-        raise HTTPException(status_code=404, detail=f"Output {n} not found in transaction")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Output {n} not found in transaction")
 
     output = vouts[n]
 

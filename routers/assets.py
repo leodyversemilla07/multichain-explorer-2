@@ -32,7 +32,8 @@ from routers.dependencies import (
 router = APIRouter(tags=["Assets"])
 
 
-@router.get("/{chain_name}/assets", response_class=HTMLResponse, name="assets")
+@router.get("/{chain_name}/assets", response_class=HTMLResponse, name="assets",
+            summary="List assets")
 async def list_assets(
     request: Request,
     chain: ChainDep,
@@ -85,7 +86,8 @@ async def list_assets(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}", response_class=HTMLResponse, name="asset")
+@router.get("/{chain_name}/asset/{asset_name}", response_class=HTMLResponse, name="asset",
+            summary="Asset details")
 async def asset_detail(
     request: Request,
     chain: ChainDep,
@@ -114,7 +116,8 @@ async def asset_detail(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/holders", response_class=HTMLResponse, name="asset_holders")
+@router.get("/{chain_name}/asset/{asset_name}/holders", response_class=HTMLResponse, name="asset_holders",
+            summary="Asset holders")
 async def asset_holders(
     request: Request,
     chain: ChainDep,
@@ -168,7 +171,8 @@ async def asset_holders(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/transactions", response_class=HTMLResponse, name="asset_transactions")
+@router.get("/{chain_name}/asset/{asset_name}/transactions", response_class=HTMLResponse, name="asset_transactions",
+            summary="Asset transaction history")
 async def asset_transactions(
     request: Request,
     chain: ChainDep,
@@ -230,7 +234,8 @@ async def asset_transactions(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/issues", response_class=HTMLResponse, name="asset_issues")
+@router.get("/{chain_name}/asset/{asset_name}/issues", response_class=HTMLResponse, name="asset_issues",
+            summary="Asset issuances")
 async def asset_issues(
     request: Request,
     chain: ChainDep,
@@ -287,7 +292,8 @@ async def asset_issues(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/permissions", response_class=HTMLResponse, name="asset_permissions")
+@router.get("/{chain_name}/asset/{asset_name}/permissions", response_class=HTMLResponse, name="asset_permissions",
+            summary="Asset permissions")
 async def asset_permissions(
     request: Request,
     chain: ChainDep,
@@ -324,7 +330,9 @@ async def asset_permissions(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/holder/{address}/transactions", response_class=HTMLResponse, name="holder_transactions")
+@router.get("/{chain_name}/asset/{asset_name}/holder/{address}/transactions",
+            response_class=HTMLResponse, name="holder_transactions",
+            summary="Holder transaction history")
 async def holder_transactions(
     request: Request,
     chain: ChainDep,

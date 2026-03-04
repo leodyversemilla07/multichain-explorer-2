@@ -37,7 +37,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Streams"])
 
 
-@router.get("/{chain_name}/streams", response_class=HTMLResponse, name="streams")
+@router.get("/{chain_name}/streams", response_class=HTMLResponse, name="streams",
+            summary="List streams")
 async def list_streams(
     request: Request,
     chain: ChainDep,
@@ -112,7 +113,8 @@ async def list_streams(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}", response_class=HTMLResponse, name="stream")
+@router.get("/{chain_name}/stream/{stream_name}", response_class=HTMLResponse, name="stream",
+            summary="Stream details")
 async def stream_detail(
     request: Request,
     chain: ChainDep,
@@ -155,7 +157,8 @@ async def stream_detail(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/items", response_class=HTMLResponse, name="stream_items")
+@router.get("/{chain_name}/stream/{stream_name}/items", response_class=HTMLResponse, name="stream_items",
+            summary="Stream items")
 async def stream_items(
     request: Request,
     chain: ChainDep,
@@ -224,7 +227,8 @@ async def stream_items(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/keys", response_class=HTMLResponse, name="stream_keys")
+@router.get("/{chain_name}/stream/{stream_name}/keys", response_class=HTMLResponse, name="stream_keys",
+            summary="Stream keys")
 async def stream_keys(
     request: Request,
     chain: ChainDep,
@@ -287,7 +291,8 @@ async def stream_keys(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/publishers", response_class=HTMLResponse, name="stream_publishers")
+@router.get("/{chain_name}/stream/{stream_name}/publishers", response_class=HTMLResponse, name="stream_publishers",
+            summary="Stream publishers")
 async def stream_publishers(
     request: Request,
     chain: ChainDep,
@@ -352,7 +357,8 @@ async def stream_publishers(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/permissions", response_class=HTMLResponse, name="stream_permissions")
+@router.get("/{chain_name}/stream/{stream_name}/permissions", response_class=HTMLResponse, name="stream_permissions",
+            summary="Stream permissions")
 async def stream_permissions(
     request: Request,
     chain: ChainDep,
@@ -382,7 +388,8 @@ async def stream_permissions(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/key/{key}", response_class=HTMLResponse, name="key_items")
+@router.get("/{chain_name}/stream/{stream_name}/key/{key}", response_class=HTMLResponse, name="key_items",
+            summary="Items by stream key")
 async def key_items(
     request: Request,
     chain: ChainDep,
@@ -452,7 +459,8 @@ async def key_items(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/publisher/{publisher}", response_class=HTMLResponse, name="publisher_items")
+@router.get("/{chain_name}/stream/{stream_name}/publisher/{publisher}", response_class=HTMLResponse, name="publisher_items",
+            summary="Items by stream publisher")
 async def publisher_items(
     request: Request,
     chain: ChainDep,

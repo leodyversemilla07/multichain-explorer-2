@@ -7,7 +7,7 @@ decoupling the internal representation from the external API contract.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PaginationInfo(BaseModel):
@@ -23,8 +23,13 @@ class PaginationInfo(BaseModel):
 
 
 class BaseResponse(BaseModel):
-    """Base API response model."""
-    pass
+    """Base API response model.
+
+    All response schemas inherit from this. `from_attributes=True` allows
+    model_validate() to work on ORM objects or attribute-access objects.
+    Skill ref: fastapi-agents > schemas > ConfigDict from_attributes
+    """
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Block Models ---

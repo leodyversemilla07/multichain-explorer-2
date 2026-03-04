@@ -9,7 +9,7 @@ This replaces the legacy .ini file configuration.
 
 import os
 from functools import lru_cache
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -80,6 +80,34 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         description="Redis connection URL (used only when cache_backend=redis)",
     )
+
+    # CORS — comma-separated list of allowed origins.
+    # Use '*' for local dev. In production set e.g. 'https://yourapp.com,https://admin.yourapp.com'
+    cors_origins: str = Field(
+        default="*",
+        description="Comma-separated list of allowed CORS origins. Use '*' for development.",
+    )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse cors_origins into a list for CORSMiddleware."""
+        if self.cors_origins.strip() == "*":
+            return ["*"]
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    # TrustedHost — comma-separated list of allowed Host header values.
+    # Use '*' for local dev. In production set e.g. 'yourapp.com,www.yourapp.com'
+    trusted_hosts: str = Field(
+        default="*",
+        description="Comma-separated list of allowed Host header values. Use '*' for development.",
+    )
+
+    @property
+    def trusted_hosts_list(self) -> List[str]:
+        """Parse trusted_hosts into a list for TrustedHostMiddleware."""
+        if self.trusted_hosts.strip() == "*":
+            return ["*"]
+        return [h.strip() for h in self.trusted_hosts.split(",") if h.strip()]
     
     @field_validator("multichain_rpc_host")
     @classmethod

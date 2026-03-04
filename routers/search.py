@@ -320,7 +320,8 @@ async def search(
     )
 
 
-@router.get("/{chain_name}/search", response_class=HTMLResponse, name="search_get")
+@router.get("/{chain_name}/search", response_class=HTMLResponse, name="search_get",
+            summary="Search the blockchain")
 async def search_get(
     request: Request,
     chain: ChainDep,
@@ -352,7 +353,8 @@ async def search_get(
         ),
     )
 
-@router.get("/{chain_name}/search/suggest", response_class=JSONResponse, name="search_suggest")
+@router.get("/{chain_name}/search/suggest", response_class=JSONResponse, name="search_suggest",
+            summary="Search suggestions (autocomplete)")
 async def search_suggest(
     request: Request,
     chain: ChainDep,

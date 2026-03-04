@@ -14,8 +14,11 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import app_state
 from env_config import get_settings
@@ -157,6 +160,30 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     logger.info("Rate limiting enabled (60 req/min per IP by default)")
 
+    # TrustedHostMiddleware — rejects requests with unexpected Host headers.
+    # Must be registered before CORSMiddleware so it's between rate limiting and CORS.
+    # Skill ref: fastapi-agents > middleware > TrustedHostMiddleware
+    settings = get_settings()
+    trusted_hosts = settings.trusted_hosts_list
+    if trusted_hosts != ["*"]:  # skip in dev (wildcard = allow all)
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
+        logger.info(f"TrustedHostMiddleware enabled for: {trusted_hosts}")
+    else:
+        logger.info("TrustedHostMiddleware: wildcard mode (all hosts allowed – set TRUSTED_HOSTS in production)")
+
+    # CORS — must be added LAST (outermost) so OPTIONS preflight requests are
+    # answered before rate limiting or other middleware runs.
+    # Skill ref: fastapi-agents > middleware > CORSMiddleware
+    cors_origins = settings.cors_origins_list
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=cors_origins != ["*"],  # never combine wildcard + credentials
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+    logger.info(f"CORS enabled for origins: {cors_origins}")
+
     # Register system routes FIRST to avoid being masked by catch-all routes
     system_router = APIRouter(tags=["System"])
 
@@ -236,13 +263,27 @@ def _register_template_filters(templates: Jinja2Templates) -> None:
 
 def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> None:
     """Register custom exception handlers."""
-    
+
+    def _is_api_request(request: Request) -> bool:
+        """Return True when the client expects JSON (API routes or explicit Accept header)."""
+        if request.url.path.startswith("/api/"):
+            return True
+        accept = request.headers.get("accept", "")
+        return "application/json" in accept and "text/html" not in accept
+
+    def _get_base_url(request: Request) -> str:
+        """Safely get base_url from app state, fall back to '/' if not yet initialised."""
+        try:
+            return request.app.state.config.get_setting("main", "base", "/")
+        except AttributeError:
+            return "/"
+
     @app.exception_handler(ChainNotFoundError)
     async def chain_not_found_handler(request: Request, exc: ChainNotFoundError):
         """Handle chain not found errors."""
-        state = request.app.state.config
-        base_url = state.get_setting("main", "base", "/")
-        
+        if _is_api_request(request):
+            return JSONResponse(status_code=404, content={"detail": str(exc)})
+        base_url = _get_base_url(request)
         context = {
             "request": request,
             "title": "Chain Not Found",
@@ -251,18 +292,14 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": f"The blockchain '{exc.chain_name}' was not found.",
             "base_url": base_url,
         }
-        return templates.TemplateResponse(
-            name="pages/error.html",
-            context=context,
-            status_code=404,
-        )
+        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=404)
     
     @app.exception_handler(ResourceNotFoundError)
     async def resource_not_found_handler(request: Request, exc: ResourceNotFoundError):
         """Handle resource not found errors."""
-        state = request.app.state.config
-        base_url = state.get_setting("main", "base", "/")
-        
+        if _is_api_request(request):
+            return JSONResponse(status_code=404, content={"detail": str(exc)})
+        base_url = _get_base_url(request)
         context = {
             "request": request,
             "title": f"{exc.resource_type} Not Found",
@@ -271,18 +308,14 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": str(exc),
             "base_url": base_url,
         }
-        return templates.TemplateResponse(
-            name="pages/error.html",
-            context=context,
-            status_code=404,
-        )
+        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=404)
     
     @app.exception_handler(MCEException)
     async def mce_exception_handler(request: Request, exc: MCEException):
         """Handle general MCE exceptions."""
-        state = request.app.state.config
-        base_url = state.get_setting("main", "base", "/")
-        
+        if _is_api_request(request):
+            return JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+        base_url = _get_base_url(request)
         context = {
             "request": request,
             "title": "Error",
@@ -291,18 +324,14 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": str(exc),
             "base_url": base_url,
         }
-        return templates.TemplateResponse(
-            name="pages/error.html",
-            context=context,
-            status_code=500,
-        )
+        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=500)
     
     @app.exception_handler(404)
     async def not_found_handler(request: Request, exc):
         """Handle 404 errors."""
-        state = request.app.state.config
-        base_url = state.get_setting("main", "base", "/")
-        
+        if _is_api_request(request):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        base_url = _get_base_url(request)
         context = {
             "request": request,
             "title": "Page Not Found",
@@ -312,18 +341,14 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "path": str(request.url.path),
             "base_url": base_url,
         }
-        return templates.TemplateResponse(
-            name="pages/error.html",
-            context=context,
-            status_code=404,
-        )
+        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=404)
     
     @app.exception_handler(500)
     async def server_error_handler(request: Request, exc):
         """Handle 500 errors."""
-        state = request.app.state.config
-        base_url = state.get_setting("main", "base", "/")
-        
+        if _is_api_request(request):
+            return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        base_url = _get_base_url(request)
         context = {
             "request": request,
             "title": "Server Error",
@@ -332,11 +357,30 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": "An unexpected error occurred. Please try again later.",
             "base_url": base_url,
         }
-        return templates.TemplateResponse(
-            name="pages/error.html",
-            context=context,
-            status_code=500,
-        )
+        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=500)
+
+    # Catch-all bare Exception guard — skill ref: fastapi-agents > errors > Unhandled Exception Guard
+    # Must be registered LAST so more-specific handlers above take priority.
+    # Prevents raw Python tracebacks from ever reaching clients in production.
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        """Catch-all for any unhandled exception."""
+        logger.exception("Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc)
+        if _is_api_request(request):
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
+        base_url = _get_base_url(request)
+        context = {
+            "request": request,
+            "title": "Server Error",
+            "status_code": 500,
+            "error_title": "Internal Server Error",
+            "error_message": "An unexpected error occurred. Please try again later.",
+            "base_url": base_url,
+        }
+        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=500)
 
 
 # Create the application instance

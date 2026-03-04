@@ -27,7 +27,8 @@ from routers.dependencies import (
 router = APIRouter(tags=["Permissions"])
 
 
-@router.get("/{chain_name}/permissions", response_class=HTMLResponse, name="permissions")
+@router.get("/{chain_name}/permissions", response_class=HTMLResponse, name="permissions",
+            summary="List all permissions")
 async def list_permissions(
     request: Request,
     chain: ChainDep,
@@ -79,7 +80,8 @@ async def list_permissions(
     )
 
 
-@router.get("/{chain_name}/permissions/global", response_class=HTMLResponse, name="global_permissions")
+@router.get("/{chain_name}/permissions/global", response_class=HTMLResponse, name="global_permissions",
+            summary="List global permissions")
 async def global_permissions(
     request: Request,
     chain: ChainDep,

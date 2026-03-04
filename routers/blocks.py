@@ -13,7 +13,7 @@ Handles:
 import asyncio
 from typing import Dict, Any, List
 
-from fastapi import APIRouter, Depends, Path, Request, HTTPException
+from fastapi import APIRouter, Depends, Path, Request, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from routers.dependencies import (
@@ -29,7 +29,8 @@ from routers.dependencies import (
 router = APIRouter(tags=["Blocks"])
 
 
-@router.get("/{chain_name}/blocks", response_class=HTMLResponse, name="blocks")
+@router.get("/{chain_name}/blocks", response_class=HTMLResponse, name="blocks",
+            summary="List blocks")
 async def list_blocks(
     request: Request,
     chain: ChainDep,
@@ -94,17 +95,19 @@ async def list_blocks(
     )
 
 
-@router.get("/{chain_name}/block", response_class=RedirectResponse, name="block_redirect")
+@router.get("/{chain_name}/block", response_class=RedirectResponse, name="block_redirect",
+            summary="Redirect /block to /blocks")
 async def block_redirect(
     chain_name: str = Path(..., description="Chain path name"),
 ):
     """
     Redirect /block to /blocks (common typo handling).
     """
-    return RedirectResponse(url=f"/{chain_name}/blocks", status_code=302)
+    return RedirectResponse(url=f"/{chain_name}/blocks", status_code=status.HTTP_302_FOUND)
 
 
-@router.get("/{chain_name}/block/{identifier}", response_class=HTMLResponse, name="block")
+@router.get("/{chain_name}/block/{identifier}", response_class=HTMLResponse, name="block",
+            summary="Block details by height or hash")
 async def block_by_identifier(
     request: Request,
     chain: ChainDep,
@@ -124,10 +127,10 @@ async def block_by_identifier(
         block = await service.get_block_by_hash(identifier)
         height = block.get("height") if block else None
     else:
-        raise HTTPException(status_code=400, detail="Invalid block identifier. Must be a height or 64-character hash.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid block identifier. Must be a height or 64-character hash.")
 
     if not block:
-        raise HTTPException(status_code=404, detail=f"Block {identifier} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Block {identifier} not found")
 
     height = block.get("height", 0)
     
@@ -153,7 +156,8 @@ async def block_by_identifier(
     )
 
 
-@router.get("/{chain_name}/blockhash/{block_hash}", response_class=HTMLResponse, name="block_by_hash")
+@router.get("/{chain_name}/blockhash/{block_hash}", response_class=HTMLResponse, name="block_by_hash",
+            summary="Block details by hash")
 async def block_by_hash(
     request: Request,
     chain: ChainDep,
@@ -168,7 +172,7 @@ async def block_by_hash(
     block = await service.get_block_by_hash(block_hash)
 
     if not block:
-        raise HTTPException(status_code=404, detail=f"Block {block_hash} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Block {block_hash} not found")
 
     return templates.TemplateResponse(
         name="pages/block.html",
@@ -179,7 +183,8 @@ async def block_by_hash(
     )
 
 
-@router.get("/{chain_name}/block/{height}/transactions", response_class=HTMLResponse, name="block_transactions")
+@router.get("/{chain_name}/block/{height}/transactions", response_class=HTMLResponse, name="block_transactions",
+            summary="Transactions in a block")
 async def block_transactions(
     request: Request,
     chain: ChainDep,

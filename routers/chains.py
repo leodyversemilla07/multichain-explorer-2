@@ -93,7 +93,7 @@ async def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
         }
 
 
-@router.get("/", response_class=HTMLResponse, name="chains")
+@router.get("/", response_class=HTMLResponse, name="chains", summary="List all chains")
 async def list_chains(
     request: Request,
     templates: TemplatesDep,
@@ -121,7 +121,7 @@ async def list_chains(
     )
 
 
-@router.get("/{chain_name}", response_class=HTMLResponse, name="chain_home")
+@router.get("/{chain_name}", response_class=HTMLResponse, name="chain_home", summary="Chain dashboard")
 async def chain_home(
     request: Request,
     chain: ChainDep,
@@ -180,7 +180,7 @@ async def chain_home(
     )
 
 
-@router.get("/{chain_name}/chain", response_class=HTMLResponse, name="chain_dashboard")
+@router.get("/{chain_name}/chain", response_class=HTMLResponse, name="chain_dashboard", summary="Chain dashboard (alias)")
 async def chain_dashboard(
     request: Request,
     chain: ChainDep,
@@ -195,7 +195,7 @@ async def chain_dashboard(
     return await chain_home(request, chain, service, templates, context, query_params)
 
 
-@router.get("/{chain_name}/parameters", response_class=HTMLResponse, name="chain_parameters")
+@router.get("/{chain_name}/parameters", response_class=HTMLResponse, name="chain_parameters", summary="Chain parameters")
 async def chain_parameters(
     request: Request,
     chain: ChainDep,
@@ -224,7 +224,7 @@ async def chain_parameters(
     )
 
 
-@router.get("/{chain_name}/peers", response_class=HTMLResponse, name="peers")
+@router.get("/{chain_name}/peers", response_class=HTMLResponse, name="peers", summary="Network peers")
 async def list_peers(
     request: Request,
     chain: ChainDep,
@@ -251,7 +251,7 @@ async def list_peers(
     )
 
 
-@router.get("/{chain_name}/miners", response_class=HTMLResponse, name="miners")
+@router.get("/{chain_name}/miners", response_class=HTMLResponse, name="miners", summary="Mining statistics")
 async def list_miners(
     request: Request,
     chain: ChainDep,
@@ -271,21 +271,29 @@ async def list_miners(
     # Get last 100 blocks
     miner_stats = {}
     block_count = min(100, current_height + 1)
-    
-    # Needs optimization! Sequential fetching 100 blocks is slow.
-    # Parallelize fetch
-    tasks = []
-    for height in range(max(0, current_height - block_count + 1), current_height + 1):
-        tasks.append(service.get_block_by_height(height))
-    
-    blocks = await asyncio.gather(*tasks)
+
+    # Semaphore caps concurrent RPC calls at 10 — avoids overwhelming the node
+    # with 100 simultaneous requests (skill ref: fastapi-agents > performance > async patterns)
+    sem = asyncio.Semaphore(10)
+
+    async def fetch_block_safe(height: int):
+        async with sem:
+            return await service.get_block_by_height(height)
+
+    tasks = [
+        fetch_block_safe(h)
+        for h in range(max(0, current_height - block_count + 1), current_height + 1)
+    ]
+
+    blocks = await asyncio.gather(*tasks, return_exceptions=True)
 
     for block in blocks:
-        if block and "miner" in block:
-            miner = block["miner"]
-            if miner not in miner_stats:
-                miner_stats[miner] = {"blocks": 0, "percentage": 0}
-            miner_stats[miner]["blocks"] += 1
+        if isinstance(block, Exception) or not block or "miner" not in block:
+            continue
+        miner = block["miner"]
+        if miner not in miner_stats:
+            miner_stats[miner] = {"blocks": 0, "percentage": 0}
+        miner_stats[miner]["blocks"] += 1
 
     # Calculate percentages
     for miner in miner_stats:
