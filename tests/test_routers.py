@@ -1,13 +1,18 @@
 """
 Tests for FastAPI routers - endpoint integration tests.
+
+Uses app.dependency_overrides (FastAPI-recommended pattern) instead of
+unittest.mock.patch for service injection — ensures FastAPI's DI system
+actually swaps the dependency rather than patching at the module reference level.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, AsyncMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
 import app_state
+from routers.dependencies import get_blockchain_service
 
 
 @pytest.fixture
@@ -128,16 +133,19 @@ def app_with_mocks(mock_chain):
 
 @pytest.fixture
 def client(app_with_mocks, mock_blockchain_service):
-    """Create test client with mocked services."""
-    with patch(
-        "routers.dependencies.get_blockchain_service",
-        return_value=mock_blockchain_service,
-    ):
-        with patch(
-            "services.blockchain_service.BlockchainService",
-            return_value=mock_blockchain_service,
-        ):
-            yield TestClient(app_with_mocks, raise_server_exceptions=False)
+    """Create test client with mocked services.
+
+    Uses app.dependency_overrides instead of patch() — the FastAPI-recommended
+    way to swap dependencies in tests (see fastapi-agents skill > testing domain).
+    """
+    # Override the blockchain service dependency at the FastAPI DI level
+    app_with_mocks.dependency_overrides[get_blockchain_service] = (
+        lambda: mock_blockchain_service
+    )
+    with TestClient(app_with_mocks, raise_server_exceptions=False) as c:
+        yield c
+    # Always clear overrides after the test to prevent state leaking
+    app_with_mocks.dependency_overrides.clear()
 
 
 class TestChainsRouter:
@@ -183,11 +191,16 @@ class TestSystemRoutes:
 
     @pytest.fixture
     def simple_client(self):
-        """Create simple test client without chain mocks."""
+        """Create simple test client without chain mocks.
+
+        Uses context manager so lifespan startup/shutdown events run.
+        Skill ref: fastapi-agents > testing > Testing Lifespan with TestClient
+        """
         from main import create_app
 
         app = create_app()
-        return TestClient(app, raise_server_exceptions=False)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client
 
     def test_health_endpoint(self, simple_client):
         """Test health endpoint works."""
@@ -258,11 +271,16 @@ class TestRouterTags:
 
     @pytest.fixture
     def simple_client(self):
-        """Create simple test client."""
+        """Create simple test client.
+
+        Uses context manager so lifespan startup/shutdown events run.
+        Skill ref: fastapi-agents > testing > Testing Lifespan with TestClient
+        """
         from main import create_app
 
         app = create_app()
-        return TestClient(app, raise_server_exceptions=False)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client
 
     def test_openapi_has_tags(self, simple_client):
         """Test OpenAPI schema has tags defined."""
@@ -286,11 +304,16 @@ class TestResponseModels:
 
     @pytest.fixture
     def simple_client(self):
-        """Create simple test client."""
+        """Create simple test client.
+
+        Uses context manager so lifespan startup/shutdown events run.
+        Skill ref: fastapi-agents > testing > Testing Lifespan with TestClient
+        """
         from main import create_app
 
         app = create_app()
-        return TestClient(app, raise_server_exceptions=False)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client
 
     def test_health_response_model(self, simple_client):
         """Test health endpoint matches HealthResponse model."""
@@ -320,22 +343,25 @@ class TestErrorHandling:
 
     @pytest.fixture
     def client_with_error_service(self, mock_chain):
-        """Create client with service that raises errors."""
+        """Create client with a service that raises errors — uses dependency_overrides."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
-        app_state.get_state().chains = [mock_chain]
-        app_state.get_state().settings = {"main": {"base": "/"}}
+
+        state = ApplicationState()
+        state.chains = [mock_chain]
+        state.settings = {"main": {"base": "/"}}
+        app.state.config = state
 
         error_service = Mock()
-        # Use AsyncMock for side effects
         error_service.get_blockchain_info = AsyncMock(side_effect=Exception("RPC Error"))
 
-        with patch(
-            "routers.dependencies.get_blockchain_service",
-            return_value=error_service,
-        ):
-            yield TestClient(app, raise_server_exceptions=False)
+        # Use dependency_overrides — the FastAPI-idiomatic approach
+        app.dependency_overrides[get_blockchain_service] = lambda: error_service
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client
+        app.dependency_overrides.clear()
 
     def test_service_error_handled(self, client_with_error_service):
         """Test that service errors are handled gracefully."""
