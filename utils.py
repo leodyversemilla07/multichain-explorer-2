@@ -11,6 +11,7 @@ import signal
 import string
 import struct
 import sys
+import ctypes
 
 import app_state
 
@@ -120,6 +121,18 @@ def is_process_running(process_id):
     if not isinstance(process_id, int) or process_id <= 0 or process_id > 4194304:
         return False
     try:
+        if os.name == "nt":
+            # Windows: avoid os.kill(pid, 0) because it can terminate processes.
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            ERROR_ACCESS_DENIED = 5
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION, False, process_id
+            )
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return ctypes.get_last_error() == ERROR_ACCESS_DENIED
         os.kill(process_id, 0)
         return True
     except (OSError, AttributeError):
@@ -131,11 +144,19 @@ def kill_process(process_id):
     if not isinstance(process_id, int) or process_id <= 0 or process_id > 4194304:
         return False
     try:
-        # On Windows, signal.SIGKILL doesn't exist, use os.kill or taskkill
+        if os.name == "nt":
+            PROCESS_TERMINATE = 0x0001
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(PROCESS_TERMINATE, False, process_id)
+            if not handle:
+                return False
+            try:
+                return bool(kernel32.TerminateProcess(handle, 1))
+            finally:
+                kernel32.CloseHandle(handle)
         if hasattr(signal, "SIGKILL"):
             os.kill(process_id, signal.SIGKILL)  # type: ignore
         else:
-            # Windows: os.kill with any signal terminates the process
             os.kill(process_id, signal.SIGTERM)
         return True
     except (OSError, AttributeError):
@@ -180,6 +201,8 @@ def read_file_ptr(config):
     current_ptr = file_read(config["ptr"])
     ptr = (0, 0)
     if current_ptr is not None:
+        if not str(current_ptr).strip():
+            return ptr
         ptr_dict = json.loads(current_ptr)
         ptr = (ptr_dict["file"], ptr_dict["offset"])
 
