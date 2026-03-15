@@ -238,7 +238,8 @@ class TestSystemRoutes:
         """Test health endpoint works."""
         response = simple_client.get("/health")
         assert response.status_code == 200
-        assert response.json()["status"] == "healthy"
+        # When chains are configured, status may be degraded if RPC is unreachable.
+        assert response.json()["status"] in ["healthy", "degraded"]
 
     def test_api_info_endpoint(self, simple_client):
         """Test API info endpoint works."""

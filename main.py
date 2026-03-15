@@ -8,6 +8,7 @@ Modern FastAPI-based web application for exploring MultiChain blockchains.
 Replaces the legacy http.server implementation with a production-grade ASGI server.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -28,6 +29,7 @@ from exceptions import (
     MCEException,
 )
 from services.cache_service import CacheService, create_cache_provider, _replace_global_cache
+from services.blockchain_service import BlockchainService
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -197,11 +199,34 @@ def create_app() -> FastAPI:
         return FileResponse(status_code=204)
 
     @system_router.get("/health")
-    async def health_check():
+    async def health_check(request: Request):
         """Health check endpoint for monitoring."""
+        status = "healthy"
+        chain_status = {}
+
+        state = getattr(request.app.state, "config", None)
+        http_client = getattr(request.app.state, "http_client", None)
+        chains = getattr(state, "chains", []) if state is not None else []
+
+        # Only run chain connectivity checks when lifespan has initialized shared app state.
+        if chains and http_client is not None:
+            checks = await asyncio.gather(
+                *[
+                    BlockchainService(chain, client=http_client).is_healthy()
+                    for chain in chains
+                ],
+                return_exceptions=True,
+            )
+            for chain, result in zip(chains, checks):
+                connected = not isinstance(result, Exception) and bool(result)
+                chain_status[chain.name] = "connected" if connected else "disconnected"
+                if not connected:
+                    status = "degraded"
+
         return {
-            "status": "healthy",
+            "status": status,
             "version": app_state.VERSION,
+            "chains": chain_status,
         }
 
     @system_router.get("/api/info")

@@ -12,6 +12,8 @@ import logging
 import time
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from services.cache_service import get_cache as get_service_cache
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,13 +104,9 @@ class SimpleCache:
         }
 
 
-# Global cache instance
-_cache = SimpleCache(default_ttl=60)
-
-
-def get_cache() -> SimpleCache:
-    """Get the global cache instance."""
-    return _cache
+def get_cache():
+    """Get the shared cache service instance."""
+    return get_service_cache()
 
 
 
@@ -211,15 +209,22 @@ class RequestTimer:
 
 def log_performance_stats():
     """Log performance statistics."""
-    cache_stats = _cache.get_stats()
+    cache_stats = get_cache().get_stats()
+    hit_rate = cache_stats.get("hit_rate_percent")
+    if hit_rate is None:
+        raw_hit_rate = cache_stats.get("hit_rate", 0)
+        if isinstance(raw_hit_rate, (int, float)):
+            hit_rate = round(raw_hit_rate * 100, 2) if raw_hit_rate <= 1 else round(raw_hit_rate, 2)
+        else:
+            hit_rate = 0
 
     logger.info("=" * 60)
     logger.info("PERFORMANCE STATISTICS")
     logger.info("=" * 60)
-    logger.info(f"Cache hits: {cache_stats['hits']}")
-    logger.info(f"Cache misses: {cache_stats['misses']}")
-    logger.info(f"Cache hit rate: {cache_stats['hit_rate_percent']}%")
-    logger.info(f"Items in cache: {cache_stats['items_cached']}")
+    logger.info(f"Cache hits: {cache_stats.get('hits', 0)}")
+    logger.info(f"Cache misses: {cache_stats.get('misses', 0)}")
+    logger.info(f"Cache hit rate: {hit_rate}%")
+    logger.info(f"Items in cache: {cache_stats.get('size', cache_stats.get('items_cached', 0))}")
     logger.info("=" * 60)
 
 

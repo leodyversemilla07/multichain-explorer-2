@@ -5,6 +5,7 @@ Provides a clean interface to MultiChain RPC calls with error handling,
 retry logic, and connection management.
 """
 
+import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -20,7 +21,14 @@ logger = logging.getLogger(__name__)
 class BlockchainService:
     """Service for interacting with MultiChain blockchain via RPC."""
 
-    def __init__(self, chain_config: ChainConfig, client: Optional[httpx.AsyncClient] = None):
+    def __init__(
+        self,
+        chain_config: ChainConfig,
+        client: Optional[httpx.AsyncClient] = None,
+        max_retries: int = 2,
+        retry_base_delay: float = 0.2,
+        retry_max_delay: float = 1.0,
+    ):
         """
         Initialize blockchain service.
 
@@ -29,6 +37,9 @@ class BlockchainService:
             client: Optional shared httpx.AsyncClient. When provided, the client
                     is NOT closed by this service (caller manages its lifecycle).
                     When omitted, an internal client is created and closed on close().
+            max_retries: Number of retries for transient transport errors.
+            retry_base_delay: Initial retry delay (seconds), doubled per attempt.
+            retry_max_delay: Maximum retry delay (seconds).
         """
         self.config = chain_config
         self.rpc_url = chain_config.multichain_url
@@ -37,6 +48,34 @@ class BlockchainService:
         self._request_id = 0
         self._owns_client = client is None
         self._client = client if client is not None else httpx.AsyncClient(timeout=30.0)
+        self._max_retries = max_retries
+        self._retry_base_delay = retry_base_delay
+        self._retry_max_delay = retry_max_delay
+
+    async def _post_with_retry(self, payload: Dict[str, Any]) -> httpx.Response:
+        """
+        Post RPC payload with bounded retry for transient transport failures.
+        """
+        for attempt in range(self._max_retries + 1):
+            try:
+                return await self._client.post(
+                    self.rpc_url,
+                    json=payload,
+                    headers=self.headers,
+                )
+            except (httpx.TransportError, httpx.TimeoutException) as exc:
+                if attempt >= self._max_retries:
+                    raise
+                delay = min(self._retry_base_delay * (2**attempt), self._retry_max_delay)
+                logger.warning(
+                    "Transient RPC transport error on %s (attempt %s/%s): %s. Retrying in %.2fs",
+                    self.chain_name,
+                    attempt + 1,
+                    self._max_retries + 1,
+                    exc,
+                    delay,
+                )
+                await asyncio.sleep(delay)
 
     async def close(self):
         """Close the underlying HTTP client (only if owned by this service)."""
@@ -71,11 +110,7 @@ class BlockchainService:
         }
 
         try:
-            response = await self._client.post(
-                self.rpc_url,
-                json=payload,
-                headers=self.headers,
-            )
+            response = await self._post_with_retry(payload)
             
             # Check for HTTP errors (like 401 Unauthorized, 500 Internal Server Error)
             # Note: MultiChain might return 500 for RPC errors, so we parse JSON first if possible

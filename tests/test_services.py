@@ -9,6 +9,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch, AsyncMock, Mock
 from urllib.error import HTTPError, URLError
 
+import httpx
 import pytest
 
 from config import ChainConfig
@@ -75,6 +76,39 @@ class TestBlockchainService:
             await service.call("getblock", ["invalid"])
 
         assert "Block not found" in str(exc_info.value)
+
+    async def test_call_retries_transient_transport_error(self, service):
+        """Test transient transport failures are retried before succeeding."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}}
+        mock_response.status_code = 200
+        connect_error = httpx.ConnectError(
+            "temporary network issue",
+            request=httpx.Request("POST", service.rpc_url),
+        )
+
+        service._client = AsyncMock()
+        service._client.post.side_effect = [connect_error, mock_response]
+
+        with patch("services.blockchain_service.asyncio.sleep", new_callable=AsyncMock):
+            result = await service.call("getinfo")
+
+        assert result == {"ok": True}
+        assert service._client.post.await_count == 2
+
+    async def test_call_raises_after_exhausting_retries(self, service):
+        """Test transport errors become ChainConnectionError after retries."""
+        connect_error = httpx.ConnectError(
+            "still failing",
+            request=httpx.Request("POST", service.rpc_url),
+        )
+        service._client = AsyncMock()
+        service._client.post.side_effect = connect_error
+
+        with patch("services.blockchain_service.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(ChainConnectionError):
+                await service.call("getinfo")
+        assert service._client.post.await_count == service._max_retries + 1
 
     async def test_get_address_summary(self, service):
         """Test get_address_summary aggregation."""

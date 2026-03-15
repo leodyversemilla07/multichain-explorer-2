@@ -3,7 +3,7 @@ Tests for main.py - FastAPI application.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 import app_state
@@ -74,6 +74,29 @@ class TestHealthEndpoint:
         data = response.json()
 
         assert data["version"] == app_state.VERSION
+
+    def test_health_check_degraded_when_chain_is_unreachable(self):
+        """Test health endpoint reports degraded status when a configured chain is down."""
+        from main import create_app
+        from app_state import ApplicationState
+
+        app = create_app()
+        state = ApplicationState()
+        chain = Mock()
+        chain.name = "test-chain"
+        state.chains = [chain]
+        state.settings = {"main": {"base": "/"}}
+        app.state.config = state
+
+        with patch("main.app_state.init_from_env", return_value=False), \
+             patch("main.BlockchainService.is_healthy", new_callable=AsyncMock, return_value=False):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.get("/health")
+
+        data = response.json()
+        assert response.status_code == 200
+        assert data["status"] == "degraded"
+        assert data["chains"]["test-chain"] == "disconnected"
 
 
 class TestApiInfoEndpoint:

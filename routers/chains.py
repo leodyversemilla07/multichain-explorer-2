@@ -19,9 +19,9 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
-import app_state
 from routers.dependencies import (
     ChainDep,
+    StateDep,
     TemplatesDep,
     BlockchainServiceDep,
     CommonContextDep,
@@ -96,6 +96,7 @@ async def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
 @router.get("/", response_class=HTMLResponse, name="chains", summary="List all chains")
 async def list_chains(
     request: Request,
+    state: StateDep,
     templates: TemplatesDep,
 ):
     """
@@ -103,12 +104,12 @@ async def list_chains(
     
     This is the main entry point of the explorer.
     """
-    chains = app_state.get_state().chains or []
+    chains = state.chains or []
     
     # Run all chain summaries concurrently
     chains_data = await asyncio.gather(*[get_chain_summary(c) for c in chains])
 
-    base_url = app_state.get_state().settings.get("main", {}).get("base", "/")
+    base_url = state.get_setting("main", "base", "/")
 
     return templates.TemplateResponse(
         name="pages/chains.html",
