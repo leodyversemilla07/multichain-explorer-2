@@ -10,6 +10,34 @@ import app_state
 from exceptions import ChainNotFoundError
 
 
+class TestGetState:
+    """Test get_state dependency."""
+
+    def test_get_state_returns_app_state_config(self):
+        """Test get_state reads ApplicationState from request.app.state.config."""
+        from app_state import ApplicationState
+        from routers.dependencies import get_state
+
+        state = ApplicationState()
+        mock_request = Mock()
+        mock_request.app = Mock()
+        mock_request.app.state = Mock()
+        mock_request.app.state.config = state
+
+        assert get_state(mock_request) is state
+
+    def test_get_state_raises_when_missing_config(self):
+        """Test get_state raises explicit error when config is missing."""
+        from routers.dependencies import get_state
+
+        mock_request = Mock()
+        mock_request.app = Mock()
+        mock_request.app.state = Mock(spec=[])  # no config attribute
+
+        with pytest.raises(RuntimeError, match="ApplicationState is not initialized"):
+            get_state(mock_request)
+
+
 class TestGetBaseUrl:
     """Test get_base_url dependency."""
 

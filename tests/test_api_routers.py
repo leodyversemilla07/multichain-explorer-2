@@ -6,8 +6,6 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
 
-import app_state
-
 @pytest.fixture
 def mock_chain():
     """Create a mock chain object."""
@@ -163,14 +161,17 @@ def mock_blockchain_service():
 def api_client(mock_chain, mock_blockchain_service):
     """Create test client with mocked services."""
     from main import create_app
+    from app_state import ApplicationState
     
     # Setup app state
     app = create_app()
-    app_state.get_state().chains = [mock_chain]
-    app_state.get_state().settings = {
+    state = ApplicationState()
+    state.chains = [mock_chain]
+    state.settings = {
         "main": {"base": "/"},
         "test-chain": {"name": "test-chain"},
     }
+    app.state.config = state
 
     from routers.dependencies import get_blockchain_service
     

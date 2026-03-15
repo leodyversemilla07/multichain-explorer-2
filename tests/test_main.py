@@ -51,8 +51,13 @@ class TestHealthEndpoint:
     def client(self):
         """Create test client."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
+        state = ApplicationState()
+        state.settings = {"main": {"base": "/"}}
+        state.chains = []
+        app.state.config = state
         return TestClient(app, raise_server_exceptions=False)
 
     def test_health_check_returns_200(self, client):
@@ -106,8 +111,13 @@ class TestApiInfoEndpoint:
     def client(self):
         """Create test client."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
+        state = ApplicationState()
+        state.settings = {"main": {"base": "/"}}
+        state.chains = []
+        app.state.config = state
         return TestClient(app, raise_server_exceptions=False)
 
     def test_api_info_returns_200(self, client):
@@ -133,8 +143,13 @@ class TestOpenAPIEndpoints:
     def client(self):
         """Create test client."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
+        state = ApplicationState()
+        state.settings = {"main": {"base": "/"}}
+        state.chains = []
+        app.state.config = state
         return TestClient(app, raise_server_exceptions=False)
 
     def test_openapi_json_available(self, client):
@@ -267,8 +282,13 @@ class TestRouterRegistration:
     def client(self):
         """Create test client."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
+        state = ApplicationState()
+        state.settings = {"main": {"base": "/"}}
+        state.chains = []
+        app.state.config = state
         return TestClient(app, raise_server_exceptions=False)
 
     def test_chains_router_registered(self, client):
@@ -301,8 +321,13 @@ class TestStaticFiles:
     def client(self):
         """Create test client."""
         from main import create_app
+        from app_state import ApplicationState
 
         app = create_app()
+        state = ApplicationState()
+        state.settings = {"main": {"base": "/"}}
+        state.chains = []
+        app.state.config = state
         return TestClient(app, raise_server_exceptions=False)
 
     def test_static_mount_exists(self):

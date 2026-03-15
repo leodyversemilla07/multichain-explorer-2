@@ -17,7 +17,6 @@ from typing import Annotated, Any, Dict
 from fastapi import Depends, Path, Query, Request
 from fastapi.templating import Jinja2Templates
 
-import app_state
 from app_state import ApplicationState
 from config import ChainConfig
 from exceptions import ChainNotFoundError
@@ -28,13 +27,19 @@ from services.pagination_service import PaginationService
 def get_state(request: Request) -> ApplicationState:
     """
     Dependency to get the application state.
-    
+
     Returns:
-        ApplicationState instance from app state or singleton as fallback.
+        ApplicationState instance from app.state.config.
+
+    Raises:
+        RuntimeError: If application state is not initialized on app.state.
     """
     if hasattr(request.app.state, "config"):
         return request.app.state.config
-    return app_state.get_state()
+    raise RuntimeError(
+        "ApplicationState is not initialized on app.state.config. "
+        "Ensure application lifespan startup has run or set app.state.config in tests."
+    )
 
 
 def get_templates(request: Request) -> Jinja2Templates:
