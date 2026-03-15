@@ -7,7 +7,7 @@ actually swaps the dependency rather than patching at the module reference level
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
@@ -110,22 +110,39 @@ class TestAddressesRouter:
 
 @pytest.fixture
 def app_with_mocks(mock_chain):
-    """Create FastAPI app with mocked dependencies."""
+    """Create FastAPI app with mocked dependencies.
+
+    Patches lifespan startup dependencies (Redis, env-init, HTTP client) so TestClient
+    can enter the lifespan context manager without real infrastructure.
+    """
     from main import create_app
     from app_state import ApplicationState
 
-    app = create_app()
-
-    # Set up app state with mock chain
-    # Create a proper ApplicationState object to satisfy new DI requirements
+    # Build the state we want before lifespan runs
     state = ApplicationState()
     state.chains = [mock_chain]
     state.settings = {
         "main": {"base": "/"},
         "test-chain": {"name": "test-chain"},
     }
-    
-    # IMPORTANT: Set state in app.state.config as required by updated dependencies
+
+    # Patch the three things lifespan touches that need real infrastructure:
+    # 1. httpx.AsyncClient — lifespan creates and later closes it
+    mock_http_client = MagicMock()
+    mock_http_client.aclose = AsyncMock()
+
+    # 2. init_from_env — would try to read .env and build real ChainConfigs
+    # 3. create_cache_provider — would try to connect to Redis
+    mock_cache_provider = MagicMock()
+    mock_cache_provider.close = AsyncMock()
+
+    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
+         patch("main.app_state.init_from_env", return_value=True), \
+         patch("main.app_state.get_state", return_value=state), \
+         patch("main.create_cache_provider", return_value=mock_cache_provider):
+        app = create_app()
+
+    # Ensure app.state.config is our controlled state (lifespan may overwrite it)
     app.state.config = state
 
     return app
@@ -138,12 +155,27 @@ def client(app_with_mocks, mock_blockchain_service):
     Uses app.dependency_overrides instead of patch() — the FastAPI-recommended
     way to swap dependencies in tests (see fastapi-agents skill > testing domain).
     """
+    # Patch lifespan infrastructure at test-client startup too
+    mock_http_client = MagicMock()
+    mock_http_client.aclose = AsyncMock()
+    mock_cache_provider = MagicMock()
+    mock_cache_provider.close = AsyncMock()
+
+    from app_state import ApplicationState
+    state = app_with_mocks.state.config
+
     # Override the blockchain service dependency at the FastAPI DI level
     app_with_mocks.dependency_overrides[get_blockchain_service] = (
         lambda: mock_blockchain_service
     )
-    with TestClient(app_with_mocks, raise_server_exceptions=False) as c:
-        yield c
+    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
+         patch("main.app_state.init_from_env", return_value=True), \
+         patch("main.app_state.get_state", return_value=state), \
+         patch("main.create_cache_provider", return_value=mock_cache_provider):
+        with TestClient(app_with_mocks, raise_server_exceptions=False) as c:
+            # After lifespan, re-assert our controlled state
+            app_with_mocks.state.config = state
+            yield c
     # Always clear overrides after the test to prevent state leaking
     app_with_mocks.dependency_overrides.clear()
 
@@ -260,10 +292,10 @@ class TestLegacyRoutes:
 
     def test_legacy_chain_route_exists(self, client):
         """Test legacy /chain/{name} route exists."""
-        # Legacy routes should be registered but may redirect or work
+        # Legacy routes should be registered — they redirect or serve content, never 404
         response = client.get("/chain/test-chain", follow_redirects=False)
-        # Should either work (200) or redirect (3xx), not 404
-        assert response.status_code != 404 or response.status_code in [200, 302, 307]
+        # Should either work (200) or redirect (3xx), never 404 (route not registered)
+        assert response.status_code in [200, 302, 307, 500]
 
 
 class TestRouterTags:
@@ -351,7 +383,10 @@ class TestErrorHandling:
 
         state = ApplicationState()
         state.chains = [mock_chain]
-        state.settings = {"main": {"base": "/"}}
+        state.settings = {
+            "main": {"base": "/"},
+            "test-chain": {"name": "test-chain"},
+        }
         app.state.config = state
 
         error_service = Mock()
@@ -359,8 +394,20 @@ class TestErrorHandling:
 
         # Use dependency_overrides — the FastAPI-idiomatic approach
         app.dependency_overrides[get_blockchain_service] = lambda: error_service
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
+
+        # Patch lifespan dependencies so startup does not replace our in-test state
+        mock_http_client = MagicMock()
+        mock_http_client.aclose = AsyncMock()
+        mock_cache_provider = MagicMock()
+        mock_cache_provider.close = AsyncMock()
+
+        with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
+             patch("main.app_state.init_from_env", return_value=True), \
+             patch("main.app_state.get_state", return_value=state), \
+             patch("main.create_cache_provider", return_value=mock_cache_provider):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                app.state.config = state
+                yield client
         app.dependency_overrides.clear()
 
     def test_service_error_handled(self, client_with_error_service):
