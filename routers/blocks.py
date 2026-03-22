@@ -23,7 +23,8 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    get_start_count,
 )
 
 router = APIRouter(tags=["Blocks"])
@@ -51,8 +52,7 @@ async def list_blocks(
     total_blocks = info.get("blocks", 0)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_blocks,
@@ -199,8 +199,7 @@ async def block_transactions(
     tx_ids = block.get("tx", [])
 
     # Apply pagination
-    start = safe_int(query_params.get("start", 0), 0)
-    count = safe_int(query_params.get("count", 20), 20)
+    start, count = get_start_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(tx_ids),

@@ -26,10 +26,46 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["Assets"])
+
+_COUNT_FETCH_LIMIT = 100000
+
+
+async def _get_asset_or_raise(service: BlockchainServiceDep, asset_name: str) -> Dict[str, Any]:
+    """Load an asset and raise a typed HTTP error when it is unavailable."""
+    try:
+        assets = await service.call("listassets", [asset_name, True])
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_name} not found")
+
+    if not assets:
+        raise HTTPException(status_code=404, detail=f"Asset {asset_name} not found")
+
+    return assets[0]
+
+
+async def _validate_address(service: BlockchainServiceDep, address: str) -> None:
+    """Validate holder addresses before rendering dependent pages."""
+    try:
+        address_info = await service.call("validateaddress", [address])
+    except Exception as exc:
+        raise_backend_http_error(exc)
+
+    if not address_info or not address_info.get("isvalid"):
+        raise HTTPException(status_code=404, detail=f"Address {address} not found")
+
+
+async def _count_asset_transactions(service: BlockchainServiceDep, asset_name: str) -> int:
+    """Estimate the total asset transactions by fetching a bounded full result set."""
+    transactions = await service.call(
+        "listassettransactions",
+        [asset_name, False, _COUNT_FETCH_LIMIT, 0],
+    )
+    return len(transactions) if transactions else 0
 
 
 @router.get("/{chain_name}/assets", response_class=HTMLResponse, name="assets",
@@ -50,13 +86,11 @@ async def list_assets(
         assets = await service.call("listassets", ["*", True])
         if not assets:
             assets = []
-    except Exception as e:
-        # TODO: Log error?
-        assets = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(assets),
@@ -91,13 +125,7 @@ async def asset_detail(
     """
     Show asset details.
     """
-    try:
-        assets = await service.call("listassets", [asset_name, True])
-        if not assets or len(assets) == 0:
-            raise HTTPException(status_code=404, detail=f"Asset {asset_name} not found")
-        asset = assets[0]
-    except Exception:
-        raise HTTPException(status_code=404, detail=f"Asset {asset_name} not found")
+    asset = await _get_asset_or_raise(service, asset_name)
 
     return templates.TemplateResponse(
         name="pages/asset.html",
@@ -123,16 +151,17 @@ async def asset_holders(
     """
     List asset holders.
     """
+    await _get_asset_or_raise(service, asset_name)
+
     try:
         holders = await service.call("listassetholders", [asset_name])
         if not holders:
             holders = []
-    except Exception:
-        holders = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(holders),
@@ -173,16 +202,16 @@ async def asset_transactions(
     """
     List asset transactions.
     """
+    await _get_asset_or_raise(service, asset_name)
+
     # Get transaction count
     try:
-        count_txs = await service.call("listassettransactions", [asset_name, False, 1, 0])
-        total_count = len(count_txs) if count_txs else 0
-    except Exception:
-        total_count = 0
+        total_count = await _count_asset_transactions(service, asset_name)
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -197,12 +226,14 @@ async def asset_transactions(
                 "listassettransactions",
                 [asset_name, True, page_info["count"], page_info["start"]],
             )
-        except Exception:
-            transactions = []
+        except Exception as exc:
+            raise_backend_http_error(exc)
 
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/asset/{asset_name}/transactions",
+        include_component_fields=True,
+        total_items=total_count,
     )
 
     return templates.TemplateResponse(
@@ -211,6 +242,7 @@ async def asset_transactions(
             title=f"Transactions - {asset_name}",
             asset_name=asset_name,
             transactions=transactions,
+            pagination=pagination_context,
             **pagination_context
         ),
     )
@@ -231,19 +263,11 @@ async def asset_issues(
     """
     Show asset issuance history.
     """
-    try:
-        assets = await service.call("listassets", [asset_name, True])
-        if assets and len(assets) > 0:
-            asset = assets[0]
-            issues = asset.get("issues", [])
-        else:
-            issues = []
-    except Exception:
-        issues = []
+    asset = await _get_asset_or_raise(service, asset_name)
+    issues = asset.get("issues", [])
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(issues),
@@ -282,20 +306,14 @@ async def asset_permissions(
     """
     Show asset permissions.
     """
+    await _get_asset_or_raise(service, asset_name)
+
     try:
-        # Verify asset exists first
-        assets = await service.call("listassets", [asset_name, True])
-        if not assets or len(assets) == 0:
+        permissions = await service.call("listpermissions", [asset_name])
+        if not permissions:
             permissions = []
-        else:
-            # Get addresses with permissions for this asset
-            # listpermissions for asset? Usually listpermissions stream|admin...
-            # The handler used `listpermissions [asset_name]`. Assuming correct.
-            permissions = await service.call("listpermissions", [asset_name])
-            if not permissions:
-                permissions = []
-    except Exception:
-        permissions = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     return templates.TemplateResponse(
         name="pages/asset_permissions.html",
@@ -324,6 +342,9 @@ async def holder_transactions(
     """
     List transactions for a specific asset holder.
     """
+    await _get_asset_or_raise(service, asset_name)
+    await _validate_address(service, address)
+
     def output_matches_asset(output: Dict[str, Any]) -> bool:
         """Match either legacy flat asset fields or nested MultiChain asset entries."""
         if output.get("assetref") == asset_name or output.get("asset") == asset_name:
@@ -351,12 +372,11 @@ async def holder_transactions(
             for tx in all_txs
             if any(output_matches_asset(item) for item in tx.get("vout", []))
         ]
-    except Exception:
-        transactions = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(transactions),

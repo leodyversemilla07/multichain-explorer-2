@@ -88,7 +88,7 @@
                 <div class="flex items-center justify-between">
                     <dt class="text-sm font-medium text-gray-500 w-48">Previous Block</dt>
                     <dd class="text-sm text-gray-900 flex-1 font-mono">
-                        <a href="chain/{{ chain_name }}/block/{{ block.height - 1 }}"
+                        <a href="{{ base_url }}{{ chain_path }}/block/{{ block.height - 1 }}"
                            class="text-blue-600 hover:text-blue-800 hover:underline">
                             {{ block.previousblockhash|format_hash }}
                         </a>
@@ -102,7 +102,7 @@
                 <div class="flex items-center justify-between">
                     <dt class="text-sm font-medium text-gray-500 w-48">Next Block</dt>
                     <dd class="text-sm text-gray-900 flex-1 font-mono">
-                        <a href="chain/{{ chain_name }}/block/{{ block.height + 1 }}"
+                        <a href="{{ base_url }}{{ chain_path }}/block/{{ block.height + 1 }}"
                            class="text-blue-600 hover:text-blue-800 hover:underline">
                             {{ block.nextblockhash|format_hash }}
                         </a>

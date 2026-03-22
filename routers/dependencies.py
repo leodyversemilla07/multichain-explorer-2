@@ -14,12 +14,12 @@ These dependencies handle common operations like:
 
 from typing import Annotated, Any, Dict
 
-from fastapi import Depends, Path, Query, Request
+from fastapi import Depends, HTTPException, Path, Query, Request, status
 from fastapi.templating import Jinja2Templates
 
 from app_state import ApplicationState
 from config import ChainConfig
-from exceptions import ChainNotFoundError
+from exceptions import ChainConnectionError, ChainNotFoundError, RPCError
 from services.blockchain_service import BlockchainService
 from services.pagination_service import PaginationService
 
@@ -216,6 +216,52 @@ def safe_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (ValueError, TypeError):
         return default
+
+
+def raise_backend_http_error(exc: Exception, not_found_detail: str | None = None) -> None:
+    """Map backend service exceptions to the correct HTTP response."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    if isinstance(exc, ChainConnectionError):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    if isinstance(exc, RPCError):
+        if exc.error_code == -5 and not_found_detail:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=not_found_detail,
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    raise exc
+
+
+def get_page_count(
+    query_params: Dict[str, str],
+    default_page: int = 1,
+    default_count: int = 20,
+) -> tuple[int, int]:
+    """Parse standard page/count query params with safe integer fallback."""
+    return (
+        safe_int(query_params.get("page", default_page), default_page),
+        safe_int(query_params.get("count", default_count), default_count),
+    )
+
+
+def get_start_count(
+    query_params: Dict[str, str],
+    default_start: int = 0,
+    default_count: int = 20,
+) -> tuple[int, int]:
+    """Parse standard start/count query params with safe integer fallback."""
+    return (
+        safe_int(query_params.get("start", default_start), default_start),
+        safe_int(query_params.get("count", default_count), default_count),
+    )
 
 
 # Optional version for routes where query params might not be needed

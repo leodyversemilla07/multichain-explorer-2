@@ -29,12 +29,41 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    raise_backend_http_error,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Streams"])
+
+_COUNT_FETCH_LIMIT = 100000
+
+
+async def _get_stream_or_raise(service: BlockchainServiceDep, stream_name: str) -> Dict[str, Any]:
+    """Load a stream and raise a typed HTTP error when it is unavailable."""
+    try:
+        streams = await service.call("liststreams", [stream_name, True])
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_name} not found")
+
+    if not streams:
+        raise HTTPException(status_code=404, detail=f"Stream {stream_name} not found")
+
+    return streams[0]
+
+
+async def _count_stream_results(
+    service: BlockchainServiceDep,
+    method: str,
+    *leading_params: Any,
+) -> int:
+    """Estimate paginated RPC totals by fetching a bounded full result set."""
+    results = await service.call(
+        method,
+        [*leading_params, False, _COUNT_FETCH_LIMIT, 0],
+    )
+    return len(results) if results else 0
 
 
 @router.get("/{chain_name}/streams", response_class=HTMLResponse, name="streams",
@@ -61,11 +90,11 @@ async def list_streams(
                 # Get item count for each stream if not present
                 if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
                     try:
-                        # Get actual count from liststreamitems
-                        stream_items = await service.call(
-                            "liststreamitems", [stream["name"], False, 1]
+                        stream["items"] = await _count_stream_results(
+                            service,
+                            "liststreamitems",
+                            stream["name"],
                         )
-                        stream["items"] = len(stream_items) if stream_items else 0
                     except Exception:
                         stream["items"] = 0
 
@@ -77,13 +106,12 @@ async def list_streams(
             # Parallel execution
             await asyncio.gather(*[enrich_stream_info(s) for s in streams])
 
-    except Exception as e:
-        logger.error(f"Error fetching streams: {e}")
-        streams = []
+    except Exception as exc:
+        logger.error("Error fetching streams", exc_info=exc)
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(streams),
@@ -119,26 +147,25 @@ async def stream_detail(
     Show stream details.
     """
     try:
-        streams = await service.call("liststreams", [stream_name, True])
-        if not streams or len(streams) == 0:
-            raise HTTPException(status_code=404, detail=f"Stream {stream_name} not found")
-        stream = streams[0]
+        stream = await _get_stream_or_raise(service, stream_name)
 
         # Fix items count if it's not a number
         if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
             try:
-                # Get actual count from liststreamitems
-                stream_items = await service.call("liststreamitems", [stream_name, False, 1])
-                stream["items"] = len(stream_items) if stream_items else 0
+                stream["items"] = await _count_stream_results(
+                    service,
+                    "liststreamitems",
+                    stream_name,
+                )
             except Exception:
                 stream["items"] = 0
 
         if "confirmed" not in stream or not isinstance(stream.get("confirmed"), (int, float)):
             stream["confirmed"] = stream.get("items", 0)
 
-    except Exception as e:
-        logger.error(f"Error fetching stream {stream_name}: {e}")
-        raise HTTPException(status_code=404, detail=f"Stream {stream_name} not found")
+    except Exception as exc:
+        logger.error("Error fetching stream %s", stream_name, exc_info=exc)
+        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_name} not found")
 
     return templates.TemplateResponse(
         name="pages/stream.html",
@@ -164,17 +191,20 @@ async def stream_items(
     """
     List items in a stream.
     """
+    await _get_stream_or_raise(service, stream_name)
+
     try:
-        # liststreamitems returns a list of items
-        count_items = await service.call("liststreamitems", [stream_name, False, 1, 0])
-        total_count = len(count_items) if count_items else 0
-    except Exception as e:
-        logger.error(f"Error getting stream item count: {e}")
-        total_count = 0
+        total_count = await _count_stream_results(
+            service,
+            "liststreamitems",
+            stream_name,
+        )
+    except Exception as exc:
+        logger.error("Error getting stream item count", exc_info=exc)
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -189,9 +219,9 @@ async def stream_items(
                 "liststreamitems",
                 [stream_name, True, page_info["count"], page_info["start"]],
             )
-        except Exception as e:
-            logger.error(f"Error fetching stream items: {e}")
-            items = []
+        except Exception as exc:
+            logger.error("Error fetching stream items", exc_info=exc)
+            raise_backend_http_error(exc)
 
     pagination_context = pagination.build_context(
         page_info,
@@ -227,17 +257,18 @@ async def stream_keys(
     """
     List keys in a stream.
     """
+    await _get_stream_or_raise(service, stream_name)
+
     try:
         keys = await service.call("liststreamkeys", [stream_name, "*", False, 1000, 0])
         if not keys:
             keys = []
-    except Exception as e:
-        logger.error(f"Error fetching stream keys: {e}")
-        keys = []
+    except Exception as exc:
+        logger.error("Error fetching stream keys", exc_info=exc)
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(keys),
@@ -284,17 +315,18 @@ async def stream_publishers(
     """
     List publishers in a stream.
     """
+    await _get_stream_or_raise(service, stream_name)
+
     try:
         publishers = await service.call("liststreampublishers", [stream_name, "*", False, 1000, 0])
         if not publishers:
             publishers = []
-    except Exception as e:
-        logger.error(f"Error fetching stream publishers: {e}")
-        publishers = []
+    except Exception as exc:
+        logger.error("Error fetching stream publishers", exc_info=exc)
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(publishers),
@@ -341,13 +373,15 @@ async def stream_permissions(
     """
     Show stream permissions.
     """
+    await _get_stream_or_raise(service, stream_name)
+
     try:
         permissions = await service.call("listpermissions", [stream_name])
         if not permissions:
             permissions = []
-    except Exception as e:
-        logger.error(f"Error fetching stream permissions: {e}")
-        permissions = []
+    except Exception as exc:
+        logger.error("Error fetching stream permissions", exc_info=exc)
+        raise_backend_http_error(exc)
 
     return templates.TemplateResponse(
         name="pages/stream_permissions.html",
@@ -375,16 +409,21 @@ async def key_items(
     """
     List items for a specific key in a stream.
     """
+    await _get_stream_or_raise(service, stream_name)
+
     try:
-        count_items = await service.call("liststreamkeyitems", [stream_name, key, False, 1, 0])
-        total_count = len(count_items) if count_items else 0
-    except Exception as e:
-        logger.error(f"Error getting key item count: {e}")
-        total_count = 0
+        total_count = await _count_stream_results(
+            service,
+            "liststreamkeyitems",
+            stream_name,
+            key,
+        )
+    except Exception as exc:
+        logger.error("Error getting key item count", exc_info=exc)
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -399,9 +438,9 @@ async def key_items(
                 "liststreamkeyitems",
                 [stream_name, key, True, page_info["count"], page_info["start"]],
             )
-        except Exception as e:
-            logger.error(f"Error fetching key items: {e}")
-            items = []
+        except Exception as exc:
+            logger.error("Error fetching key items", exc_info=exc)
+            raise_backend_http_error(exc)
 
     pagination_context = pagination.build_context(
         page_info,
@@ -439,18 +478,21 @@ async def publisher_items(
     """
     List items from a specific publisher in a stream.
     """
+    await _get_stream_or_raise(service, stream_name)
+
     try:
-        count_items = await service.call(
-            "liststreampublisheritems", [stream_name, publisher, False, 1, 0]
+        total_count = await _count_stream_results(
+            service,
+            "liststreampublisheritems",
+            stream_name,
+            publisher,
         )
-        total_count = len(count_items) if count_items else 0
-    except Exception as e:
-        logger.error(f"Error getting publisher item count: {e}")
-        total_count = 0
+    except Exception as exc:
+        logger.error("Error getting publisher item count", exc_info=exc)
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -465,9 +507,9 @@ async def publisher_items(
                 "liststreampublisheritems",
                 [stream_name, publisher, True, page_info["count"], page_info["start"]],
             )
-        except Exception as e:
-            logger.error(f"Error fetching publisher items: {e}")
-            items = []
+        except Exception as exc:
+            logger.error("Error fetching publisher items", exc_info=exc)
+            raise_backend_http_error(exc)
 
     pagination_context = pagination.build_context(
         page_info,

@@ -26,10 +26,24 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["Addresses"])
+
+
+async def _validate_address(service: BlockchainServiceDep, address: str) -> Dict[str, Any]:
+    """Validate an address before rendering dependent pages."""
+    try:
+        address_info = await service.call("validateaddress", [address])
+    except Exception as exc:
+        raise_backend_http_error(exc)
+
+    if not address_info or not address_info.get("isvalid"):
+        raise HTTPException(status_code=404, detail=f"Address {address} not found")
+
+    return address_info
 
 
 @router.get("/{chain_name}/addresses", response_class=HTMLResponse, name="addresses")
@@ -52,12 +66,11 @@ async def list_addresses(
         addresses = await service.call("listaddresses", ["*", True])
         if not addresses:
             addresses = []
-    except Exception:
-        addresses = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(addresses),
@@ -93,53 +106,50 @@ async def address_detail(
     """
     Show address details.
     """
-    # Use gathers to fetch everything in parallel
-    # 1. Address Info (includes balances)
-    # 2. Permissions
-    # 3. Recent Transactions
-    # 4. Total Transaction Count
-    
+    address_info = await _validate_address(service, address)
+
+    # Fetch dependent address data in parallel after validation.
+    async def fetch_balances():
+        return await service.get_address_balances(address)
+
+    async def fetch_permissions():
+        return await service.call("listpermissions", ["*", address])
+
     async def fetch_transactions():
-        try:
-            txs = await service.call("listaddresstransactions", [address, 10, 0, True])
-            return txs if txs else []
-        except Exception:
-            return []
+        return await service.call("listaddresstransactions", [address, 10, 0, True])
 
     async def fetch_tx_count():
-        try:
-            # Use a smaller batch to estimate count efficiently
-            all_txs = await service.call("listaddresstransactions", [address, 10000, 0, False])
-            return len(all_txs) if all_txs else 0
-        except Exception:
-            return 0
+        all_txs = await service.call("listaddresstransactions", [address, 10000, 0, False])
+        return len(all_txs) if all_txs else 0
 
     results = await asyncio.gather(
-        service.get_address_summary(address),
+        fetch_balances(),
+        fetch_permissions(),
         fetch_transactions(),
         fetch_tx_count(),
-        return_exceptions=True
+        return_exceptions=True,
     )
-    
-    address_info = results[0] if not isinstance(results[0], Exception) else None
-    transactions = results[1] if not isinstance(results[1], Exception) else []
-    transactions_count = results[2] if not isinstance(results[2], Exception) else 0
-    
-    # Extract permissions from summary
-    permissions = address_info.get("permissions", []) if address_info else []
 
-    if not address_info:
-        raise HTTPException(status_code=404, detail=f"Address {address} not found")
+    for result in results:
+        if isinstance(result, Exception):
+            raise_backend_http_error(result)
 
-    balances = address_info.get("balances", [])
+    balances = results[0] or []
+    permissions = results[1] or []
+    transactions = results[2] or []
+    transactions_count = results[3] or 0
+
+    address_summary = dict(address_info)
+    address_summary["balances"] = balances
+    address_summary["permissions"] = permissions
 
     return templates.TemplateResponse(
         name="pages/address.html",
         context=context.build_context(
             title=f"Address - {chain.display_name}",
             address=address,
-            address_info=address_info,
-            address_data=address_info, # Both keys used in template?
+            address_info=address_summary,
+            address_data=address_summary, # Both keys used in template?
             balances=balances,
             assets=balances, # Alias
             permissions=permissions,
@@ -163,19 +173,19 @@ async def address_transactions(
     """
     List transactions for an address.
     """
+    await _validate_address(service, address)
+
     # Get total count first
     try:
         all_transactions = await service.call("listaddresstransactions", [address, 10000, 0, False])
         if not all_transactions:
             all_transactions = []
         total_count = len(all_transactions)
-    except Exception:
-        all_transactions = []
-        total_count = 0
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_count,
@@ -193,8 +203,8 @@ async def address_transactions(
             )
             if not transactions:
                 transactions = []
-        except Exception:
-            transactions = []
+        except Exception as exc:
+            raise_backend_http_error(exc)
 
     pagination_context = pagination.build_context(
         page_info,
@@ -224,8 +234,12 @@ async def address_assets(
     """
     List assets held by an address.
     """
-    # Get address balances
-    balances = await service.get_address_balances(address)
+    await _validate_address(service, address)
+
+    try:
+        balances = await service.get_address_balances(address)
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     return templates.TemplateResponse(
         name="pages/address_assets.html",
@@ -251,6 +265,8 @@ async def address_streams(
     """
     List streams associated with an address.
     """
+    await _validate_address(service, address)
+
     # Get all streams to count them
     try:
         # Note: explorerlistaddressstreams is a custom RPC or extended one?
@@ -263,25 +279,18 @@ async def address_streams(
             all_streams = []
 
         total_count = len(all_streams)
-    except Exception:
-        # If the RPC call fails, just show empty list
-        all_streams = []
-        total_count = 0
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
-    page_info = None
+    page, count = get_page_count(query_params)
+    page_info = pagination.get_pagination_info(
+        total=total_count,
+        page=page,
+        items_per_page=count,
+    )
     streams = []
 
     if total_count > 0:
-        # Apply pagination
-        page = safe_int(query_params.get("page", 1), 1)
-        count = safe_int(query_params.get("count", 20), 20)
-
-        page_info = pagination.get_pagination_info(
-            total=total_count,
-            page=page,
-            items_per_page=count,
-        )
-
         # Get streams for this page
         try:
             streams = await service.call(
@@ -290,15 +299,13 @@ async def address_streams(
             )
             if not streams:
                 streams = []
-        except Exception:
-            streams = []
+        except Exception as exc:
+            raise_backend_http_error(exc)
 
-    pagination_context = {}
-    if page_info:
-        pagination_context = pagination.build_context(
-            page_info,
-            f"/{chain.path_name}/address/{address}/streams",
-        )
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/address/{address}/streams",
+    )
 
     return templates.TemplateResponse(
         name="pages/address_streams.html",
@@ -323,8 +330,12 @@ async def address_permissions(
     """
     List permissions for an address.
     """
-    # Get permissions
-    permissions = await service.get_address_permissions(address)
+    await _validate_address(service, address)
+
+    try:
+        permissions = await service.call("listpermissions", ["*", address])
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     return templates.TemplateResponse(
         name="pages/address_permissions.html",

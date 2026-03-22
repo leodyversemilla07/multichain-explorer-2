@@ -322,6 +322,34 @@ class TestGetOptionalQueryParams:
         assert result == {}
 
 
+class TestQueryParsingHelpers:
+    """Test shared query parsing helpers."""
+
+    def test_get_page_count_defaults(self):
+        """Test page/count defaults are returned when params are missing."""
+        from routers.dependencies import get_page_count
+
+        page, count = get_page_count({})
+        assert page == 1
+        assert count == 20
+
+    def test_get_page_count_custom_values(self):
+        """Test page/count helper parses valid values."""
+        from routers.dependencies import get_page_count
+
+        page, count = get_page_count({"page": "3", "count": "50"})
+        assert page == 3
+        assert count == 50
+
+    def test_get_start_count_invalid_values(self):
+        """Test start/count helper falls back on invalid values."""
+        from routers.dependencies import get_start_count
+
+        start, count = get_start_count({"start": "bad", "count": None})
+        assert start == 0
+        assert count == 20
+
+
 class TestGetTemplates:
     """Test get_templates dependency."""
 

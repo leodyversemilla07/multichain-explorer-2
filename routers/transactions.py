@@ -24,10 +24,16 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["Transactions"])
+
+
+def _raise_transaction_http_error(txid: str, exc: Exception) -> None:
+    """Map backend transaction errors to the correct HTTP response."""
+    raise_backend_http_error(exc, not_found_detail=f"Transaction {txid} not found")
 
 
 @router.get("/{chain_name}/transactions", response_class=HTMLResponse, name="transactions",
@@ -47,8 +53,7 @@ async def list_transactions(
     Displays paginated list of transactions across the blockchain.
     """
     # Apply pagination first to minimize work
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
     
     # Get recent confirmed transactions (newest blocks first)
     info = await service.get_blockchain_info()
@@ -162,8 +167,8 @@ async def raw_transaction(
         transaction = await service.call("getrawtransaction", [txid, 1])
         if not transaction:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
+    except Exception as exc:
+        _raise_transaction_http_error(txid, exc)
 
     # If the client accepts JSON, return JSON. Otherwise return the HTML view of the JSON.
     accept = request.headers.get("accept", "")
@@ -198,8 +203,8 @@ async def raw_transaction_hex(
         hex_data = await service.call("getrawtransaction", [txid, 0])
         if not hex_data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
+    except Exception as exc:
+        _raise_transaction_http_error(txid, exc)
 
     return templates.TemplateResponse(
         name="pages/raw_transaction_hex.html",

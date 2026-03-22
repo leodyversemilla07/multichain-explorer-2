@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
 import app_state
+from exceptions import ChainConnectionError, RPCError
 from routers.dependencies import get_blockchain_service
 
 
@@ -74,7 +75,40 @@ def mock_blockchain_service():
         "vout": [],
     })
     
-    service.call = AsyncMock(return_value=[])
+    async def mock_call(method, params=None):
+        if method == "validateaddress":
+            address = params[0] if params else ""
+            return {"address": address, "isvalid": True, "ismine": False}
+        if method == "listaddresses":
+            return []
+        if method == "listpermissions":
+            return []
+        if method == "listaddresstransactions":
+            return []
+        if method == "listassets":
+            if params and params[0] != "*":
+                return [{"name": params[0], "assetref": "1-2-3", "issues": []}]
+            return []
+        if method == "listassetholders":
+            return []
+        if method == "listassettransactions":
+            return []
+        if method == "liststreams":
+            if params and params[0] != "*":
+                return [{"name": params[0], "streamref": "5-6-7", "items": 0}]
+            return []
+        if method in {
+            "liststreamitems",
+            "liststreamkeys",
+            "liststreampublishers",
+            "liststreamkeyitems",
+            "liststreampublisheritems",
+            "explorerlistaddressstreams",
+        }:
+            return []
+        return []
+
+    service.call = AsyncMock(side_effect=mock_call)
     
     service.get_address_info = AsyncMock(return_value={"address": "1ABC", "isvalid": True})
     service.get_address_balances = AsyncMock(return_value=[])
@@ -100,6 +134,56 @@ class TestAddressesRouter:
         response = client.get("/test-chain/addresses")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+
+
+class TestAssetsRouter:
+    """Test asset router endpoints (HTML)."""
+
+    def test_asset_detail_uses_canonical_links(self, client):
+        """Test asset detail page links use the canonical chain path."""
+        response = client.get("/test-chain/asset/asset1")
+        assert response.status_code == 200
+        assert "/test-chain/asset/asset1/holders" in response.text
+        assert "/test-chain/asset/asset1/issues" in response.text
+        assert "/test-chain/asset/asset1/transactions" in response.text
+        assert "/test-chain/assets" in response.text
+
+
+class TestStreamsRouter:
+    """Test stream router endpoints (HTML)."""
+
+    def test_stream_detail_uses_canonical_links(self, client):
+        """Test stream detail page links use the canonical chain path."""
+        response = client.get("/test-chain/stream/stream1")
+        assert response.status_code == 200
+        assert "/test-chain/stream/stream1/items" in response.text
+        assert "/test-chain/stream/stream1/keys" in response.text
+        assert "/test-chain/stream/stream1/publishers" in response.text
+        assert "/test-chain/streams" in response.text
+
+    def test_streams_list_uses_canonical_links(self, client, mock_blockchain_service):
+        """Test streams list page links use the canonical chain path."""
+        async def stream_list_call(method, params=None):
+            if method == "liststreams":
+                return [
+                    {
+                        "name": "stream1",
+                        "streamref": "5-6-7",
+                        "items": 0,
+                        "confirmed": 0,
+                        "open": True,
+                    }
+                ]
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=stream_list_call)
+
+        response = client.get("/test-chain/streams")
+        assert response.status_code == 200
+        assert "/test-chain/stream/stream1" in response.text
+        assert "/test-chain/stream/stream1/items" in response.text
+        assert "/test-chain/stream/stream1/keys" in response.text
+        assert "/test-chain/stream/stream1/publishers" in response.text
         
     def test_address_detail(self, client):
         """Test GET /test-chain/address/{address}."""
@@ -223,6 +307,23 @@ class TestBlocksRouter:
         assert response.status_code == 302
         assert "/blocks" in response.headers.get("location", "")
 
+    def test_block_detail_uses_canonical_navigation_links(self, client, mock_blockchain_service):
+        """Test block detail navigation links use the canonical chain path."""
+        mock_blockchain_service.get_block_by_height.return_value = {
+            "hash": "blockhash123",
+            "height": 100,
+            "time": 1700000000,
+            "tx": [],
+            "size": 256,
+            "previousblockhash": "prevhash",
+            "nextblockhash": "nexthash",
+        }
+
+        response = client.get("/test-chain/block/100")
+        assert response.status_code == 200
+        assert "/test-chain/block/99" in response.text
+        assert "/test-chain/block/101" in response.text
+
 
 class TestSearchRouter:
     """Test search router endpoints."""
@@ -307,6 +408,59 @@ class TestPaginationInRoutes:
         """Test blocks endpoint accepts count parameter."""
         response = client.get("/test-chain/blocks?count=50")
         assert response.status_code in [200, 500]
+
+    def test_asset_transactions_uses_full_total_for_pagination(self, client, mock_blockchain_service):
+        """Test asset transaction pages use the real total, not a one-item probe."""
+        transactions = [
+            {"txid": f"tx{i}", "type": "transfer", "qty": i, "blockheight": i, "time": 1700000000 + i}
+            for i in range(5)
+        ]
+
+        async def asset_call(method, params=None):
+            if method == "listassets":
+                return [{"name": "asset1", "assetref": "1-2-3", "issues": []}]
+            if method == "listassettransactions":
+                _, _, count, start = params
+                return transactions[start : start + count]
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=asset_call)
+
+        response = client.get("/test-chain/asset/asset1/transactions?page=2&count=2")
+        assert response.status_code == 200
+        assert "5 total" in response.text
+        assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
+        assert "/test-chain/asset/asset1/transactions?page=3" in response.text
+
+    def test_stream_items_uses_full_total_for_pagination(self, client, mock_blockchain_service):
+        """Test stream item pages use the real total, not a one-item probe."""
+        items = [
+            {
+                "publishers": ["publisher1"],
+                "key": f"key{i}",
+                "data": f"data{i}",
+                "confirmations": 1,
+                "blocktime": 1700000000 + i,
+                "txid": f"tx{i}",
+            }
+            for i in range(5)
+        ]
+
+        async def stream_call(method, params=None):
+            if method == "liststreams":
+                return [{"name": "stream1", "streamref": "5-6-7"}]
+            if method == "liststreamitems":
+                stream_name, verbose, count, start = params
+                return items[start : start + count]
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=stream_call)
+
+        response = client.get("/test-chain/stream/stream1/items?page=2&count=2")
+        assert response.status_code == 200
+        assert "5 total items" in response.text
+        assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
+        assert "/test-chain/stream/stream1/items?page=3" in response.text
 
 
 class TestLegacyRoutes:
@@ -440,3 +594,51 @@ class TestErrorHandling:
         response = client_with_error_service.get("/test-chain")
         # Should return some response (error page or 500)
         assert response.status_code in [200, 500]
+
+    def test_raw_transaction_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+        """Test raw transaction endpoint preserves chain connection failures."""
+        mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
+
+        response = client.get("/test-chain/tx/" + ("a" * 64) + "/raw")
+        assert response.status_code == 503
+
+    def test_raw_transaction_returns_502_for_rpc_errors(self, client, mock_blockchain_service):
+        """Test raw transaction endpoint returns 502 for non-not-found RPC errors."""
+        mock_blockchain_service.call.side_effect = RPCError(
+            method="getrawtransaction",
+            error_message="backend exploded",
+            error_code=-1,
+        )
+
+        response = client.get("/test-chain/tx/" + ("b" * 64) + "/raw")
+        assert response.status_code == 502
+
+    def test_address_detail_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+        """Test address detail preserves backend connection failures."""
+        mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
+
+        response = client.get("/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+        assert response.status_code == 503
+
+    def test_asset_detail_returns_502_for_rpc_errors(self, client, mock_blockchain_service):
+        """Test asset detail returns 502 for backend RPC failures."""
+        mock_blockchain_service.call.side_effect = RPCError(
+            method="listassets",
+            error_message="backend exploded",
+            error_code=-1,
+        )
+
+        response = client.get("/test-chain/asset/asset1")
+        assert response.status_code == 502
+
+    def test_stream_detail_returns_404_for_missing_streams(self, client, mock_blockchain_service):
+        """Test stream detail returns 404 when the stream does not exist."""
+        async def missing_stream_call(method, params=None):
+            if method == "liststreams":
+                return []
+            return []
+
+        mock_blockchain_service.call.side_effect = missing_stream_call
+
+        response = client.get("/test-chain/stream/stream1")
+        assert response.status_code == 404
