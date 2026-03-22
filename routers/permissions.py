@@ -124,15 +124,10 @@ async def global_permissions(
         page_info["start"] : page_info["start"] + page_info["count"]
     ]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/permissions/global",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/permissions/global",
+    )
 
     return templates.TemplateResponse(
         name="pages/global_permissions.html",

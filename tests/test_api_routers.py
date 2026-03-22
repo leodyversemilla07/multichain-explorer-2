@@ -253,6 +253,18 @@ class TestApiAddressesRouter:
         assert len(data) == 1
         assert data[0]["txid"] == "tx1"
 
+    def test_api_list_address_transactions_invalid_address(self, api_client, mock_blockchain_service):
+        """Test invalid addresses return 404 instead of an empty list."""
+        async def invalid_address_call(method, params=None):
+            if method == "validateaddress":
+                return {"isvalid": False}
+            return None
+
+        mock_blockchain_service.call = AsyncMock(side_effect=invalid_address_call)
+
+        response = api_client.get("/api/v1/test-chain/addresses/bad-address/transactions")
+        assert response.status_code == 404
+
 
 class TestApiAssetsRouter:
     """Test API assets router."""
@@ -328,3 +340,11 @@ class TestApiSearchRouter:
         assert data["total"] >= 1
         assert data["results"][0]["type"] == "block"
         assert data["results"][0]["id"] == "999"
+
+    def test_api_search_includes_urls_from_shared_search_service(self, api_client):
+        """Test API search now uses the shared search implementation with canonical URLs."""
+        response = api_client.get("/api/v1/test-chain/search", params={"q": "asset1"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] >= 1
+        assert any(result.get("url") == "/test-chain/asset/asset1" for result in data["results"])

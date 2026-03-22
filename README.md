@@ -35,7 +35,7 @@ A modern, web-based explorer for MultiChain blockchains with a clean architectur
 - **Auto-Generated API Docs** - Interactive Swagger UI at `/docs`
 - **Clean Architecture** - Modular router/handler system with separated concerns
 - **Type-Safe** - Input validation with Pydantic and FastAPI
-- **Well-Tested** - 283+ tests with 100% pass rate
+- **Well-Tested** - 328 automated tests passing locally
 - **Production-Ready** - Security hardening, error handling, and performance optimizations
 
 ---
@@ -274,58 +274,34 @@ MultiChain Explorer 2 follows a clean, modular architecture powered by **FastAPI
 
 ```
 ┌─────────────────┐
-│   Uvicorn       │  ← ASGI server (production-ready)
+│   Uvicorn       │  ← ASGI server
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   FastAPI App   │  ← main.py (Modern async framework)
+│   FastAPI App   │  ← main.py
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   Routers       │  ← routers/ (API route definitions)
+│  HTML Routers   │  ← routers/*.py
 ├─────────────────┤
-│ • chains.py     │  ← Chain listing & home
-│ • blocks.py     │  ← Block operations
-│ • transactions  │  ← Transaction operations
-│ • addresses.py  │  ← Address operations
-│ • assets.py     │  ← Asset operations
-│ • streams.py    │  ← Stream operations
-│ • permissions   │  ← Permission operations
-│ • search.py     │  ← Search functionality
+│  API Routers    │  ← routers/api/*.py
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   Handlers      │  ← handlers/ (Business logic)
-├─────────────────┤
-│ • BlockHandler  │  ← Block operations
-│ • TxHandler     │  ← Transaction operations
-│ • AddrHandler   │  ← Address operations
-│ • AssetHandler  │  ← Asset operations
-│ • StreamHandler │  ← Stream operations
-│ • ChainHandler  │  ← Chain info
-│ • PermHandler   │  ← Permissions
+│ Shared Services │  ← blockchain, cache, pagination, search
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   Services      │  ← services/ (Data layer)
-├─────────────────┤
-│ • Blockchain    │  ← RPC abstraction
-│ • Cache         │  ← Response caching
-│ • Formatting    │  ← Data transformation
-│ • Pagination    │  ← List pagination
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│   Templates     │  ← templates/ (Jinja2 + TailwindCSS)
+│ MultiChain RPC  │
 └─────────────────┘
 ```
 
 ### Key Components
 
-- **`main.py`** - FastAPI application with routers, middleware, and exception handlers
-- **`routers/`** - API route definitions with dependency injection (8 routers)
-- **`handlers/`** - Specialized request handlers (7 handlers)
-- **`services/`** - Business logic and data services (4 services)
+- **`main.py`** - FastAPI application with routers, middleware, startup, and exception handlers
+- **`routers/`** - Server-rendered HTML routes and dependency injection helpers
+- **`routers/api/`** - JSON API endpoints under `/api/v1`
+- **`services/`** - Shared RPC, cache, pagination, formatting, and search services
 - **`templates/`** - Jinja2 templates with TailwindCSS
 - **`validators.py`** - Input validation with Pydantic
 - **`config.py`** - Type-safe configuration management
@@ -341,49 +317,46 @@ MultiChain Explorer 2 follows a clean, modular architecture powered by **FastAPI
 # Run all tests
 pytest
 
-# Run with coverage report
-pytest --cov=. --cov-report=html
+# Run a single test module
+pytest tests/test_api_routers.py
 
-# Run specific test file
-pytest tests/test_handlers.py
-
-# Run specific test
-pytest tests/test_handlers.py::test_block_handler
-
-# Run with verbose output
-pytest -v
+# Run a single test
+pytest tests/test_main.py::TestHealthEndpoint::test_health_check_returns_200
 
 # Run tests matching a pattern
-pytest -k "handler"
+pytest -k "search"
 ```
 
 ### Test Structure
 
 ```
 tests/
-├── test_config.py              # Configuration tests
-├── test_validators.py          # Input validation tests
-├── test_exceptions.py          # Error handling tests
-├── test_handlers.py            # BaseHandler tests
-├── test_specialized_handlers.py # Handler-specific tests
+├── test_api_routers.py         # JSON API route coverage
+├── test_routers.py             # HTML route coverage
+├── test_main.py                # App factory and system routes
 ├── test_services.py            # Service layer tests
-├── test_search.py              # Search functionality tests
-├── test_template_engine.py     # Template tests
-├── test_integration.py         # End-to-end tests
-└── mocks/                      # Test fixtures & mocks
+├── test_cache_service.py       # Cache providers and decorator behavior
+├── test_config.py              # Dataclass config tests
+├── test_env_config.py          # Environment settings tests
+├── test_dependencies.py        # FastAPI dependency tests
+├── test_exceptions.py          # Error handling tests
+├── test_models.py              # Domain model tests
+├── test_multichain.py          # Legacy RPC client tests
+├── test_utils.py               # Utility tests
+└── test_validators.py          # Input validation tests
 ```
 
 ### Test Coverage
 
-- **283+ tests** with **100% pass rate**
+- **328 tests** passing locally
 - Comprehensive coverage of:
   - Input validation and security
   - Configuration management
   - Error handling
-  - Handler operations
+  - Router behavior
   - Service layer
-  - Template rendering
-  - Integration scenarios
+  - Startup and dependency injection
+  - Template-backed HTML views
 
 ### Running Specific Test Categories
 
@@ -404,13 +377,14 @@ pytest -m security
 
 ```
 multichain-explorer-2/
-├── main.py           # FastAPI application (single entry point)
+├── main.py                  # FastAPI application (single entry point)
 ├── app_state.py             # Global state management
-├── config.py                # Configuration management
-├── validators.py            # Input validation
+├── config.py                # Configuration dataclasses
+├── env_config.py            # Environment-backed settings loader
+├── validators.py            # Input validation helpers
 ├── exceptions.py            # Error handling
-├── template_engine.py       # Template rendering
-├── multichain.py            # MultiChain RPC client
+├── multichain.py            # Legacy RPC client
+├── performance.py           # Cache/compression utilities
 ├── utils.py                 # Utility functions
 │
 ├── routers/                 # FastAPI routers
@@ -423,26 +397,16 @@ multichain-explorer-2/
 │   ├── assets.py            # Asset routes
 │   ├── streams.py           # Stream routes
 │   ├── permissions.py       # Permission routes
-│   └── search.py            # Search routes
-│
-├── handlers/                # Request handlers
-│   ├── __init__.py
-│   ├── README.md           # Handler documentation
-│   ├── base.py             # BaseHandler (common functionality)
-│   ├── block_handler.py    # Block operations
-│   ├── transaction_handler.py
-│   ├── address_handler.py
-│   ├── asset_handler.py
-│   ├── stream_handler.py
-│   ├── chain_handler.py
-│   └── permission_handler.py
+│   ├── search.py            # Search routes
+│   └── api/                 # JSON API routes
 │
 ├── services/                # Business logic services
 │   ├── __init__.py
 │   ├── blockchain_service.py   # RPC abstraction
 │   ├── cache_service.py        # Caching
 │   ├── formatting_service.py   # Data formatting
-│   └── pagination_service.py   # Pagination
+│   ├── pagination_service.py   # Pagination helpers
+│   └── search_service.py       # Shared search logic
 │
 ├── templates/               # Jinja2 templates
 │   ├── base.html
@@ -470,9 +434,9 @@ multichain-explorer-2/
 │
 ├── requirements.txt         # Production dependencies
 ├── requirements-dev.txt     # Development dependencies
-├── pyproject.toml          # Project configuration
+├── pyproject.toml           # Packaging / tool configuration
 ├── pytest.ini              # Pytest configuration
-├── example.ini             # Example configuration
+├── .env.example            # Example environment configuration
 ├── LICENSE.txt             # BSD-3-Clause license
 ├── ARCHITECTURE_ROADMAP.md # Development roadmap
 └── README.md               # This file
@@ -547,15 +511,13 @@ Open a pull request on GitHub with a clear description of your changes.
 
 ## 📊 Current Status
 
-**Phase 3 COMPLETE** ✅
+**Current snapshot**
 
-- ✅ **283 tests** (100% passing)
-- ✅ **Handler decomposition** complete (7 specialized handlers)
-- ✅ **Service layer** implemented (4 services)
-- ✅ **Modern routing** system
-- ✅ **Template integration** for all core pages
-- ✅ **Clean architecture** with separated concerns
-- ✅ **Production-grade security** with input validation
+- ✅ **328 tests** passing locally
+- ✅ **Server-rendered HTML routes** and **JSON API routes**
+- ✅ **Shared service layer** for RPC, cache, pagination, and search
+- ✅ **Template integration** for core explorer pages
+- ✅ **Production-focused middleware** for rate limiting, CORS, and trusted hosts
 - ✅ **Type-safe configuration** management
 
 See [ARCHITECTURE_ROADMAP.md](ARCHITECTURE_ROADMAP.md) for detailed progress and future plans.
@@ -564,9 +526,8 @@ See [ARCHITECTURE_ROADMAP.md](ARCHITECTURE_ROADMAP.md) for detailed progress and
 
 ## 📖 Additional Documentation
 
-- **[Handler Documentation](handlers/README.md)** - Detailed handler architecture and usage
 - **[Architecture Roadmap](ARCHITECTURE_ROADMAP.md)** - Development phases and progress
-- **[Example Configuration](example.ini)** - Sample configuration file with comments
+- **[.env.example](.env.example)** - Sample environment configuration
 
 ---
 

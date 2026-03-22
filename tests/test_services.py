@@ -221,6 +221,25 @@ class TestPaginationService:
         assert len(pages) == 5
         assert pages == [16, 17, 18, 19, 20]
 
+    def test_build_context_includes_component_fields(self):
+        """Test template pagination context builder."""
+        service = PaginationService()
+        page_info = service.get_pagination_info(total=42, page=2, items_per_page=10)
+
+        context = service.build_context(
+            page_info,
+            "/test/path",
+            include_component_fields=True,
+        )
+
+        assert context["page"] == 2
+        assert context["page_count"] == 5
+        assert context["url_base"] == "/test/path"
+        assert context["total"] == 42
+        assert context["total_pages"] == 5
+        assert context["page_number"] == 2
+        assert context["base_path"] == "/test/path"
+
 
 class TestFormattingService:
     """Tests for FormattingService."""

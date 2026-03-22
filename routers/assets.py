@@ -66,15 +66,7 @@ async def list_assets(
 
     paginated_assets = assets[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/assets",
-    }
+    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/assets")
 
     return templates.TemplateResponse(
         name="pages/assets.html",
@@ -150,15 +142,10 @@ async def asset_holders(
 
     paginated_holders = holders[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/asset/{asset_name}/holders",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/asset/{asset_name}/holders",
+    )
 
     return templates.TemplateResponse(
         name="pages/asset_holders.html",
@@ -213,15 +200,10 @@ async def asset_transactions(
         except Exception:
             transactions = []
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/asset/{asset_name}/transactions",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/asset/{asset_name}/transactions",
+    )
 
     return templates.TemplateResponse(
         name="pages/asset_transactions.html",
@@ -271,15 +253,10 @@ async def asset_issues(
 
     paginated_issues = issues[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/asset/{asset_name}/issues",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/asset/{asset_name}/issues",
+    )
 
     return templates.TemplateResponse(
         name="pages/asset_issues.html",
@@ -347,6 +324,20 @@ async def holder_transactions(
     """
     List transactions for a specific asset holder.
     """
+    def output_matches_asset(output: Dict[str, Any]) -> bool:
+        """Match either legacy flat asset fields or nested MultiChain asset entries."""
+        if output.get("assetref") == asset_name or output.get("asset") == asset_name:
+            return True
+
+        for asset in output.get("assets", []) or []:
+            if (
+                asset.get("assetref") == asset_name
+                or asset.get("name") == asset_name
+                or asset.get("asset") == asset_name
+            ):
+                return True
+        return False
+
     # Get transactions
     try:
         # Note: inefficient to fetch all address transactions to filter by asset.
@@ -354,14 +345,11 @@ async def holder_transactions(
         if not all_txs:
             all_txs = []
         # Filter transactions for this specific asset
-        # Check vout for assetref or asset name
+        # Match both nested assets arrays and legacy flattened output fields.
         transactions = [
             tx
             for tx in all_txs
-            if any(
-                item.get("assetref") == asset_name or item.get("asset") == asset_name
-                for item in tx.get("vout", [])
-            )
+            if any(output_matches_asset(item) for item in tx.get("vout", []))
         ]
     except Exception:
         transactions = []
@@ -378,15 +366,10 @@ async def holder_transactions(
 
     paginated_txs = transactions[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/asset/{asset_name}/holder/{address}/transactions",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/asset/{asset_name}/holder/{address}/transactions",
+    )
 
     return templates.TemplateResponse(
         name="pages/asset_holder_transactions.html",

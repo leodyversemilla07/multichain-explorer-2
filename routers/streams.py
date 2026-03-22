@@ -93,15 +93,7 @@ async def list_streams(
 
     paginated_streams = streams[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/streams",
-    }
+    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/streams")
 
     return templates.TemplateResponse(
         name="pages/streams.html",
@@ -201,19 +193,12 @@ async def stream_items(
             logger.error(f"Error fetching stream items: {e}")
             items = []
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/stream/{stream_name}/items",
-        "total": total_count,
-        "total_pages": page_info["page_count"],
-        "page_number": page_info["page"],
-        "base_path": f"/{chain.path_name}/stream/{stream_name}/items",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/stream/{stream_name}/items",
+        include_component_fields=True,
+        total_items=total_count,
+    )
 
     return templates.TemplateResponse(
         name="pages/stream_items.html",
@@ -262,19 +247,12 @@ async def stream_keys(
 
     paginated_keys = keys[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/stream/{stream_name}/keys",
-        "total": len(keys),
-        "total_pages": page_info["page_count"],
-        "page_number": page_info["page"],
-        "base_path": f"/{chain.path_name}/stream/{stream_name}/keys",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/stream/{stream_name}/keys",
+        include_component_fields=True,
+        total_items=len(keys),
+    )
 
     show_pagination = page_info["page_count"] > 1
 
@@ -328,19 +306,12 @@ async def stream_publishers(
         page_info["start"] : page_info["start"] + page_info["count"]
     ]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/stream/{stream_name}/publishers",
-        "total": len(publishers),
-        "total_pages": page_info["page_count"],
-        "page_number": page_info["page"],
-        "base_path": f"/{chain.path_name}/stream/{stream_name}/publishers",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/stream/{stream_name}/publishers",
+        include_component_fields=True,
+        total_items=len(publishers),
+    )
 
     show_pagination = page_info["page_count"] > 1
 
@@ -432,19 +403,12 @@ async def key_items(
             logger.error(f"Error fetching key items: {e}")
             items = []
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/stream/{stream_name}/key/{key}",
-        "total": total_count,
-        "total_pages": page_info["page_count"],
-        "page_number": page_info["page"],
-        "base_path": f"/{chain.path_name}/stream/{stream_name}/key/{key}",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/stream/{stream_name}/key/{key}",
+        include_component_fields=True,
+        total_items=total_count,
+    )
 
     return templates.TemplateResponse(
         name="pages/stream_key_items.html",
@@ -505,19 +469,12 @@ async def publisher_items(
             logger.error(f"Error fetching publisher items: {e}")
             items = []
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/stream/{stream_name}/publisher/{publisher}",
-        "total": total_count,
-        "total_pages": page_info["page_count"],
-        "page_number": page_info["page"],
-        "base_path": f"/{chain.path_name}/stream/{stream_name}/publisher/{publisher}",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/stream/{stream_name}/publisher/{publisher}",
+        include_component_fields=True,
+        total_items=total_count,
+    )
 
     return templates.TemplateResponse(
         name="pages/stream_publisher_items.html",

@@ -196,7 +196,7 @@
     <div class="bg-white rounded-lg shadow-sm p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-2xl font-bold text-gray-800">Recent Blocks</h2>
-            <a href="chain/{{ chain_name }}/blocks" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+            <a href="{{ base_url }}{{ chain_path }}/blocks" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
                 View All →
             </a>
         </div>
@@ -214,7 +214,7 @@
                     {% for block in recent_blocks %}
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <a href="chain/{{ chain_name }}/block/{{ block.height }}"
+                            <a href="{{ base_url }}{{ chain_path }}/block/{{ block.height }}"
                                class="text-blue-600 hover:text-blue-800 font-semibold">
                                 #{{ block.height }}
                             </a>

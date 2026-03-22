@@ -8,9 +8,11 @@ the web framework and can be tested in isolation.
 from services.blockchain_service import BlockchainService
 from services.formatting_service import FormattingService
 from services.pagination_service import PaginationService
+from services.search_service import search_all_entities
 
 __all__ = [
     "BlockchainService",
     "PaginationService",
     "FormattingService",
+    "search_all_entities",
 ]

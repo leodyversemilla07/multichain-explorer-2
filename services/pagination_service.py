@@ -5,7 +5,7 @@ Provides utilities for paginating results with proper URL generation.
 """
 
 from dataclasses import dataclass, asdict
-from typing import Any, List, Literal, Optional, Union, overload
+from typing import Any, Dict, List, Literal, Optional, Union, overload
 from urllib.parse import urlencode
 
 
@@ -88,6 +88,48 @@ class PaginationInfo:
 
 class PaginationService:
     """Service for handling pagination logic."""
+
+    @staticmethod
+    def build_context(
+        page_info: PaginationInfo,
+        url_base: str,
+        include_component_fields: bool = False,
+        total_items: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Build the common template context used by paginated HTML routes.
+
+        Args:
+            page_info: PaginationInfo returned by this service.
+            url_base: Base URL for page links.
+            include_component_fields: Include extra keys used by the shared
+                pagination component (`total_pages`, `page_number`, `base_path`).
+            total_items: Optional explicit total to expose as `total`.
+
+        Returns:
+            Dictionary ready to merge into a template context.
+        """
+        context: Dict[str, Any] = {
+            "page": page_info.current_page,
+            "page_count": page_info.total_pages,
+            "has_next": page_info.has_next,
+            "has_prev": page_info.has_previous,
+            "next_page": page_info.next_page,
+            "prev_page": page_info.previous_page,
+            "url_base": url_base,
+        }
+
+        if include_component_fields:
+            context.update(
+                {
+                    "total": page_info.total_items if total_items is None else total_items,
+                    "total_pages": page_info.total_pages,
+                    "page_number": page_info.current_page,
+                    "base_path": url_base,
+                }
+            )
+
+        return context
 
     @staticmethod
     def paginate(

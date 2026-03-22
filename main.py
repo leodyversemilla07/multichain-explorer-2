@@ -16,7 +16,7 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -196,7 +196,7 @@ def create_app() -> FastAPI:
         favicon_path = STATIC_DIR / "logo32.png"
         if favicon_path.exists():
             return FileResponse(favicon_path, media_type="image/png")
-        return FileResponse(status_code=204)
+        return Response(status_code=204)
 
     @system_router.get("/health")
     async def health_check(request: Request):

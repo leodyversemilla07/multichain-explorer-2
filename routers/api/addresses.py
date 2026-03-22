@@ -7,6 +7,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 from schemas.responses import AddressResponse, TransactionResponse, PaginationInfo
+from exceptions import ChainConnectionError, RPCError
 
 from routers.dependencies import (
     ChainDep,
@@ -64,6 +65,8 @@ async def get_address(
     responses={
         200: {"description": "Transactions for the address"},
         404: {"description": "Address not found"},
+        502: {"description": "RPC error while fetching address transactions"},
+        503: {"description": "Chain connection unavailable"},
     },
 )
 async def list_address_transactions(
@@ -79,47 +82,26 @@ async def list_address_transactions(
     # Apply pagination
     start = safe_int(query_params.get("start", 0), 0)
     count = safe_int(query_params.get("count", 20), 20)
-    
-    # Fetch transactions - simplified list
-    # get_address_transactions usually returns list of {txid, balance_change, ...}
-    # We might need to fetch full tx details if standardized response is required
-    
+
     try:
-        # Get simplified list first
-        # We use 'count' + 'start' logic with skip/limit if supported by RPC `listaddresstransactions`
-        # But commonly we might get all and slice, or use specific RPC args.
-        # Check service method signature.
-        # Since I don't see service code right now, assuming getting raw list then full details.
-        
-        # Actually, let's look at how HTML router does it.
-        # It used `service.get_address_transactions(address, count, start)` likely.
-        
+        address_info = await service.call("validateaddress", [address])
+        if not address_info or not address_info.get("isvalid", False):
+            raise HTTPException(status_code=404, detail=f"Address {address} not found")
+
         tx_list = await service.get_address_transactions(address, count, start)
-        
-        # tx_list is likely list of dicts. 
-        # API expects TransactionResponse. 
-        # If tx_list contains full tx details, great. 
-        # If it only contains txid, we need to fetch details.
-        # Usually `listaddresstransactions` returns partial info.
-        
-        # For full details matching TransactionResponse, we should fetch individual TXs.
-        # But that's heavy. Use what we have if possible, or fetch.
-        # Let's assume we want full details for standardization.
-        
         txids = [tx.get("txid") for tx in tx_list if "txid" in tx]
-        
-        import asyncio
         tasks = [service.get_transaction(txid) for txid in txids]
-        
+
         transactions = []
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for res in results:
                 if isinstance(res, dict):
                     transactions.append(TransactionResponse(**res))
-                    
         return transactions
-
-    except Exception as e:
-        # If address not found or error
-        return []
+    except HTTPException:
+        raise
+    except ChainConnectionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RPCError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

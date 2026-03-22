@@ -193,6 +193,26 @@ class TestChainsRouter:
         response = client.get("/")
         assert "text/html" in response.headers.get("content-type", "")
 
+    def test_chain_home_renders_recent_blocks_links(self, client, mock_blockchain_service):
+        """Test chain dashboard includes recent block navigation when blocks are available."""
+        mock_blockchain_service.get_blockchain_info.return_value = {
+            "blocks": 2,
+            "headers": 2,
+            "bestblockhash": "abc123",
+            "difficulty": 1.0,
+            "chainwork": "0000",
+            "description": "Test chain description",
+        }
+        mock_blockchain_service.list_blocks.return_value = [
+            {"height": 1, "hash": "hash1", "time": 1700000000, "tx": ["tx1"]},
+            {"height": 0, "hash": "hash0", "time": 1699990000, "tx": ["tx0"]},
+        ]
+
+        response = client.get("/test-chain")
+        assert response.status_code == 200
+        assert "/test-chain/blocks" in response.text
+        assert "/test-chain/block/1" in response.text
+
 
 class TestBlocksRouter:
     """Test blocks router endpoints."""
@@ -231,8 +251,9 @@ class TestSystemRoutes:
         from main import create_app
 
         app = create_app()
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
+        with patch("main.app_state.init_from_env", return_value=False):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                yield client
 
     def test_health_endpoint(self, simple_client):
         """Test health endpoint works."""
@@ -312,8 +333,9 @@ class TestRouterTags:
         from main import create_app
 
         app = create_app()
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
+        with patch("main.app_state.init_from_env", return_value=False):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                yield client
 
     def test_openapi_has_tags(self, simple_client):
         """Test OpenAPI schema has tags defined."""
@@ -345,8 +367,9 @@ class TestResponseModels:
         from main import create_app
 
         app = create_app()
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
+        with patch("main.app_state.init_from_env", return_value=False):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                yield client
 
     def test_health_response_model(self, simple_client):
         """Test health endpoint matches HealthResponse model."""

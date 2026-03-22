@@ -69,15 +69,7 @@ async def list_addresses(
         page_info["start"] : page_info["start"] + page_info["count"]
     ]
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/addresses",
-    }
+    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/addresses")
 
     return templates.TemplateResponse(
         name="pages/addresses.html",
@@ -204,15 +196,10 @@ async def address_transactions(
         except Exception:
             transactions = []
 
-    pagination_context = {
-        "page": page_info["page"],
-        "page_count": page_info["page_count"],
-        "has_next": page_info["has_next"],
-        "has_prev": page_info["has_prev"],
-        "next_page": page_info["next_page"],
-        "prev_page": page_info["prev_page"],
-        "url_base": f"/{chain.path_name}/address/{address}/transactions",
-    }
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/address/{address}/transactions",
+    )
 
     return templates.TemplateResponse(
         name="pages/address_transactions.html",
@@ -308,15 +295,10 @@ async def address_streams(
 
     pagination_context = {}
     if page_info:
-        pagination_context = {
-            "page": page_info["page"],
-            "page_count": page_info["page_count"],
-            "has_next": page_info["has_next"],
-            "has_prev": page_info["has_prev"],
-            "next_page": page_info["next_page"],
-            "prev_page": page_info["prev_page"],
-            "url_base": f"/{chain.path_name}/address/{address}/streams",
-        }
+        pagination_context = pagination.build_context(
+            page_info,
+            f"/{chain.path_name}/address/{address}/streams",
+        )
 
     return templates.TemplateResponse(
         name="pages/address_streams.html",

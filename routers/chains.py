@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chains"])
 
 
-async def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
+async def get_chain_summary(chain_config: Any, client: Any = None) -> Dict[str, Any]:
     """Helper to get summary for a single chain."""
+    service = BlockchainService(chain_config, client=client)
     try:
-        service = BlockchainService(chain_config)
         info = await service.get_blockchain_info()
 
         # Get additional stats - best effort
@@ -91,6 +91,8 @@ async def get_chain_summary(chain_config: Any) -> Dict[str, Any]:
             "connected": False,
             "error": str(e) if str(e) else "Connection failed",
         }
+    finally:
+        await service.close()
 
 
 @router.get("/", response_class=HTMLResponse, name="chains", summary="List all chains")
@@ -105,9 +107,10 @@ async def list_chains(
     This is the main entry point of the explorer.
     """
     chains = state.chains or []
+    http_client = getattr(request.app.state, "http_client", None)
     
     # Run all chain summaries concurrently
-    chains_data = await asyncio.gather(*[get_chain_summary(c) for c in chains])
+    chains_data = await asyncio.gather(*[get_chain_summary(c, client=http_client) for c in chains])
 
     base_url = state.get_setting("main", "base", "/")
 
@@ -138,6 +141,17 @@ async def chain_home(
     transaction count, and other statistics.
     """
     info = await service.get_blockchain_info()
+    recent_blocks = []
+    latest_height = max(info.get("blocks", 0) - 1, 0)
+
+    if info.get("blocks", 0) > 0:
+        recent_count = min(10, info.get("blocks", 0))
+        start_height = max(0, latest_height - recent_count + 1)
+        try:
+            recent_blocks = await service.list_blocks(start_height, recent_count)
+            recent_blocks.sort(key=lambda block: block.get("height", 0), reverse=True)
+        except Exception:
+            recent_blocks = []
 
     # Get mining info and network stats
     mining_info = {}
@@ -176,7 +190,9 @@ async def chain_home(
         context=context.build_context(
             title=f"{chain.display_name} - Dashboard",
             info=info,
+            chain_description=info.get("description"),
             networkhashps=networkhashps,
+            recent_blocks=recent_blocks,
         ),
     )
 
