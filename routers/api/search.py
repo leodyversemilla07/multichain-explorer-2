@@ -5,6 +5,7 @@ from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
     get_query_params,
+    raise_backend_http_error,
 )
 from services.search_service import search_all_entities
 
@@ -21,4 +22,7 @@ async def search(
     Search the blockchain (JSON).
     """
     query = query_params.get("q", "")
-    return await search_all_entities(chain, service, query, include_stream_keys=False)
+    try:
+        return await search_all_entities(chain, service, query, include_stream_keys=False)
+    except Exception as exc:
+        raise_backend_http_error(exc)

@@ -5,14 +5,15 @@ API Blocks Router - JSON endpoints for block-related operations.
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from schemas.responses import BlockResponse, PaginationInfo
+from schemas.responses import BlockResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["API Blocks"])
@@ -39,12 +40,14 @@ async def list_blocks(
     List blocks in the blockchain (JSON).
     """
     # Get blockchain info for total blocks
-    info = await service.get_blockchain_info()
+    try:
+        info = await service.get_blockchain_info()
+    except Exception as exc:
+        raise_backend_http_error(exc)
     total_blocks = info.get("blocks", 0)
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=total_blocks,
@@ -60,7 +63,10 @@ async def list_blocks(
     blocks = []
     if blocks_to_fetch > 0 and start_height <= end_height:
         # Batch fetch blocks
-        raw_blocks = await service.list_blocks(start_height, blocks_to_fetch)
+        try:
+            raw_blocks = await service.list_blocks(start_height, blocks_to_fetch)
+        except Exception as exc:
+            raise_backend_http_error(exc)
         # Sort blocks by height descending (newest first)
         raw_blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
         
@@ -101,14 +107,17 @@ async def get_block(
     Get block details by height or hash (JSON).
     """
     # Determine if identifier is a height (numeric) or hash (64 hex chars)
-    block = None
-    if identifier.isdigit():
-        height = int(identifier)
-        block = await service.get_block_by_height(height)
-    elif len(identifier) == 64:
-        block = await service.get_block_by_hash(identifier)
-    else:
-        raise HTTPException(status_code=400, detail="Invalid block identifier")
+    try:
+        if identifier.isdigit():
+            height = int(identifier)
+            block_hash = await service.get_block_hash(height)
+            block = await service.get_block(block_hash)
+        elif len(identifier) == 64:
+            block = await service.get_block(identifier)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid block identifier")
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block {identifier} not found")
 
     if not block:
         raise HTTPException(status_code=404, detail=f"Block {identifier} not found")

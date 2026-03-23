@@ -5,6 +5,7 @@ Tests for API routers (JSON endpoints).
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
+from exceptions import ChainConnectionError, RPCError
 
 @pytest.fixture
 def mock_chain():
@@ -61,6 +62,18 @@ def mock_blockchain_service():
     
     # Block details
     service.get_block_by_height = AsyncMock(return_value={
+        "hash": "blockhash_new",
+        "height": 999,
+        "time": 1700000000,
+        "tx": ["tx1"],
+        "nTx": 1,
+        "size": 100,
+        "version": 1,
+        "confirmations": 1,
+        "merkleroot": "root",
+    })
+    service.get_block_hash = AsyncMock(return_value="blockhash_new")
+    service.get_block = AsyncMock(return_value={
         "hash": "blockhash_new",
         "height": 999,
         "time": 1700000000,
@@ -195,6 +208,12 @@ class TestApiBlocksRouter:
         data = response.json()
         assert isinstance(data, list)
         assert len(data) == 2
+
+    def test_api_list_blocks_supports_legacy_start_fallback(self, api_client, mock_blockchain_service):
+        """Test blocks API accepts legacy start/count pagination inputs."""
+        response = api_client.get("/api/v1/test-chain/blocks?start=40&count=20")
+        assert response.status_code == 200
+        mock_blockchain_service.list_blocks.assert_awaited_with(940, 20)
         
     def test_api_get_block_by_height(self, api_client):
         """Test GET /api/v1/{chain}/blocks/{height}."""
@@ -221,6 +240,13 @@ class TestApiTransactionsRouter:
         assert response.status_code == 200
         data = response.json()
         assert data["txid"] == "tx1"
+
+    def test_api_get_transaction_returns_503_on_connection_error(self, api_client, mock_blockchain_service):
+        """Test transaction endpoint surfaces backend connection failures."""
+        mock_blockchain_service.get_transaction = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        response = api_client.get("/api/v1/test-chain/transactions/tx1")
+        assert response.status_code == 503
 
     def test_api_list_block_transactions(self, api_client):
         """Test GET /api/v1/{chain}/blocks/{height}/transactions."""
@@ -278,12 +304,27 @@ class TestApiAssetsRouter:
         assert len(data) >= 2
         assert data[0]["name"] == "asset1"
 
+    def test_api_list_assets_supports_legacy_start_fallback(self, api_client):
+        """Test assets API accepts legacy start/count pagination inputs."""
+        response = api_client.get("/api/v1/test-chain/assets?start=1&count=1")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "assetA"
+
     def test_api_get_asset(self, api_client):
         """Test GET /api/v1/{chain}/assets/{asset_ref}."""
         response = api_client.get("/api/v1/test-chain/assets/asset1")
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "asset1"
+
+    def test_api_get_asset_returns_502_on_rpc_error(self, api_client, mock_blockchain_service):
+        """Test asset endpoint surfaces RPC failures instead of returning 500."""
+        mock_blockchain_service.call = AsyncMock(side_effect=RPCError("listassets", "boom"))
+
+        response = api_client.get("/api/v1/test-chain/assets/asset1")
+        assert response.status_code == 502
         
     def test_api_list_asset_transactions(self, api_client):
         """Test GET /api/v1/{chain}/assets/{asset_ref}/transactions."""
@@ -311,6 +352,13 @@ class TestApiStreamsRouter:
         assert isinstance(data, list)
         assert len(data) >= 1
         assert data[0]["name"] == "stream1"
+
+    def test_api_list_streams_returns_503_on_connection_error(self, api_client, mock_blockchain_service):
+        """Test streams list endpoint surfaces backend connection failures."""
+        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        response = api_client.get("/api/v1/test-chain/streams")
+        assert response.status_code == 503
         
     def test_api_get_stream(self, api_client):
         """Test GET /api/v1/{chain}/streams/{stream_ref}."""

@@ -5,14 +5,15 @@ API Transactions Router - JSON endpoints for transaction-related operations.
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from schemas.responses import TransactionResponse, PaginationInfo
+from schemas.responses import TransactionResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
-    safe_int,
+    get_start_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["API Transactions"])
@@ -37,7 +38,10 @@ async def get_transaction(
     """
     Get transaction details by ID (JSON).
     """
-    tx = await service.get_transaction(txid)
+    try:
+        tx = await service.get_transaction(txid)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Transaction {txid} not found")
     
     if not tx:
         raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
@@ -67,7 +71,11 @@ async def list_block_transactions(
     List transactions in a specific block (JSON).
     """
     # Get block
-    block = await service.get_block_by_height(height)
+    try:
+        block_hash = await service.get_block_hash(height)
+        block = await service.get_block(block_hash)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block #{height} not found")
     if not block:
         raise HTTPException(status_code=404, detail=f"Block #{height} not found")
 
@@ -77,8 +85,7 @@ async def list_block_transactions(
         return []
 
     # Apply pagination
-    start = safe_int(query_params.get("start", 0), 0)
-    count = safe_int(query_params.get("count", 20), 20)
+    start, count = get_start_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(tx_ids),

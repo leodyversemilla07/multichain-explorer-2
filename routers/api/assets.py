@@ -5,14 +5,16 @@ API Assets Router - JSON endpoints for asset-related operations.
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from schemas.responses import AssetResponse, TransactionResponse, PaginationInfo
+from schemas.responses import AssetResponse, TransactionResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
     PaginationServiceDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    get_start_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["API Assets"])
@@ -40,14 +42,16 @@ async def list_assets(
     """
     # Fetch all assets
     # listassets returns list of dicts.
-    assets = await service.call("listassets", ["*", True])
+    try:
+        assets = await service.call("listassets", ["*", True])
+    except Exception as exc:
+        raise_backend_http_error(exc)
     
     # Sort by name
     assets.sort(key=lambda x: x.get("name", ""))
     
     # Pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
     
     page_info = pagination.get_pagination_info(
         total=len(assets),
@@ -81,7 +85,10 @@ async def get_asset(
     """
     # Fetch specific asset
     # listassets with name/ref
-    assets = await service.call("listassets", [asset_ref, True])
+    try:
+        assets = await service.call("listassets", [asset_ref, True])
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
     
     if not assets:
         raise HTTPException(status_code=404, detail=f"Asset {asset_ref} not found")
@@ -106,7 +113,6 @@ async def get_asset(
 async def list_asset_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,
-    pagination: PaginationServiceDep,
     asset_ref: str = Path(..., description="Asset name or reference"),
     query_params: dict = Depends(get_query_params),
 ):
@@ -114,11 +120,20 @@ async def list_asset_transactions(
     List transactions involving a specific asset (JSON).
     """
     # Apply pagination
-    count = safe_int(query_params.get("count", 20), 20)
-    start = safe_int(query_params.get("start", 0), 0)
+    start, count = get_start_count(query_params)
     
-    # listassettransactions
-    tx_list = await service.call("listassettransactions", [asset_ref, True, count, start])
+    try:
+        assets = await service.call("listassets", [asset_ref, True])
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
+
+    if not assets:
+        raise HTTPException(status_code=404, detail=f"Asset {asset_ref} not found")
+
+    try:
+        tx_list = await service.call("listassettransactions", [asset_ref, True, count, start])
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
     
     if not tx_list:
         return []

@@ -6,15 +6,15 @@ import asyncio
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from schemas.responses import AddressResponse, TransactionResponse, PaginationInfo
+from schemas.responses import AddressResponse, TransactionResponse
 from exceptions import ChainConnectionError, RPCError
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
-    PaginationServiceDep,
     get_query_params,
-    safe_int,
+    get_start_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["API Addresses"])
@@ -41,8 +41,14 @@ async def get_address(
     
     Fetches info, balances, and permissions in parallel.
     """
-    # Fetch comprehensive summary from service
-    summary = await service.get_address_summary(address)
+    try:
+        address_info = await service.call("validateaddress", [address])
+        if not address_info or not address_info.get("isvalid", False):
+            raise HTTPException(status_code=404, detail=f"Address {address} not found")
+
+        summary = await service.get_address_summary(address)
+    except Exception as exc:
+        raise_backend_http_error(exc)
     
     if not summary:
         # Should not happen as get_address_summary handles errors
@@ -72,7 +78,6 @@ async def get_address(
 async def list_address_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,
-    pagination: PaginationServiceDep,
     address: str = Path(..., description="Wallet address"),
     query_params: dict = Depends(get_query_params),
 ):
@@ -80,8 +85,7 @@ async def list_address_transactions(
     List transactions for a specific address (JSON).
     """
     # Apply pagination
-    start = safe_int(query_params.get("start", 0), 0)
-    count = safe_int(query_params.get("count", 20), 20)
+    start, count = get_start_count(query_params)
 
     try:
         address_info = await service.call("validateaddress", [address])
@@ -101,7 +105,5 @@ async def list_address_transactions(
         return transactions
     except HTTPException:
         raise
-    except ChainConnectionError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except RPCError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except (ChainConnectionError, RPCError) as exc:
+        raise_backend_http_error(exc)

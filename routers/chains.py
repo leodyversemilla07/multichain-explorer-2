@@ -26,9 +26,9 @@ from routers.dependencies import (
     BlockchainServiceDep,
     CommonContextDep,
     get_query_params,
+    raise_backend_http_error,
 )
 from services.blockchain_service import BlockchainService
-from services.pagination_service import PaginationService
 
 logger = logging.getLogger(__name__)
 
@@ -43,27 +43,39 @@ async def get_chain_summary(chain_config: Any, client: Any = None) -> Dict[str, 
 
         # Get additional stats - best effort
         # We can run these concurrently
-        try:
-            results = await asyncio.gather(
-                service.call("listassets"),
-                service.call("liststreams"),
-                # listaddresses with count=False might be slow on huge chains, beware
-                # Actually "*" means all, False means verbose=False
-                service.call("listaddresses", ["*", False]),
-                return_exceptions=True
-            )
-            
-            listassets_result = results[0] if not isinstance(results[0], Exception) else []
-            liststreams_result = results[1] if not isinstance(results[1], Exception) else []
-            listaddresses_result = results[2] if not isinstance(results[2], Exception) else []
+        results = await asyncio.gather(
+            service.call("listassets"),
+            service.call("liststreams"),
+            # listaddresses with count=False might be slow on huge chains, beware
+            # Actually "*" means all, False means verbose=False
+            service.call("listaddresses", ["*", False]),
+            return_exceptions=True,
+        )
 
-            assets_count = len(listassets_result) if listassets_result else 0
-            streams_count = len(liststreams_result) if liststreams_result else 0
-            addresses_count = len(listaddresses_result) if listaddresses_result else 0
-        except Exception:
-             assets_count = 0
-             streams_count = 0
-             addresses_count = 0
+        assets_count = 0
+        streams_count = 0
+        addresses_count = 0
+
+        for label, result in zip(
+            ("assets", "streams", "addresses"),
+            results,
+            strict=False,
+        ):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Error fetching %s summary for %s: %s",
+                    label,
+                    chain_config.name,
+                    result,
+                )
+                continue
+
+            if label == "assets":
+                assets_count = len(result) if result else 0
+            elif label == "streams":
+                streams_count = len(result) if result else 0
+            else:
+                addresses_count = len(result) if result else 0
 
         block_count = info.get("blocks", 0)
         transactions_count = block_count  # Simplified estimate
@@ -79,7 +91,7 @@ async def get_chain_summary(chain_config: Any, client: Any = None) -> Dict[str, 
             "connected": True,
         }
     except Exception as e:
-        logger.error(f"Error fetching chain data for {chain_config.name}: {e}")
+        logger.error("Error fetching chain data for %s: %s", chain_config.name, e)
         return {
             "name": chain_config.config.get("display-name", "Unknown"),
             "path": chain_config.config.get("path-name", ""),
@@ -150,15 +162,16 @@ async def chain_home(
         try:
             recent_blocks = await service.list_blocks(start_height, recent_count)
             recent_blocks.sort(key=lambda block: block.get("height", 0), reverse=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error fetching recent blocks for %s: %s", chain.name, exc)
             recent_blocks = []
 
     # Get mining info and network stats
     mining_info = {}
     try:
         mining_info = await service.call("getmininginfo")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Error fetching mining info for %s: %s", chain.name, exc)
 
     # Get network hash rate
     networkhashps = None
@@ -177,7 +190,8 @@ async def chain_home(
                 networkhashps = f"{hashrate / 1_000:.2f} KH/s"
             else:
                 networkhashps = f"{hashrate:.2f} H/s"
-    except Exception:
+    except Exception as exc:
+        logger.warning("Error fetching network hash rate for %s: %s", chain.name, exc)
         # MultiChain doesn't use PoW, so network hashrate might not be applicable
         networkhashps = "N/A (Permission-based)"
 
@@ -228,9 +242,8 @@ async def chain_parameters(
     """
     try:
         params = await service.call("getblockchainparams") or {}
-    except Exception as e:
-        logger.error(f"Error fetching blockchain params: {e}")
-        params = {}
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     return templates.TemplateResponse(
         name="pages/chain_parameters.html",
@@ -256,8 +269,8 @@ async def list_peers(
     """
     try:
         peers = await service.call("getpeerinfo") or []
-    except Exception:
-        peers = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     return templates.TemplateResponse(
         name="pages/peers.html",

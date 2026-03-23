@@ -1,58 +1,81 @@
 {% extends "base.html" %}
 
+{% block title %}Streams - {{ address[:16] }}... - {{ chain_name }}{% endblock %}
+
 {% block content %}
-<div class="container">
-    <nav class="breadcrumb">
-        <a href="{{ base_url }}{{ chain_path }}">{{ chain_name }}</a> /
-        <a href="{{ base_url }}{{ chain_path }}/address/{{ address }}">{{ address[:16] }}...</a> /
-        <span>Streams</span>
-    </nav>
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-8">
+        <nav class="text-sm text-gray-600 mb-4">
+            <a href="{{ base_url }}" class="hover:text-blue-600">Home</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}" class="hover:text-blue-600">{{ chain_name }}</a>
+            <span class="mx-2">/</span>
+            <a href="{{ base_url }}{{ chain_path }}/address/{{ address }}" class="hover:text-blue-600">Address</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900">Streams</span>
+        </nav>
 
-    <h1>Streams Published by Address</h1>
-    <p class="address-display">{{ address }}</p>
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Published Streams</h1>
+                <p class="mt-2 text-gray-600 font-mono text-sm break-all">{{ address }}</p>
+            </div>
+            <span class="text-sm text-gray-600">{{ pagination.total|default(streams|length) }} total</span>
+        </div>
+    </div>
 
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Stream</th>
-                    <th>Items Published</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for stream in streams %}
-                <tr>
-                    <td>
-                        <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream.name }}">
-                            {{ stream.name }}
-                        </a>
-                    </td>
-                    <td>{{ stream.get('items', 0) }}</td>
-                    <td>
-                        <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream.name }}/publisher/{{ address }}">
-                            View Items
-                        </a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="3" class="text-center">No streams found</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% if streams and streams|length > 0 %}
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Stream
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Items Published
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for stream in streams %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream.name }}"
+                               class="text-blue-600 hover:text-blue-800 font-medium">
+                                {{ stream.name }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ stream.get('items', 0) }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream.name }}/publisher/{{ address }}"
+                               class="text-blue-600 hover:text-blue-800">
+                                View Items
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     {% if pagination %}
-    <div class="pagination">
-        {% if pagination.has_prev %}
-        <a href="?start={{ pagination.prev_start }}&count={{ pagination.count }}">Previous</a>
-        {% endif %}
-        <span>{{ pagination.start + 1 }} - {{ pagination.end }} of {{ pagination.total }}</span>
-        {% if pagination.has_next %}
-        <a href="?start={{ pagination.next_start }}&count={{ pagination.count }}">Next</a>
-        {% endif %}
+    <div class="mt-8">
+        {% include 'components/pagination.html' %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="bg-white rounded-lg shadow p-12 text-center">
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No streams found</h3>
+        <p class="mt-1 text-sm text-gray-500">This address has not published to any streams.</p>
     </div>
     {% endif %}
 </div>

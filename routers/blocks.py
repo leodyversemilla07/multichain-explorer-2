@@ -75,7 +75,12 @@ async def list_blocks(
         blocks = []
 
     # Prepare pagination context
-    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/blocks")
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/blocks",
+        include_component_fields=True,
+        total_items=total_blocks,
+    )
 
     return templates.TemplateResponse(
         name="pages/blocks.html",

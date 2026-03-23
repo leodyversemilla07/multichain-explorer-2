@@ -82,7 +82,12 @@ async def list_addresses(
         page_info["start"] : page_info["start"] + page_info["count"]
     ]
 
-    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/addresses")
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/addresses",
+        include_component_fields=True,
+        total_items=len(addresses),
+    )
 
     return templates.TemplateResponse(
         name="pages/addresses.html",
@@ -210,6 +215,8 @@ async def address_transactions(
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/address/{address}/transactions",
+        include_component_fields=True,
+        total_items=total_count,
     )
 
     return templates.TemplateResponse(
@@ -307,6 +314,8 @@ async def address_streams(
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/address/{address}/streams",
+        include_component_fields=True,
+        total_items=total_count,
     )
 
     return templates.TemplateResponse(

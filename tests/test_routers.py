@@ -135,6 +135,26 @@ class TestAddressesRouter:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
+    def test_list_addresses_renders_shared_pagination(self, client, mock_blockchain_service):
+        """Test addresses page uses the shared page-based pagination component."""
+        addresses = [
+            {"address": f"addr{i}", "ismine": i % 2 == 0}
+            for i in range(5)
+        ]
+
+        async def list_addresses_call(method, params=None):
+            if method == "listaddresses":
+                return addresses
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=list_addresses_call)
+
+        response = client.get("/test-chain/addresses?page=2&count=2")
+        assert response.status_code == 200
+        assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
+        assert "/test-chain/address/addr2" in response.text
+        assert "/test-chain/address/addr3" in response.text
+
 
 class TestAssetsRouter:
     """Test asset router endpoints (HTML)."""
@@ -257,6 +277,32 @@ class TestAddressesDetailRouter:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
+    def test_address_streams_renders_shared_pagination(self, client, mock_blockchain_service):
+        """Test address streams page uses the shared page-based pagination component."""
+        streams = [
+            {"name": f"stream{i}", "items": i}
+            for i in range(5)
+        ]
+
+        async def address_streams_call(method, params=None):
+            if method == "validateaddress":
+                return {"address": params[0], "isvalid": True}
+            if method == "explorerlistaddressstreams":
+                _, _, count, start = params
+                return streams[start : start + count]
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=address_streams_call)
+
+        response = client.get(
+            "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/streams?page=2&count=2"
+        )
+        assert response.status_code == 200
+        assert "Published Streams" in response.text
+        assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
+        assert "/test-chain/stream/stream2" in response.text
+        assert "/test-chain/stream/stream3" in response.text
+
 
 @pytest.fixture
 def app_with_mocks(mock_chain):
@@ -363,6 +409,22 @@ class TestChainsRouter:
         assert "/test-chain/blocks" in response.text
         assert "/test-chain/block/1" in response.text
 
+    def test_chain_parameters_returns_503_on_connection_error(self, client, mock_blockchain_service):
+        """Test chain parameters page surfaces backend connection failures."""
+        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("RPC unavailable"))
+
+        response = client.get("/test-chain/parameters")
+        assert response.status_code == 503
+        assert "RPC unavailable" in response.text
+
+    def test_peers_returns_503_on_connection_error(self, client, mock_blockchain_service):
+        """Test peers page surfaces backend connection failures."""
+        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("RPC unavailable"))
+
+        response = client.get("/test-chain/peers")
+        assert response.status_code == 503
+        assert "RPC unavailable" in response.text
+
 
 class TestBlocksRouter:
     """Test blocks router endpoints."""
@@ -466,14 +528,35 @@ class TestPaginationInRoutes:
 
     def test_blocks_accepts_page_param(self, client, mock_blockchain_service):
         """Test blocks endpoint accepts page parameter."""
+        mock_blockchain_service.list_blocks.return_value = [
+            {
+                "height": 980,
+                "hash": "a" * 64,
+                "time": 1700000000,
+                "tx": ["tx1"],
+                "miner": "1ABC123",
+            }
+        ]
         response = client.get("/test-chain/blocks?page=2")
-        # Should not error on pagination param
-        assert response.status_code in [200, 500]  # 500 if template missing
+        assert response.status_code == 200
+        assert 'Page <span class="font-medium">2</span> of <span class="font-medium">50</span>' in response.text
+        assert '/test-chain/blocks?page=1' in response.text
+        assert '/test-chain/blocks?page=3' in response.text
 
     def test_blocks_accepts_count_param(self, client, mock_blockchain_service):
         """Test blocks endpoint accepts count parameter."""
+        mock_blockchain_service.list_blocks.return_value = [
+            {
+                "height": 999,
+                "hash": "b" * 64,
+                "time": 1700000000,
+                "tx": ["tx1", "tx2"],
+                "miner": "1ABC123",
+            }
+        ]
         response = client.get("/test-chain/blocks?count=50")
-        assert response.status_code in [200, 500]
+        assert response.status_code == 200
+        assert 'Page <span class="font-medium">1</span> of <span class="font-medium">20</span>' in response.text
 
     def test_asset_transactions_uses_full_total_for_pagination(self, client, mock_blockchain_service):
         """Test asset transaction pages use the real total, not a one-item probe."""
@@ -555,9 +638,10 @@ class TestPaginationInRoutes:
             "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/transactions?start=2&count=2"
         )
         assert response.status_code == 200
-        assert "3 - 4 of 5" in response.text
-        assert "?start=0" in response.text
-        assert "?start=4" in response.text
+        assert "5 total" in response.text
+        assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
+        assert "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/transactions?page=1" in response.text
+        assert "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/transactions?page=3" in response.text
 
 
 class TestLegacyRoutes:
