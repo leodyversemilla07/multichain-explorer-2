@@ -19,6 +19,19 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Transactions"])
 
 
+async def _get_block_or_raise(service: BlockchainServiceDep, height: int) -> dict:
+    """Load a block by height or raise the correct HTTP error."""
+    try:
+        block = await service.get_block_by_height(height)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block #{height} not found")
+
+    if not block:
+        raise HTTPException(status_code=404, detail=f"Block #{height} not found")
+
+    return block
+
+
 @router.get(
     "/{chain_name}/transactions/{txid}",
     response_model=TransactionResponse,
@@ -70,14 +83,7 @@ async def list_block_transactions(
     """
     List transactions in a specific block (JSON).
     """
-    # Get block
-    try:
-        block_hash = await service.get_block_hash(height)
-        block = await service.get_block(block_hash)
-    except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Block #{height} not found")
-    if not block:
-        raise HTTPException(status_code=404, detail=f"Block #{height} not found")
+    block = await _get_block_or_raise(service, height)
 
     # Get transactions
     tx_ids = block.get("tx", [])
@@ -102,8 +108,11 @@ async def list_block_transactions(
     transactions = []
     if tasks:
         results = await asyncio.gather(*tasks, return_exceptions=True)
+        errors = [res for res in results if isinstance(res, Exception)]
+        if errors and len(errors) == len(results):
+            raise_backend_http_error(errors[0])
         for res in results:
             if isinstance(res, dict):
                 transactions.append(TransactionResponse(**res))
-                
+
     return transactions

@@ -276,6 +276,66 @@ class BlockchainService:
         """Get permissions for an address."""
         return await self.call("listpermissions", ["*", address])
 
+    async def get_asset(self, asset_ref: str) -> Optional[Dict[str, Any]]:
+        """Get a single asset by name/reference, returning None when not found."""
+        try:
+            assets = await self.call("listassets", [asset_ref, True])
+        except RPCError as exc:
+            if is_rpc_not_found_error(exc):
+                return None
+            raise
+        return assets[0] if assets else None
+
+    async def get_stream(self, stream_ref: str) -> Optional[Dict[str, Any]]:
+        """Get a single stream by name/reference, returning None when not found."""
+        try:
+            streams = await self.call("liststreams", [stream_ref, True])
+        except RPCError as exc:
+            if is_rpc_not_found_error(exc):
+                return None
+            raise
+        return streams[0] if streams else None
+
+    async def count_rpc_list_results(
+        self,
+        method: str,
+        *leading_params: Any,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """
+        Count paginated RPC list results via a bounded full fetch.
+
+        This is the current compatibility fallback for MultiChain list endpoints
+        that do not expose a dedicated count RPC. Centralizing it makes the cost
+        visible and keeps the route layer consistent.
+        """
+        results = await self.call(method, [*leading_params, False, fetch_limit, 0])
+        return len(results) if results else 0
+
+    async def count_address_transactions(
+        self,
+        address: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Count address transactions using the MultiChain parameter order."""
+        results = await self.call(
+            "listaddresstransactions",
+            [address, fetch_limit, 0, False],
+        )
+        return len(results) if results else 0
+
+    async def count_address_streams(
+        self,
+        address: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Count address-associated streams using the explorer RPC parameter order."""
+        results = await self.call(
+            "explorerlistaddressstreams",
+            [address, True, fetch_limit, 0],
+        )
+        return len(results) if results else 0
+
     async def get_address_summary(self, address: str) -> Dict[str, Any]:
         """
         Get comprehensive address summary in parallel.

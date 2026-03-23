@@ -19,6 +19,24 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Blocks"])
 
 
+async def _get_block_or_raise(service: BlockchainServiceDep, identifier: str) -> dict:
+    """Load a block by height/hash or raise the correct HTTP error."""
+    try:
+        if identifier.isdigit():
+            block = await service.get_block_by_height(int(identifier))
+        elif len(identifier) == 64:
+            block = await service.get_block_by_hash(identifier)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid block identifier")
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block {identifier} not found")
+
+    if not block:
+        raise HTTPException(status_code=404, detail=f"Block {identifier} not found")
+
+    return block
+
+
 @router.get(
     "/{chain_name}/blocks",
     response_model=List[BlockResponse],
@@ -106,21 +124,7 @@ async def get_block(
     """
     Get block details by height or hash (JSON).
     """
-    # Determine if identifier is a height (numeric) or hash (64 hex chars)
-    try:
-        if identifier.isdigit():
-            height = int(identifier)
-            block_hash = await service.get_block_hash(height)
-            block = await service.get_block(block_hash)
-        elif len(identifier) == 64:
-            block = await service.get_block(identifier)
-        else:
-            raise HTTPException(status_code=400, detail="Invalid block identifier")
-    except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Block {identifier} not found")
-
-    if not block:
-        raise HTTPException(status_code=404, detail=f"Block {identifier} not found")
+    block = await _get_block_or_raise(service, identifier)
 
     # Map fields
     block_data = block.copy()

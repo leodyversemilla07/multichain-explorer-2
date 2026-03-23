@@ -74,11 +74,11 @@ def log_error(data):
 def check_directory(dir_name):
     try:
         os.mkdir(dir_name)
-    except Exception:
+    except FileExistsError:
         pass
-    if not os.path.exists(dir_name):
+    except OSError:
         return False
-    return True
+    return os.path.exists(dir_name)
 
 
 def directory_exists(dir_name):
@@ -90,7 +90,7 @@ def directory_exists(dir_name):
 def remove_file(file_name):
     try:
         os.remove(file_name)
-    except Exception:
+    except FileNotFoundError:
         pass
 
 

@@ -1,8 +1,6 @@
-"""
-API Streams Router - JSON endpoints for stream-related operations.
-"""
+"""API Streams Router - JSON endpoints for stream-related operations."""
 
-from typing import List
+from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 from schemas.responses import StreamResponse, StreamItemResponse
@@ -18,6 +16,19 @@ from routers.dependencies import (
 )
 
 router = APIRouter(tags=["API Streams"])
+
+
+async def _get_stream_or_raise(service: BlockchainServiceDep, stream_ref: str) -> Dict:
+    """Load a stream or raise the correct HTTP error."""
+    try:
+        stream = await service.get_stream(stream_ref)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_ref} not found")
+
+    if not stream:
+        raise HTTPException(status_code=404, detail=f"Stream {stream_ref} not found")
+
+    return stream
 
 
 @router.get(
@@ -40,16 +51,12 @@ async def list_streams(
     """
     List streams in the blockchain (JSON).
     """
-    # Fetch all streams
     try:
         streams = await service.call("liststreams", ["*", True])
     except Exception as exc:
         raise_backend_http_error(exc)
     
-    # Sort by name
     streams.sort(key=lambda x: x.get("name", ""))
-    
-    # Pagination
     page, count = get_page_count(query_params)
     
     page_info = pagination.get_pagination_info(
@@ -82,16 +89,8 @@ async def get_stream(
     """
     Get stream details (JSON).
     """
-    # Fetch specific stream
-    try:
-        streams = await service.call("liststreams", [stream_ref, True])
-    except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_ref} not found")
-    
-    if not streams:
-        raise HTTPException(status_code=404, detail=f"Stream {stream_ref} not found")
-        
-    return StreamResponse(**streams[0])
+    stream = await _get_stream_or_raise(service, stream_ref)
+    return StreamResponse(**stream)
 
 
 @router.get(
@@ -114,28 +113,12 @@ async def list_stream_items(
     """
     List items in a stream (JSON).
     """
-    # Apply pagination
     start, count = get_start_count(query_params)
-    
-    try:
-        streams = await service.call("liststreams", [stream_ref, True])
-    except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_ref} not found")
-
-    if not streams:
-        raise HTTPException(status_code=404, detail=f"Stream {stream_ref} not found")
+    await _get_stream_or_raise(service, stream_ref)
 
     try:
         items = await service.call("liststreamitems", [stream_ref, True, count, start])
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Stream {stream_ref} not found")
-    
-    if not items:
-        return []
-        
-    # Map to response
-    formatted_items = []
-    for item in items:
-        formatted_items.append(StreamItemResponse(**item))
-         
-    return formatted_items
+
+    return [StreamItemResponse(**item) for item in (items or [])]

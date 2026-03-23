@@ -32,20 +32,18 @@ from routers.dependencies import (
 
 router = APIRouter(tags=["Assets"])
 
-_COUNT_FETCH_LIMIT = 100000
-
 
 async def _get_asset_or_raise(service: BlockchainServiceDep, asset_name: str) -> Dict[str, Any]:
     """Load an asset and raise a typed HTTP error when it is unavailable."""
     try:
-        assets = await service.call("listassets", [asset_name, True])
+        asset = await service.get_asset(asset_name)
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Asset {asset_name} not found")
 
-    if not assets:
+    if not asset:
         raise HTTPException(status_code=404, detail=f"Asset {asset_name} not found")
 
-    return assets[0]
+    return asset
 
 
 async def _validate_address(service: BlockchainServiceDep, address: str) -> None:
@@ -60,12 +58,11 @@ async def _validate_address(service: BlockchainServiceDep, address: str) -> None
 
 
 async def _count_asset_transactions(service: BlockchainServiceDep, asset_name: str) -> int:
-    """Estimate the total asset transactions by fetching a bounded full result set."""
-    transactions = await service.call(
+    """Count asset transactions using the shared bounded list-count fallback."""
+    return await service.count_rpc_list_results(
         "listassettransactions",
-        [asset_name, False, _COUNT_FETCH_LIMIT, 0],
+        asset_name,
     )
-    return len(transactions) if transactions else 0
 
 
 @router.get("/{chain_name}/assets", response_class=HTMLResponse, name="assets",

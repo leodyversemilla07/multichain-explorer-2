@@ -137,7 +137,7 @@ def compress_response(content: bytes, min_size: int = 1024) -> Tuple[bytes, bool
             return compressed, True
         else:
             return content, False
-    except Exception as e:
+    except (OSError, TypeError, ValueError) as e:
         logger.warning(f"Compression failed: {e}")
         return content, False
 

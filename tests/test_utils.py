@@ -87,6 +87,14 @@ class TestFileOperations:
         # Should not raise an exception
         remove_file("/nonexistent/path/file.txt")
 
+    def test_remove_file_propagates_real_os_errors(self):
+        """Test remove_file does not hide real filesystem errors."""
+        from utils import remove_file
+
+        with patch("utils.os.remove", side_effect=PermissionError("denied")):
+            with pytest.raises(PermissionError):
+                remove_file("C:/protected/file.txt")
+
 
 class TestDirectoryOperations:
     """Test directory operation utilities."""
@@ -110,6 +118,13 @@ class TestDirectoryOperations:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = check_directory(temp_dir)
             assert result is True
+
+    def test_check_directory_returns_false_for_real_os_errors(self):
+        """Test check_directory returns False for non-benign mkdir failures."""
+        from utils import check_directory
+
+        with patch("utils.os.mkdir", side_effect=PermissionError("denied")):
+            assert check_directory("/protected/path") is False
 
     def test_directory_exists(self):
         """Test directory_exists function."""

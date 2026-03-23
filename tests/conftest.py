@@ -427,7 +427,7 @@ def app_mock_blockchain_service():
         if method == "listassetholders":
             return []
         if method == "listassettransactions":
-            return [{"txid": "tx1"}]
+            return [tx]
         if method == "liststreams":
             if params and params[0] != "*":
                 stream_name = params[0]
@@ -447,7 +447,41 @@ def app_mock_blockchain_service():
             return []
         return []
 
+    async def mock_get_asset(asset_ref):
+        assets = await service.call("listassets", [asset_ref, True])
+        return assets[0] if assets else None
+
+    async def mock_get_stream(stream_ref):
+        streams = await service.call("liststreams", [stream_ref, True])
+        return streams[0] if streams else None
+
+    async def mock_count_rpc_list_results(method, *leading_params, fetch_limit=100000):
+        results = await service.call(
+            method,
+            [*leading_params, False, fetch_limit, 0],
+        )
+        return len(results) if results else 0
+
+    async def mock_count_address_transactions(address, fetch_limit=100000):
+        results = await service.call(
+            "listaddresstransactions",
+            [address, fetch_limit, 0, False],
+        )
+        return len(results) if results else 0
+
+    async def mock_count_address_streams(address, fetch_limit=100000):
+        results = await service.call(
+            "explorerlistaddressstreams",
+            [address, True, fetch_limit, 0],
+        )
+        return len(results) if results else 0
+
     service.call = AsyncMock(side_effect=mock_call)
+    service.get_asset = AsyncMock(side_effect=mock_get_asset)
+    service.get_stream = AsyncMock(side_effect=mock_get_stream)
+    service.count_rpc_list_results = AsyncMock(side_effect=mock_count_rpc_list_results)
+    service.count_address_transactions = AsyncMock(side_effect=mock_count_address_transactions)
+    service.count_address_streams = AsyncMock(side_effect=mock_count_address_streams)
     service.get_address_info = AsyncMock(
         return_value={
             "address": "addr1",

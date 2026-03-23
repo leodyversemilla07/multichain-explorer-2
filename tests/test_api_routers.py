@@ -38,6 +38,22 @@ class TestApiBlocksRouter:
         data = response.json()
         assert data["hash"] == "blockhash_new"
 
+    def test_api_get_block_rejects_invalid_identifier(self, api_test_client):
+        """Test block detail rejects malformed identifiers."""
+        response = api_test_client.get("/api/v1/test-chain/blocks/not-a-block-id")
+        assert response.status_code == 400
+
+    def test_api_get_block_returns_503_on_connection_error(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test block detail surfaces backend connection failures."""
+        app_mock_blockchain_service.get_block_by_height = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
+
+        response = api_test_client.get("/api/v1/test-chain/blocks/999")
+        assert response.status_code == 503
+
 
 class TestApiTransactionsRouter:
     """Test API transactions router."""
@@ -64,6 +80,18 @@ class TestApiTransactionsRouter:
         assert isinstance(data, list)
         assert len(data) == 1
         assert data[0]["txid"] == "tx1"
+
+    def test_api_list_block_transactions_returns_503_when_all_tx_fetches_fail(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test block transaction listing surfaces backend failures when no tx can be loaded."""
+        app_mock_blockchain_service.get_transaction = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
+
+        response = api_test_client.get("/api/v1/test-chain/blocks/999/transactions")
+
+        assert response.status_code == 503
 
 
 class TestApiAddressesRouter:
@@ -161,6 +189,19 @@ class TestApiAssetsRouter:
         assert isinstance(data, list)
         assert len(data) == 1
         assert data[0]["txid"] == "tx1"
+
+    def test_api_list_asset_transactions_does_not_rehydrate_each_tx(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test asset transaction listing uses the RPC payload directly."""
+        app_mock_blockchain_service.get_transaction = AsyncMock(
+            side_effect=AssertionError("should not fetch per-transaction details")
+        )
+
+        response = api_test_client.get("/api/v1/test-chain/assets/asset1/transactions")
+
+        assert response.status_code == 200
+        assert response.json()[0]["txid"] == "tx1"
 
 
 class TestApiStreamsRouter:

@@ -8,6 +8,7 @@ Modern configuration and state management using a singleton pattern.
 Provides a clean, type-safe interface for application-wide state.
 """
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -15,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from config import ChainConfig
 
 VERSION = "2.1.0"
+logger = logging.getLogger(__name__)
 
 
 def init_from_env() -> bool:
@@ -79,7 +81,7 @@ def init_from_env() -> bool:
         return True
 
     except Exception as e:
-        print(f"Error initializing from .env: {e}")
+        logger.warning("Error initializing from .env: %s", e)
         return False
 
 

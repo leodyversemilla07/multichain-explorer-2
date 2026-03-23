@@ -119,14 +119,13 @@ async def address_detail(
         return await service.get_address_balances(address)
 
     async def fetch_permissions():
-        return await service.call("listpermissions", ["*", address])
+        return await service.get_address_permissions(address)
 
     async def fetch_transactions():
         return await service.call("listaddresstransactions", [address, 10, 0, True])
 
     async def fetch_tx_count():
-        all_txs = await service.call("listaddresstransactions", [address, 10000, 0, False])
-        return len(all_txs) if all_txs else 0
+        return await service.count_address_transactions(address)
 
     results = await asyncio.gather(
         fetch_balances(),
@@ -183,10 +182,7 @@ async def address_transactions(
 
     # Get total count first
     try:
-        all_transactions = await service.call("listaddresstransactions", [address, 10000, 0, False])
-        if not all_transactions:
-            all_transactions = []
-        total_count = len(all_transactions)
+        total_count = await service.count_address_transactions(address)
     except Exception as exc:
         raise_backend_http_error(exc)
 
@@ -278,16 +274,7 @@ async def address_streams(
 
     # Get all streams to count them
     try:
-        # Note: explorerlistaddressstreams is a custom RPC or extended one?
-        # The handler used it. If not available, it might fail.
-        # Fallback to standard liststreams? No, that lists all.
-        # Check if listaddressstreams exists? usually it's liststreampublisher...
-        # But let's assume the handler was correct about the method name.
-        all_streams = await service.call("explorerlistaddressstreams", [address, True, 9999999, 0])
-        if not all_streams or not isinstance(all_streams, list):
-            all_streams = []
-
-        total_count = len(all_streams)
+        total_count = await service.count_address_streams(address)
     except Exception as exc:
         raise_backend_http_error(exc)
 

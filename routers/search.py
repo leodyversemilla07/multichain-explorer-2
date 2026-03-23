@@ -21,6 +21,26 @@ from services.search_service import search_all_entities
 router = APIRouter(tags=["Search"])
 
 
+async def _run_search(
+    chain: ChainDep,
+    service: BlockchainServiceDep,
+    query: str,
+    *,
+    limit: int | None = None,
+) -> dict:
+    """Execute shared search and preserve backend HTTP semantics."""
+    try:
+        return await search_all_entities(
+            chain,
+            service,
+            query,
+            limit=limit,
+            include_stream_keys=True,
+        )
+    except Exception as exc:
+        raise_backend_http_error(exc)
+
+
 @router.post("/{chain_name}/search", response_class=HTMLResponse, name="search")
 async def search(
     request: Request,
@@ -35,10 +55,7 @@ async def search(
     """
     query = search_value
 
-    try:
-        results = await search_all_entities(chain, service, query, include_stream_keys=True)
-    except Exception as exc:
-        raise_backend_http_error(exc)
+    results = await _run_search(chain, service, query)
     
     # Check if single result for redirect
     if results["total"] == 1:
@@ -72,10 +89,7 @@ async def search_get(
     """
     query = query_params.get("q", "")
 
-    try:
-        results = await search_all_entities(chain, service, query, include_stream_keys=True)
-    except Exception as exc:
-        raise_backend_http_error(exc)
+    results = await _run_search(chain, service, query)
     
     # Check if single result for redirect
     if results["total"] == 1:
@@ -110,16 +124,7 @@ async def search_suggest(
 
     limit = 5
 
-    try:
-        search_results = await search_all_entities(
-            chain,
-            service,
-            query,
-            limit=limit,
-            include_stream_keys=True,
-        )
-    except Exception as exc:
-        raise_backend_http_error(exc)
+    search_results = await _run_search(chain, service, query, limit=limit)
 
     suggestions = []
     for result in search_results["results"][:limit]:

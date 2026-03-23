@@ -2,7 +2,7 @@
 API Assets Router - JSON endpoints for asset-related operations.
 """
 
-from typing import List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 from schemas.responses import AssetResponse, TransactionResponse
@@ -18,6 +18,19 @@ from routers.dependencies import (
 )
 
 router = APIRouter(tags=["API Assets"])
+
+
+async def _get_asset_or_raise(service: BlockchainServiceDep, asset_ref: str) -> Dict[str, Any]:
+    """Load an asset or raise the correct HTTP error."""
+    try:
+        asset = await service.get_asset(asset_ref)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
+
+    if not asset:
+        raise HTTPException(status_code=404, detail=f"Asset {asset_ref} not found")
+
+    return asset
 
 
 @router.get(
@@ -83,19 +96,8 @@ async def get_asset(
     """
     Get asset details (JSON).
     """
-    # Fetch specific asset
-    # listassets with name/ref
-    try:
-        assets = await service.call("listassets", [asset_ref, True])
-    except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
-    
-    if not assets:
-        raise HTTPException(status_code=404, detail=f"Asset {asset_ref} not found")
-        
-    # Should be single result exactly matching
-    asset = assets[0]
-    
+    asset = await _get_asset_or_raise(service, asset_ref)
+
     return AssetResponse(**asset)
 
 
@@ -119,39 +121,12 @@ async def list_asset_transactions(
     """
     List transactions involving a specific asset (JSON).
     """
-    # Apply pagination
     start, count = get_start_count(query_params)
-    
-    try:
-        assets = await service.call("listassets", [asset_ref, True])
-    except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
-
-    if not assets:
-        raise HTTPException(status_code=404, detail=f"Asset {asset_ref} not found")
+    await _get_asset_or_raise(service, asset_ref)
 
     try:
         tx_list = await service.call("listassettransactions", [asset_ref, True, count, start])
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
-    
-    if not tx_list:
-        return []
-        
-    # Only TXIDs are usually returned or partial info.
-    # Check if we need to fetch full details.
-    # Assuming we do for consistency.
-    
-    txids = [tx.get("txid") for tx in tx_list if "txid" in tx]
-    
-    import asyncio
-    tasks = [service.get_transaction(txid) for txid in txids]
-    
-    transactions = []
-    if tasks:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for res in results:
-            if isinstance(res, dict):
-                transactions.append(TransactionResponse(**res))
-                
-    return transactions
+
+    return [TransactionResponse(**tx) for tx in (tx_list or [])]

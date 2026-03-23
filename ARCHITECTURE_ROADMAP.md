@@ -2,7 +2,7 @@
 
 **Version:** 8.1 - Single Entry Point  
 **Date:** December 8, 2025  
-**Status:** ✅ **PRODUCTION READY** - Pure FastAPI Implementation! 🎉
+**Status:** ✅ **PRODUCTION READY** - FastAPI implementation with maintained compatibility routes
 
 ---
 
@@ -13,17 +13,17 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 
 **Key Metrics:**
 - **Time Invested:** 23+ hours total (including legacy removal & consolidation)
-- **Test Coverage:** 300+ tests, 100% passing ✅
+- **Test Coverage:** 375 tests passing locally ✅
 - **Code Quality:** Excellent (all files <300 lines) 📝
 - **Templates:** 34 responsive pages with modern UI 🎨
 - **Architecture:** FastAPI routers → services → models 🏗️
 - **Framework:** FastAPI + Uvicorn (async ASGI) ⚡
 - **Entry Point:** `main.py` (single entry point)
-- **Legacy Code:** Removed ❌ (http_server.py, routing.py, app.py, cfg.py)
+- **Legacy Files:** Removed ❌ (http_server.py, routing.py, app.py, cfg.py)
 
 **Current Status:**
 - ✅ All core functionality complete
-- ✅ Pure FastAPI implementation (no legacy code)
+- ✅ FastAPI implementation with legacy URL compatibility retained intentionally
 - ✅ Single entry point (`main.py`)
 - ✅ Production-ready codebase
 - ✅ Auto-generated API documentation
@@ -126,7 +126,7 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 - Created 8 modular routers with dependency injection
 - Added async request handling with Uvicorn
 - Auto-generated OpenAPI documentation at `/docs`
-- Maintained backward compatibility with legacy code
+- Maintained backward compatibility with legacy URLs
 
 **Key Files Created:**
 - `main.py` - Main FastAPI application
@@ -145,14 +145,15 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 **What Was Done:**
 - Removed deprecated `http_server.py`, `routing.py`, `app.py`, `cfg.py`
 - Established `main.py` as single entry point
-- Cleaned up all legacy code references
+- Cleaned up removed legacy application-entrypoint references
 - Streamlined codebase to pure FastAPI
 
 **Benefits Achieved:**
 - 🧹 Single source of truth
 - 📦 Smaller deployment footprint  
 - 🔧 Easier maintenance
-- ✅ No legacy tech debt
+- ✅ No legacy application entrypoints
+- ℹ️ Legacy `/chain/...` URL compatibility is still supported by design
 
 ### Phase 3.7 - Standard FastAPI Refactor ✅ COMPLETE
 

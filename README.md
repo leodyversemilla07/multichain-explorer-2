@@ -33,9 +33,9 @@ A modern, web-based explorer for MultiChain blockchains with a clean architectur
 - **Real-time Search** - Live search and filtering across all entity types
 - **FastAPI Powered** - Async performance with modern Python web framework
 - **Auto-Generated API Docs** - Interactive Swagger UI at `/docs`
-- **Clean Architecture** - Modular router/handler system with separated concerns
+- **Clean Architecture** - Modular HTML/API routers with shared services and dependencies
 - **Type-Safe** - Input validation with Pydantic and FastAPI
-- **Well-Tested** - 328 automated tests passing locally
+- **Well-Tested** - 375 automated tests passing locally
 - **Production-Ready** - Security hardening, error handling, and performance optimizations
 
 ---
@@ -183,7 +183,7 @@ Options:
   --host HOST       Host to bind to (default: 127.0.0.1)
   --port PORT       Port to bind to (default: 8080)
   --reload          Enable auto-reload for development
-  --config FILE     Path to configuration file (default: multichain.ini)
+  --config FILE     Reserved for compatibility; `.env` is the supported configuration source
 ```
 
 ### Production Deployment
@@ -255,10 +255,9 @@ flake8 .
 
 For development, you can run the server with debug mode enabled:
 
-```ini
-# In your config file
-[main]
-debug=true
+```env
+# In your .env file
+DEBUG=true
 ```
 
 This will:
@@ -302,6 +301,7 @@ MultiChain Explorer 2 follows a clean, modular architecture powered by **FastAPI
 - **`routers/`** - Server-rendered HTML routes and dependency injection helpers
 - **`routers/api/`** - JSON API endpoints under `/api/v1`
 - **`services/`** - Shared RPC, cache, pagination, formatting, and search services
+- **Legacy `/chain/...` routes** - Supported compatibility URLs with dedicated regression coverage
 - **`templates/`** - Jinja2 templates with TailwindCSS
 - **`validators.py`** - Input validation with Pydantic
 - **`config.py`** - Type-safe configuration management
@@ -348,7 +348,7 @@ tests/
 
 ### Test Coverage
 
-- **328 tests** passing locally
+- **375 tests** passing locally
 - Comprehensive coverage of:
   - Input validation and security
   - Configuration management
@@ -357,6 +357,7 @@ tests/
   - Service layer
   - Startup and dependency injection
   - Template-backed HTML views
+  - Legacy `/chain/...` compatibility routes
 
 ### Running Specific Test Categories
 
@@ -513,7 +514,7 @@ Open a pull request on GitHub with a clear description of your changes.
 
 **Current snapshot**
 
-- ✅ **328 tests** passing locally
+- ✅ **375 tests** passing locally
 - ✅ **Server-rendered HTML routes** and **JSON API routes**
 - ✅ **Shared service layer** for RPC, cache, pagination, and search
 - ✅ **Template integration** for core explorer pages
@@ -553,7 +554,7 @@ kill -9 <pid>
 #### Can't connect to MultiChain node
 
 1. Verify MultiChain node is running
-2. Check RPC credentials in config file
+2. Check RPC credentials in `.env`
 3. For local nodes, verify `datadir` path
 4. For remote nodes, check firewall settings
 

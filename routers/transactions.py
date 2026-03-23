@@ -143,7 +143,10 @@ async def transaction_detail(
     """
     Show transaction details.
     """
-    transaction = await service.get_transaction(txid)
+    try:
+        transaction = await service.get_transaction(txid)
+    except Exception as exc:
+        _raise_transaction_http_error(txid, exc)
 
     if not transaction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
@@ -238,7 +241,11 @@ async def transaction_output(
     """
     Get transaction output data.
     """
-    transaction = await service.get_transaction(txid)
+    try:
+        transaction = await service.get_transaction(txid)
+    except Exception as exc:
+        _raise_transaction_http_error(txid, exc)
+
     if not transaction:
         raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
 

@@ -37,20 +37,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Streams"])
 
-_COUNT_FETCH_LIMIT = 100000
-
 
 async def _get_stream_or_raise(service: BlockchainServiceDep, stream_name: str) -> Dict[str, Any]:
     """Load a stream and raise a typed HTTP error when it is unavailable."""
     try:
-        streams = await service.call("liststreams", [stream_name, True])
+        stream = await service.get_stream(stream_name)
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Stream {stream_name} not found")
 
-    if not streams:
+    if not stream:
         raise HTTPException(status_code=404, detail=f"Stream {stream_name} not found")
 
-    return streams[0]
+    return stream
 
 
 async def _count_stream_results(
@@ -58,12 +56,11 @@ async def _count_stream_results(
     method: str,
     *leading_params: Any,
 ) -> int:
-    """Estimate paginated RPC totals by fetching a bounded full result set."""
-    results = await service.call(
+    """Count paginated stream-related results using the shared fallback."""
+    return await service.count_rpc_list_results(
         method,
-        [*leading_params, False, _COUNT_FETCH_LIMIT, 0],
+        *leading_params,
     )
-    return len(results) if results else 0
 
 
 @router.get("/{chain_name}/streams", response_class=HTMLResponse, name="streams",

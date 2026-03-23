@@ -186,6 +186,35 @@ class TestBlockchainService:
         with pytest.raises(RPCError):
             await service.get_block_by_hash("a" * 64)
 
+    async def test_get_asset_returns_none_for_missing_assets(self, service):
+        """Test missing assets resolve to None without swallowing other failures."""
+        service.call = AsyncMock(
+            side_effect=RPCError("listassets", "Asset not found", error_code=-5)
+        )
+
+        result = await service.get_asset("missing-asset")
+
+        assert result is None
+
+    async def test_get_stream_raises_connection_errors(self, service):
+        """Test stream lookups preserve backend connection failures."""
+        service.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        with pytest.raises(ChainConnectionError):
+            await service.get_stream("stream1")
+
+    async def test_count_rpc_list_results_uses_shared_bounded_fetch(self, service):
+        """Test shared RPC count fallback uses the expected bounded parameters."""
+        service.call = AsyncMock(return_value=[{"txid": "tx1"}, {"txid": "tx2"}])
+
+        result = await service.count_rpc_list_results("listassettransactions", "asset1")
+
+        assert result == 2
+        service.call.assert_awaited_with(
+            "listassettransactions",
+            ["asset1", False, 100000, 0],
+        )
+
 
 @pytest.mark.asyncio
 class TestSearchService:
