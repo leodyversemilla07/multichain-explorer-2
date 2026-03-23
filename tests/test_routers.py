@@ -161,6 +161,22 @@ class TestStreamsRouter:
         assert "/test-chain/stream/stream1/publishers" in response.text
         assert "/test-chain/streams" in response.text
 
+    def test_stream_detail_renders_recent_items_preview(self, client, mock_blockchain_service):
+        """Test stream detail includes the recent items preview when available."""
+        async def stream_detail_call(method, params=None):
+            if method == "liststreams":
+                return [{"name": "stream1", "streamref": "5-6-7", "items": 1, "confirmed": 1}]
+            if method == "liststreamitems":
+                return [{"publishers": ["publisher1"], "key": "key1", "txid": "tx1", "data": "payload"}]
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=stream_detail_call)
+
+        response = client.get("/test-chain/stream/stream1")
+        assert response.status_code == 200
+        assert "key1" in response.text
+        assert "/test-chain/tx/tx1" in response.text
+
     def test_streams_list_uses_canonical_links(self, client, mock_blockchain_service):
         """Test streams list page links use the canonical chain path."""
         async def stream_list_call(method, params=None):
@@ -184,7 +200,57 @@ class TestStreamsRouter:
         assert "/test-chain/stream/stream1/items" in response.text
         assert "/test-chain/stream/stream1/keys" in response.text
         assert "/test-chain/stream/stream1/publishers" in response.text
-        
+
+
+class TestPermissionsRouter:
+    """Test permissions router endpoints (HTML)."""
+
+    def test_permissions_page_renders_paginated_permissions(self, client, mock_blockchain_service):
+        """Test main permissions page renders table rows and pagination state."""
+        permissions = [
+            {"address": f"addr{i}", "type": "admin", "startblock": i, "endblock": i + 10}
+            for i in range(5)
+        ]
+
+        async def permissions_call(method, params=None):
+            if method == "listpermissions":
+                return permissions
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=permissions_call)
+
+        response = client.get("/test-chain/permissions?page=2&count=2")
+        assert response.status_code == 200
+        assert "Global Permissions" in response.text
+        assert "Addresses with Permissions" in response.text
+        assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
+
+    def test_global_permissions_page_renders(self, client, mock_blockchain_service):
+        """Test global permissions page uses its dedicated template successfully."""
+        permissions = [
+            {"address": "addr1", "type": "admin", "startblock": 0, "endblock": None},
+            {"address": "addr2", "type": "mine", "startblock": 1, "endblock": 10, "for": {"type": "global"}},
+            {"address": "addr3", "type": "write", "startblock": 2, "endblock": 20, "for": {"type": "stream"}},
+        ]
+
+        async def global_permissions_call(method, params=None):
+            if method == "listpermissions":
+                return permissions
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=global_permissions_call)
+
+        response = client.get("/test-chain/permissions/global")
+        assert response.status_code == 200
+        assert "Global Permissions" in response.text
+        assert "addr1" in response.text
+        assert "addr2" in response.text
+        assert "addr3" not in response.text
+
+
+class TestAddressesDetailRouter:
+    """Test address detail page behavior."""
+
     def test_address_detail(self, client):
         """Test GET /test-chain/address/{address}."""
         response = client.get("/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
@@ -462,6 +528,37 @@ class TestPaginationInRoutes:
         assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
         assert "/test-chain/stream/stream1/items?page=3" in response.text
 
+    def test_address_transactions_supports_legacy_start_links(self, client, mock_blockchain_service):
+        """Test address transactions still work with legacy start/count pagination links."""
+        transactions = [
+            {
+                "txid": f"tx{i}",
+                "confirmations": i,
+                "time": 1700000000 + i,
+                "vin": [],
+                "vout": [],
+            }
+            for i in range(5)
+        ]
+
+        async def address_call(method, params=None):
+            if method == "validateaddress":
+                return {"address": params[0], "isvalid": True}
+            if method == "listaddresstransactions":
+                _, count, start, _ = params
+                return transactions[start : start + count]
+            return []
+
+        mock_blockchain_service.call = AsyncMock(side_effect=address_call)
+
+        response = client.get(
+            "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/transactions?start=2&count=2"
+        )
+        assert response.status_code == 200
+        assert "3 - 4 of 5" in response.text
+        assert "?start=0" in response.text
+        assert "?start=4" in response.text
+
 
 class TestLegacyRoutes:
     """Test legacy route compatibility."""
@@ -642,3 +739,10 @@ class TestErrorHandling:
 
         response = client.get("/test-chain/stream/stream1")
         assert response.status_code == 404
+
+    def test_permissions_page_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+        """Test permissions page preserves backend connection failures."""
+        mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
+
+        response = client.get("/test-chain/permissions")
+        assert response.status_code == 503

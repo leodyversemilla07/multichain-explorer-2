@@ -245,11 +245,20 @@ def get_page_count(
     default_page: int = 1,
     default_count: int = 20,
 ) -> tuple[int, int]:
-    """Parse standard page/count query params with safe integer fallback."""
-    return (
-        safe_int(query_params.get("page", default_page), default_page),
-        safe_int(query_params.get("count", default_count), default_count),
-    )
+    """Parse page/count params, falling back to legacy start/count links."""
+    count = safe_int(query_params.get("count", default_count), default_count)
+
+    if "page" in query_params:
+        return (
+            safe_int(query_params.get("page", default_page), default_page),
+            count,
+        )
+
+    if "start" in query_params and count > 0:
+        start = safe_int(query_params.get("start", 0), 0)
+        return ((start // count) + 1, count)
+
+    return (default_page, count)
 
 
 def get_start_count(

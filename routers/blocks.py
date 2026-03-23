@@ -82,6 +82,7 @@ async def list_blocks(
         context=context.build_context(
             title=f"Blocks - {chain.display_name}",
             blocks=blocks,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -230,6 +231,7 @@ async def block_transactions(
             title=f"Transactions in Block #{height}",
             block_height=height,
             transactions=transactions,
+            pagination=page_info,
             **pagination_context
         ),
     )

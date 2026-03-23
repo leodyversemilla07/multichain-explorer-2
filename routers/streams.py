@@ -121,13 +121,21 @@ async def list_streams(
 
     paginated_streams = streams[page_info["start"] : page_info["start"] + page_info["count"]]
 
-    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/streams")
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/streams",
+        include_component_fields=True,
+        total_items=len(streams),
+    )
+    show_pagination = page_info["page_count"] > 1
 
     return templates.TemplateResponse(
         name="pages/streams.html",
         context=context.build_context(
             title=f"Streams - {chain.display_name}",
             streams=paginated_streams,
+            pagination=page_info,
+            show_pagination=show_pagination,
             **pagination_context
         ),
     )
@@ -167,11 +175,19 @@ async def stream_detail(
         logger.error("Error fetching stream %s", stream_name, exc_info=exc)
         raise_backend_http_error(exc, not_found_detail=f"Stream {stream_name} not found")
 
+    try:
+        stream_items_preview = await service.call("liststreamitems", [stream_name, True, 10, 0])
+    except Exception:
+        stream_items_preview = []
+
     return templates.TemplateResponse(
         name="pages/stream.html",
         context=context.build_context(
             title=f"Stream {stream_name}",
             stream=stream,
+            stream_items=stream_items_preview or [],
+            show_pagination=False,
+            pagination=None,
         ),
     )
 
@@ -236,7 +252,7 @@ async def stream_items(
             title=f"Items - {stream_name}",
             stream_name=stream_name,
             items=items,
-            pagination=pagination_context,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -293,7 +309,7 @@ async def stream_keys(
             title=f"Keys - {stream_name}",
             stream_name=stream_name,
             keys=paginated_keys,
-            pagination=pagination_context,
+            pagination=page_info,
             show_pagination=show_pagination,
             **pagination_context
         ),
@@ -353,7 +369,7 @@ async def stream_publishers(
             title=f"Publishers - {stream_name}",
             stream_name=stream_name,
             publishers=paginated_publishers,
-            pagination=pagination_context,
+            pagination=page_info,
             show_pagination=show_pagination,
             **pagination_context
         ),
@@ -456,7 +472,7 @@ async def key_items(
             stream_name=stream_name,
             key=key,
             items=items,
-            pagination=pagination_context,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -525,7 +541,7 @@ async def publisher_items(
             stream_name=stream_name,
             publisher=publisher,
             items=items,
-            pagination=pagination_context,
+            pagination=page_info,
             **pagination_context
         ),
     )

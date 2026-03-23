@@ -35,6 +35,35 @@ class PaginationInfo:
         """Get items per page (legacy compatibility)."""
         return self.items_per_page
 
+    @property
+    def total(self) -> int:
+        """Legacy alias for total_items."""
+        return self.total_items
+
+    @property
+    def end(self) -> int:
+        """Legacy alias for end_item."""
+        return self.end_item
+
+    @property
+    def has_prev(self) -> bool:
+        """Legacy alias for has_previous."""
+        return self.has_previous
+
+    @property
+    def prev_start(self) -> int | None:
+        """Legacy start offset for the previous page."""
+        if self.previous_page is None:
+            return None
+        return (self.previous_page - 1) * self.items_per_page
+
+    @property
+    def next_start(self) -> int | None:
+        """Legacy start offset for the next page."""
+        if self.next_page is None:
+            return None
+        return (self.next_page - 1) * self.items_per_page
+
     def __getitem__(self, key: str) -> Any:
         """
         Dict-like access for backward compatibility and template ease.
@@ -57,10 +86,18 @@ class PaginationInfo:
             return self.has_next
         if key == "has_prev":
             return self.has_previous
+        if key == "has_previous":
+            return self.has_previous
         if key == "next_page":
             return self.next_page
         if key == "prev_page":
             return self.previous_page
+        if key == "prev_start":
+            return self.prev_start
+        if key == "next_start":
+            return self.next_start
+        if key == "end":
+            return self.end_item
         if key == "url_base":
             return self.base_url
 

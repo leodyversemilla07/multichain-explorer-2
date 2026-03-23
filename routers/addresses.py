@@ -89,6 +89,7 @@ async def list_addresses(
         context=context.build_context(
             title=f"Addresses - {chain.display_name}",
             addresses=paginated_addresses,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -217,6 +218,7 @@ async def address_transactions(
             title=f"Transactions - {address[:16]}...",
             address=address,
             transactions=transactions,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -313,6 +315,7 @@ async def address_streams(
             title=f"Streams - {address[:16]}...",
             address=address,
             streams=streams,
+            pagination=page_info,
             **pagination_context
         ),
     )

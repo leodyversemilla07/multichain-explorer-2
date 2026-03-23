@@ -240,6 +240,17 @@ class TestPaginationService:
         assert context["page_number"] == 2
         assert context["base_path"] == "/test/path"
 
+    def test_pagination_info_exposes_legacy_accessors(self):
+        """Test PaginationInfo still supports the legacy template fields."""
+        service = PaginationService()
+        page_info = service.get_pagination_info(total=42, page=2, items_per_page=10)
+
+        assert page_info.total == 42
+        assert page_info.end == 20
+        assert page_info.has_prev is True
+        assert page_info.prev_start == 0
+        assert page_info.next_start == 20
+
 
 class TestFormattingService:
     """Tests for FormattingService."""

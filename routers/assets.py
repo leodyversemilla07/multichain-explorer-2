@@ -107,6 +107,7 @@ async def list_assets(
         context=context.build_context(
             title=f"Assets - {chain.display_name}",
             assets=paginated_assets,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -174,6 +175,8 @@ async def asset_holders(
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/asset/{asset_name}/holders",
+        include_component_fields=True,
+        total_items=len(holders),
     )
 
     return templates.TemplateResponse(
@@ -182,6 +185,7 @@ async def asset_holders(
             title=f"Holders - {asset_name}",
             asset_name=asset_name,
             holders=paginated_holders,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -242,7 +246,7 @@ async def asset_transactions(
             title=f"Transactions - {asset_name}",
             asset_name=asset_name,
             transactions=transactions,
-            pagination=pagination_context,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -280,6 +284,8 @@ async def asset_issues(
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/asset/{asset_name}/issues",
+        include_component_fields=True,
+        total_items=len(issues),
     )
 
     return templates.TemplateResponse(
@@ -288,6 +294,7 @@ async def asset_issues(
             title=f"Issuances - {asset_name}",
             asset_name=asset_name,
             issues=paginated_issues,
+            pagination=page_info,
             **pagination_context
         ),
     )
@@ -389,6 +396,8 @@ async def holder_transactions(
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/asset/{asset_name}/holder/{address}/transactions",
+        include_component_fields=True,
+        total_items=len(transactions),
     )
 
     return templates.TemplateResponse(
@@ -398,6 +407,7 @@ async def holder_transactions(
             asset_name=asset_name,
             address=address,
             transactions=paginated_txs,
+            pagination=page_info,
             **pagination_context
         ),
     )

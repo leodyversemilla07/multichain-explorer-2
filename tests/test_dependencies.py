@@ -341,6 +341,14 @@ class TestQueryParsingHelpers:
         assert page == 3
         assert count == 50
 
+    def test_get_page_count_legacy_start_fallback(self):
+        """Test page/count helper derives the page from legacy start/count links."""
+        from routers.dependencies import get_page_count
+
+        page, count = get_page_count({"start": "40", "count": "20"})
+        assert page == 3
+        assert count == 20
+
     def test_get_start_count_invalid_values(self):
         """Test start/count helper falls back on invalid values."""
         from routers.dependencies import get_start_count

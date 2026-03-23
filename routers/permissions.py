@@ -21,7 +21,8 @@ from routers.dependencies import (
     PaginationServiceDep,
     CommonContextDep,
     get_query_params,
-    safe_int,
+    get_page_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["Permissions"])
@@ -33,8 +34,10 @@ async def list_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
+    pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
+    query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
     List all permissions on the blockchain.
@@ -46,8 +49,8 @@ async def list_permissions(
         permissions = await service.call("listpermissions", ["*"])
         if not permissions:
             permissions = []
-    except Exception:
-        permissions = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Calculate statistics
     unique_addresses = set()
@@ -68,14 +71,32 @@ async def list_permissions(
         if not perm.get("for") or perm.get("for", {}).get("type") == "global":
             global_count += 1
 
+    page, count = get_page_count(query_params)
+    page_info = pagination.get_pagination_info(
+        total=len(permissions),
+        page=page,
+        items_per_page=count,
+    )
+    paginated_permissions = permissions[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
+    pagination_context = pagination.build_context(
+        page_info,
+        f"/{chain.path_name}/permissions",
+        include_component_fields=True,
+        total_items=len(permissions),
+    )
+
     return templates.TemplateResponse(
         name="pages/permissions.html",
         context=context.build_context(
             title=f"Permissions - {chain.display_name}",
-            permissions=permissions,
+            permissions=paginated_permissions,
             global_count=global_count,
             address_count=len(unique_addresses),
             type_count=len(permission_types),
+            pagination=page_info,
+            **pagination_context,
         ),
     )
 
@@ -100,8 +121,8 @@ async def global_permissions(
         all_permissions = await service.call("listpermissions", ["*"])
         if not all_permissions:
             all_permissions = []
-    except Exception:
-        all_permissions = []
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     # Filter to only global permissions (not entity-specific)
     global_permissions = [
@@ -111,8 +132,7 @@ async def global_permissions(
     ]
 
     # Apply pagination
-    page = safe_int(query_params.get("page", 1), 1)
-    count = safe_int(query_params.get("count", 20), 20)
+    page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(
         total=len(global_permissions),
@@ -127,6 +147,8 @@ async def global_permissions(
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/permissions/global",
+        include_component_fields=True,
+        total_items=len(global_permissions),
     )
 
     return templates.TemplateResponse(
@@ -134,6 +156,8 @@ async def global_permissions(
         context=context.build_context(
             title=f"Global Permissions - {chain.display_name}",
             permissions=paginated_perms,
+            pagination=page_info,
+            total_permissions=len(global_permissions),
             **pagination_context
         ),
     )
@@ -145,9 +169,18 @@ async def legacy_list_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
+    pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy permissions list route."""
-    return await list_permissions(request, chain, service, templates, context)
+    return await list_permissions(
+        request,
+        chain,
+        service,
+        pagination,
+        templates,
+        context,
+        query_params,
+    )

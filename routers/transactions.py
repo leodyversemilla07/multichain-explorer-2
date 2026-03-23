@@ -116,7 +116,7 @@ async def list_transactions(
         context=context.build_context(
             title=f"Recent Transactions - {chain.display_name}",
             transactions=paginated_txs,
-            pagination=pagination_context,
+            pagination=page_info,
             **pagination_context
         ),
     )
