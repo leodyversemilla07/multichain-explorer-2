@@ -2,11 +2,10 @@
 Tests for routers/dependencies.py - FastAPI dependency injection.
 """
 
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 
 import pytest
 
-import app_state
 from exceptions import ChainNotFoundError
 
 
@@ -49,7 +48,7 @@ class TestGetBaseUrl:
         # Mock state
         mock_state = Mock(spec=ApplicationState)
         mock_state.get_setting.return_value = "/"
-        
+
         result = get_base_url(mock_state)
         assert result == "/"
 
@@ -61,7 +60,7 @@ class TestGetBaseUrl:
         # Mock state
         mock_state = Mock(spec=ApplicationState)
         mock_state.get_setting.return_value = "/explorer/"
-        
+
         result = get_base_url(mock_state)
         assert result == "/explorer/"
 
@@ -210,11 +209,12 @@ class TestCommonContext:
         chain.path_name = "test-chain"
         chain.display_name = "Test Chain"
         return chain
-        
+
     @pytest.fixture
     def mock_state(self):
         """Create mock state."""
         from app_state import ApplicationState
+
         state = Mock(spec=ApplicationState)
         state.get_setting.return_value = "/api/"
         return state
@@ -234,7 +234,7 @@ class TestCommonContext:
     def test_common_context_build_context(self, mock_request, mock_chain, mock_state):
         """Test CommonContext.build_context method."""
         from routers.dependencies import CommonContext
-        
+
         mock_state.get_setting.return_value = "/"
 
         context = CommonContext(mock_request, mock_chain, mock_state)
@@ -256,7 +256,7 @@ class TestCommonContext:
         chain = Mock()
         chain.name = "fallback-name"
         chain.path_name = "fallback-path"
-        chain.display_name = "Fallback Chain" # ChainConfig always has display_name
+        chain.display_name = "Fallback Chain"  # ChainConfig always has display_name
 
         mock_state.get_setting.return_value = "/"
 

@@ -3,7 +3,6 @@
 
 """Tests for cache service."""
 
-import time
 import pytest
 import asyncio
 
@@ -152,14 +151,13 @@ class TestCacheService:
         assert stats["sets"] == 0
         assert stats["deletes"] == 0
 
-
     async def test_cached_decorator_basic(self):
         """Test basic cached decorator functionality."""
         # Clean global cache
         cache = get_cache()
         await cache.clear()
         cache.reset_stats()
-        
+
         call_count = 0
 
         @cached(ttl=60, key_prefix="test")
@@ -184,7 +182,7 @@ class TestCacheService:
         cache = get_cache()
         await cache.clear()
         cache.reset_stats()
-        
+
         call_count = 0
 
         @cached(ttl=60, key_prefix="test")
@@ -356,6 +354,7 @@ class TestRedisCacheProvider:
         sys.modules.setdefault("redis.asyncio", aioredis_mod)
 
         from services.cache_service import RedisCacheProvider
+
         provider = RedisCacheProvider(redis_url="redis://localhost:6379/0")
         provider._client = mock_client
         return provider, mock_client
@@ -363,6 +362,7 @@ class TestRedisCacheProvider:
     async def test_get_cache_hit(self):
         """get() returns deserialised value on cache hit."""
         import json
+
         provider, client = self._make_provider()
         client.get.return_value = json.dumps("hello").encode()
 
@@ -383,6 +383,7 @@ class TestRedisCacheProvider:
     async def test_set_with_ttl(self):
         """set() calls setex when ttl > 0."""
         import json
+
         provider, client = self._make_provider()
 
         await provider.set("k", {"x": 1}, ttl=30)
@@ -392,6 +393,7 @@ class TestRedisCacheProvider:
     async def test_set_no_ttl(self):
         """set() calls set (no expiry) when ttl == 0."""
         import json
+
         provider, client = self._make_provider()
 
         await provider.set("k", "val", ttl=0)
@@ -467,7 +469,8 @@ class TestCreateCacheProvider:
     def test_returns_redis_provider_when_requested(self):
         """create_cache_provider('redis') returns a RedisCacheProvider (mocked)."""
         from unittest.mock import MagicMock, AsyncMock
-        import sys, types
+        import sys
+        import types
 
         aioredis_mod = types.ModuleType("redis.asyncio")
         aioredis_mod.from_url = MagicMock(return_value=AsyncMock())
@@ -477,14 +480,19 @@ class TestCreateCacheProvider:
         sys.modules.setdefault("redis.asyncio", aioredis_mod)
 
         from services.cache_service import create_cache_provider, RedisCacheProvider
-        provider = create_cache_provider(backend="redis", redis_url="redis://localhost:6379/0")
+
+        provider = create_cache_provider(
+            backend="redis", redis_url="redis://localhost:6379/0"
+        )
         assert isinstance(provider, RedisCacheProvider)
 
     def test_replace_global_cache(self):
         """_replace_global_cache() changes what get_cache() returns."""
         from services.cache_service import (
-            CacheService, MemoryCacheProvider,
-            _replace_global_cache, get_cache,
+            CacheService,
+            MemoryCacheProvider,
+            _replace_global_cache,
+            get_cache,
         )
 
         new_service = CacheService(MemoryCacheProvider())

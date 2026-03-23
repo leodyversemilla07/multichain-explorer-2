@@ -14,7 +14,7 @@ Handles:
 """
 
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, Path, Request, HTTPException
 from fastapi.responses import HTMLResponse

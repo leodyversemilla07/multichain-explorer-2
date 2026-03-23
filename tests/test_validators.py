@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from validators import (
+from validators import (  # noqa: E402
     AddressParams,
     BlockHeightParams,
     EntityNameParams,
@@ -310,11 +310,8 @@ class TestValidatorSmoke:
     def test_all_validators_importable(self):
         """Test that all validators can be imported"""
         from validators import (
-            AddressParams,
             BlockHeightParams,
-            EntityNameParams,
             PaginationParams,
-            TransactionParams,
         )
 
         assert all(

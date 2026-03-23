@@ -55,7 +55,7 @@ async def get_transaction(
         tx = await service.get_transaction(txid)
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Transaction {txid} not found")
-    
+
     if not tx:
         raise HTTPException(status_code=404, detail=f"Transaction {txid} not found")
 
@@ -99,12 +99,15 @@ async def list_block_transactions(
         count=count,
     )
 
-    paginated_tx_ids = tx_ids[page_info["start"] : page_info["start"] + page_info["count"]]
-    
+    paginated_tx_ids = tx_ids[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
+
     # Concurrent fetch
     import asyncio
+
     tasks = [service.get_transaction(tx_id) for tx_id in paginated_tx_ids]
-    
+
     transactions = []
     if tasks:
         results = await asyncio.gather(*tasks, return_exceptions=True)

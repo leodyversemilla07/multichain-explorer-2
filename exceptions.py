@@ -4,7 +4,7 @@ Structured error handling for better debugging and user experience
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ def format_error_html(exception: Exception, debug: bool = False) -> str:
         error_class = exception.__class__.__name__
         message = exception.message
 
-        html = f'<div class="alert alert-danger" role="alert">'
+        html = '<div class="alert alert-danger" role="alert">'
         html += f"<h4>{error_class}</h4>"
         html += f"<p>{message}</p>"
 
@@ -193,7 +193,7 @@ def format_error_html(exception: Exception, debug: bool = False) -> str:
     else:
         # Generic exception
         html = '<div class="alert alert-danger" role="alert">'
-        html += f"<h4>Error</h4>"
+        html += "<h4>Error</h4>"
         html += f"<p>{str(exception)}</p>"
         html += "</div>"
         return html

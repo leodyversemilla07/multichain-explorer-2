@@ -37,8 +37,10 @@ def bytes_to_int64(data):
 
 
 def bytes_to_hex(data):
-    toHex = lambda x: "".join(format(c, "02x") for c in x)
-    return toHex(data)
+    def to_hex(value):
+        return "".join(format(char, "02x") for char in value)
+
+    return to_hex(data)
 
 
 def print_error(msg):
@@ -64,7 +66,9 @@ def file_file_name(file_name):
 
 def log_write(data):
     state = app_state.get_state()
-    return file_write(state.log_file, str(datetime.datetime.now()) + " " + str(data) + "\n", True)
+    return file_write(
+        state.log_file, str(datetime.datetime.now()) + " " + str(data) + "\n", True
+    )
 
 
 def log_error(data):

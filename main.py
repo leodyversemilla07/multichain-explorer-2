@@ -28,15 +28,16 @@ from exceptions import (
     ResourceNotFoundError,
     MCEException,
 )
-from services.cache_service import CacheService, create_cache_provider, _replace_global_cache
+from services.cache_service import (
+    CacheService,
+    create_cache_provider,
+    _replace_global_cache,
+)
 from services.blockchain_service import BlockchainService
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-
-# Rate limiter — keyed by client IP, 60 requests/minute default
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 # Import routers
 from routers import (
@@ -51,6 +52,9 @@ from routers import (
 )
 from routers.api import api_router
 
+# Rate limiter — keyed by client IP, 60 requests/minute default
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -64,11 +68,28 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 
+def _patch_template_response(templates: Jinja2Templates) -> None:
+    """Support both old and new Starlette TemplateResponse calling styles."""
+    if getattr(templates, "_mce_template_response_patched", False):
+        return
+
+    original_template_response = templates.TemplateResponse
+
+    def compat_template_response(*args, **kwargs):
+        if not args and "context" in kwargs:
+            context = kwargs["context"] or {}
+            kwargs.setdefault("request", context.get("request"))
+        return original_template_response(*args, **kwargs)
+
+    templates.TemplateResponse = compat_template_response
+    templates._mce_template_response_patched = True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application lifespan handler.
-    
+
     Runs on startup and shutdown to initialize/cleanup resources.
     """
     # Startup
@@ -120,13 +141,13 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """
     Create and configure the FastAPI application.
-    
+
     Returns:
         Configured FastAPI application instance
     """
     # Get version from app_state
     version = app_state.VERSION
-    
+
     app = FastAPI(
         title="MultiChain Explorer 2",
         description="A modern, web-based explorer for MultiChain blockchains",
@@ -136,23 +157,24 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
-    
+
     # Mount static files
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
         logger.info(f"Mounted static files from {STATIC_DIR}")
     else:
         logger.warning(f"Static directory not found: {STATIC_DIR}")
-    
+
     # Setup Jinja2 templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-    
+    _patch_template_response(templates)
+
     # Store templates in app state for access in routes
     app.state.templates = templates
-    
+
     # Register custom template filters
     _register_template_filters(templates)
-    
+
     # Register exception handlers
     _register_exception_handlers(app, templates)
 
@@ -171,7 +193,9 @@ def create_app() -> FastAPI:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
         logger.info(f"TrustedHostMiddleware enabled for: {trusted_hosts}")
     else:
-        logger.info("TrustedHostMiddleware: wildcard mode (all hosts allowed – set TRUSTED_HOSTS in production)")
+        logger.info(
+            "TrustedHostMiddleware: wildcard mode (all hosts allowed – set TRUSTED_HOSTS in production)"
+        )
 
     # CORS — must be added LAST (outermost) so OPTIONS preflight requests are
     # answered before rate limiting or other middleware runs.
@@ -193,6 +217,7 @@ def create_app() -> FastAPI:
     async def favicon():
         """Serve favicon."""
         from fastapi.responses import FileResponse
+
         favicon_path = STATIC_DIR / "logo32.png"
         if favicon_path.exists():
             return FileResponse(favicon_path, media_type="image/png")
@@ -238,7 +263,7 @@ def create_app() -> FastAPI:
             "docs": "/docs",
             "redoc": "/redoc",
         }
-    
+
     app.include_router(system_router)
     app.include_router(api_router)
 
@@ -251,35 +276,38 @@ def create_app() -> FastAPI:
     app.include_router(streams_router.router)
     app.include_router(search_router.router)
     app.include_router(permissions_router.router)
-    
+
     logger.info("FastAPI application configured successfully")
-    
+
     return app
 
 
 def _register_template_filters(templates: Jinja2Templates) -> None:
     """Register custom Jinja2 filters for templates."""
-    
+
     def format_hash(value: str, length: int = 16) -> str:
         """Format a hash for display (truncate with ellipsis)."""
         if not value or len(value) <= length:
             return value
         half = length // 2
         return f"{value[:half]}...{value[-half:]}"
-    
+
     def format_amount(value: float, decimals: int = 8) -> str:
         """Format an amount with proper decimals."""
         if value == 0:
             return "0"
         return f"{value:.{decimals}f}".rstrip("0").rstrip(".")
-    
+
     def format_timestamp(value: int) -> str:
         """Format a Unix timestamp to human-readable date."""
         from datetime import datetime, timezone
+
         if not value:
             return "N/A"
-        return datetime.fromtimestamp(value, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    
+        return datetime.fromtimestamp(value, tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
     # Register filters
     templates.env.filters["format_hash"] = format_hash
     templates.env.filters["format_amount"] = format_amount
@@ -317,8 +345,10 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": f"The blockchain '{exc.chain_name}' was not found.",
             "base_url": base_url,
         }
-        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=404)
-    
+        return templates.TemplateResponse(
+            name="pages/error.html", context=context, status_code=404
+        )
+
     @app.exception_handler(ResourceNotFoundError)
     async def resource_not_found_handler(request: Request, exc: ResourceNotFoundError):
         """Handle resource not found errors."""
@@ -333,13 +363,18 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": str(exc),
             "base_url": base_url,
         }
-        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=404)
-    
+        return templates.TemplateResponse(
+            name="pages/error.html", context=context, status_code=404
+        )
+
     @app.exception_handler(MCEException)
     async def mce_exception_handler(request: Request, exc: MCEException):
         """Handle general MCE exceptions."""
         if _is_api_request(request):
-            return JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(exc), "type": type(exc).__name__},
+            )
         base_url = _get_base_url(request)
         context = {
             "request": request,
@@ -349,8 +384,10 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": str(exc),
             "base_url": base_url,
         }
-        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=500)
-    
+        return templates.TemplateResponse(
+            name="pages/error.html", context=context, status_code=500
+        )
+
     @app.exception_handler(404)
     async def not_found_handler(request: Request, exc):
         """Handle 404 errors."""
@@ -366,13 +403,17 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "path": str(request.url.path),
             "base_url": base_url,
         }
-        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=404)
-    
+        return templates.TemplateResponse(
+            name="pages/error.html", context=context, status_code=404
+        )
+
     @app.exception_handler(500)
     async def server_error_handler(request: Request, exc):
         """Handle 500 errors."""
         if _is_api_request(request):
-            return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+            return JSONResponse(
+                status_code=500, content={"detail": "Internal server error"}
+            )
         base_url = _get_base_url(request)
         context = {
             "request": request,
@@ -382,7 +423,9 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": "An unexpected error occurred. Please try again later.",
             "base_url": base_url,
         }
-        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=500)
+        return templates.TemplateResponse(
+            name="pages/error.html", context=context, status_code=500
+        )
 
     # Catch-all bare Exception guard — skill ref: fastapi-agents > errors > Unhandled Exception Guard
     # Must be registered LAST so more-specific handlers above take priority.
@@ -390,7 +433,12 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
         """Catch-all for any unhandled exception."""
-        logger.exception("Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc)
+        logger.exception(
+            "Unhandled exception on %s %s",
+            request.method,
+            request.url.path,
+            exc_info=exc,
+        )
         if _is_api_request(request):
             return JSONResponse(
                 status_code=500,
@@ -405,7 +453,9 @@ def _register_exception_handlers(app: FastAPI, templates: Jinja2Templates) -> No
             "error_message": "An unexpected error occurred. Please try again later.",
             "base_url": base_url,
         }
-        return templates.TemplateResponse(name="pages/error.html", context=context, status_code=500)
+        return templates.TemplateResponse(
+            name="pages/error.html", context=context, status_code=500
+        )
 
 
 # Create the application instance
@@ -415,19 +465,19 @@ app = create_app()
 def run_server(host: str = "127.0.0.1", port: int = 8080, reload: bool = False) -> None:
     """
     Run the FastAPI server using uvicorn.
-    
+
     Args:
         host: Host to bind to (default: 127.0.0.1)
         port: Port to listen on (default: 8080)
         reload: Enable auto-reload for development (default: False)
     """
     import uvicorn
-    
-    print(f"\n🚀 MultiChain Explorer 2 (FastAPI)")
+
+    print("\n🚀 MultiChain Explorer 2 (FastAPI)")
     print(f"   Server running at: http://{host}:{port}")
     print(f"   API Documentation: http://{host}:{port}/docs")
-    print(f"   Press Ctrl+C to stop\n")
-    
+    print("   Press Ctrl+C to stop\n")
+
     uvicorn.run(
         "main:app",
         host=host,
@@ -440,14 +490,13 @@ def run_server(host: str = "127.0.0.1", port: int = 8080, reload: bool = False) 
 
 if __name__ == "__main__":
     import sys
-    from env_config import get_settings
-    
+
     # Load defaults from .env
     settings = get_settings()
     host = settings.explorer_host
     port = settings.explorer_port
     reload = settings.debug
-    
+
     args = sys.argv[1:]
     i = 0
     while i < len(args):
@@ -490,5 +539,5 @@ Alternative (recommended):
         else:
             print(f"Unknown argument: {args[i]}")
             sys.exit(1)
-    
+
     run_server(host=host, port=port, reload=reload)

@@ -12,7 +12,7 @@ Handles:
 """
 
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict
 
 from fastapi import APIRouter, Depends, Path, Request, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -36,8 +36,12 @@ def _raise_transaction_http_error(txid: str, exc: Exception) -> None:
     raise_backend_http_error(exc, not_found_detail=f"Transaction {txid} not found")
 
 
-@router.get("/{chain_name}/transactions", response_class=HTMLResponse, name="transactions",
-            summary="List recent transactions")
+@router.get(
+    "/{chain_name}/transactions",
+    response_class=HTMLResponse,
+    name="transactions",
+    summary="List recent transactions",
+)
 async def list_transactions(
     request: Request,
     chain: ChainDep,
@@ -49,12 +53,12 @@ async def list_transactions(
 ):
     """
     List recent transactions.
-    
+
     Displays paginated list of transactions across the blockchain.
     """
     # Apply pagination first to minimize work
     page, count = get_page_count(query_params)
-    
+
     # Get recent confirmed transactions (newest blocks first)
     info = await service.get_blockchain_info()
     current_height = info.get("blocks", 0)
@@ -63,7 +67,7 @@ async def list_transactions(
     # We need enough to fill the current page plus know if there's a next page
     needed = page * count + 1
     max_txs = min(needed, 200)  # Cap at 200 to prevent excessive fetching
-    
+
     recent_txs = []
     # Scan recent blocks — fetch in parallel batches for performance
     max_blocks_to_scan = 50
@@ -95,12 +99,14 @@ async def list_transactions(
             for txid in block["tx"]:
                 if len(recent_txs) >= max_txs:
                     break
-                recent_txs.append({
-                    "txid": txid,
-                    "blockheight": block_height,
-                    "confirmations": confirmations,
-                    "time": block_time,
-                })
+                recent_txs.append(
+                    {
+                        "txid": txid,
+                        "blockheight": block_height,
+                        "confirmations": confirmations,
+                        "time": block_time,
+                    }
+                )
 
     all_txs = recent_txs
 
@@ -110,7 +116,9 @@ async def list_transactions(
         items_per_page=count,
     )
 
-    paginated_txs = all_txs[page_info["start"] : page_info["start"] + page_info["count"]]
+    paginated_txs = all_txs[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -125,13 +133,17 @@ async def list_transactions(
             title=f"Recent Transactions - {chain.display_name}",
             transactions=paginated_txs,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="transaction",
-            summary="Transaction details")
+@router.get(
+    "/{chain_name}/tx/{txid}",
+    response_class=HTMLResponse,
+    name="transaction",
+    summary="Transaction details",
+)
 async def transaction_detail(
     request: Request,
     chain: ChainDep,
@@ -149,7 +161,10 @@ async def transaction_detail(
         _raise_transaction_http_error(txid, exc)
 
     if not transaction:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Transaction {txid} not found",
+        )
 
     return templates.TemplateResponse(
         name="pages/transaction.html",
@@ -161,8 +176,12 @@ async def transaction_detail(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}/raw", response_class=JSONResponse, name="raw_transaction",
-            summary="Raw transaction JSON")
+@router.get(
+    "/{chain_name}/tx/{txid}/raw",
+    response_class=JSONResponse,
+    name="raw_transaction",
+    summary="Raw transaction JSON",
+)
 async def raw_transaction(
     request: Request,
     chain: ChainDep,
@@ -177,7 +196,10 @@ async def raw_transaction(
     try:
         transaction = await service.call("getrawtransaction", [txid, 1])
         if not transaction:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Transaction {txid} not found",
+            )
     except Exception as exc:
         _raise_transaction_http_error(txid, exc)
 
@@ -197,8 +219,12 @@ async def raw_transaction(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}/hex", response_class=HTMLResponse, name="raw_transaction_hex",
-            summary="Raw transaction hex")
+@router.get(
+    "/{chain_name}/tx/{txid}/hex",
+    response_class=HTMLResponse,
+    name="raw_transaction_hex",
+    summary="Raw transaction hex",
+)
 async def raw_transaction_hex(
     request: Request,
     chain: ChainDep,
@@ -213,7 +239,10 @@ async def raw_transaction_hex(
     try:
         hex_data = await service.call("getrawtransaction", [txid, 0])
         if not hex_data:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {txid} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Transaction {txid} not found",
+            )
     except Exception as exc:
         _raise_transaction_http_error(txid, exc)
 
@@ -227,8 +256,12 @@ async def raw_transaction_hex(
     )
 
 
-@router.get("/{chain_name}/tx/{txid}/output/{n}", response_class=HTMLResponse, name="tx_output_data",
-            summary="Transaction output data")
+@router.get(
+    "/{chain_name}/tx/{txid}/output/{n}",
+    response_class=HTMLResponse,
+    name="tx_output_data",
+    summary="Transaction output data",
+)
 async def transaction_output(
     request: Request,
     chain: ChainDep,
@@ -252,7 +285,10 @@ async def transaction_output(
     # Get specific output
     vouts = transaction.get("vout", [])
     if n >= len(vouts):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Output {n} not found in transaction")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Output {n} not found in transaction",
+        )
 
     output = vouts[n]
 
@@ -268,7 +304,12 @@ async def transaction_output(
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}/transactions", response_class=HTMLResponse, name="legacy_transactions", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/transactions",
+    response_class=HTMLResponse,
+    name="legacy_transactions",
+    include_in_schema=False,
+)
 async def legacy_list_transactions(
     request: Request,
     chain: ChainDep,
@@ -279,10 +320,17 @@ async def legacy_list_transactions(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy transactions list route."""
-    return await list_transactions(request, chain, service, pagination, templates, context, query_params)
+    return await list_transactions(
+        request, chain, service, pagination, templates, context, query_params
+    )
 
 
-@router.get("/chain/{chain_name}/tx/{txid}", response_class=HTMLResponse, name="legacy_transaction", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/tx/{txid}",
+    response_class=HTMLResponse,
+    name="legacy_transaction",
+    include_in_schema=False,
+)
 async def legacy_transaction_detail(
     request: Request,
     chain: ChainDep,

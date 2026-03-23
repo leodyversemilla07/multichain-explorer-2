@@ -9,7 +9,7 @@ Handles:
 - Global permissions
 """
 
-from typing import Dict, Any, List
+from typing import Dict
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
@@ -28,8 +28,12 @@ from routers.dependencies import (
 router = APIRouter(tags=["Permissions"])
 
 
-@router.get("/{chain_name}/permissions", response_class=HTMLResponse, name="permissions",
-            summary="List all permissions")
+@router.get(
+    "/{chain_name}/permissions",
+    response_class=HTMLResponse,
+    name="permissions",
+    summary="List all permissions",
+)
 async def list_permissions(
     request: Request,
     chain: ChainDep,
@@ -41,7 +45,7 @@ async def list_permissions(
 ):
     """
     List all permissions on the blockchain.
-    
+
     Displays permissions for all addresses.
     """
     # Get all global permissions
@@ -101,8 +105,12 @@ async def list_permissions(
     )
 
 
-@router.get("/{chain_name}/permissions/global", response_class=HTMLResponse, name="global_permissions",
-            summary="List global permissions")
+@router.get(
+    "/{chain_name}/permissions/global",
+    response_class=HTMLResponse,
+    name="global_permissions",
+    summary="List global permissions",
+)
 async def global_permissions(
     request: Request,
     chain: ChainDep,
@@ -114,7 +122,7 @@ async def global_permissions(
 ):
     """
     List global permissions.
-    
+
     Shows only global (blockchain-level) permissions.
     """
     try:
@@ -158,13 +166,18 @@ async def global_permissions(
             permissions=paginated_perms,
             pagination=page_info,
             total_permissions=len(global_permissions),
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}/permissions", response_class=HTMLResponse, name="legacy_permissions", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/permissions",
+    response_class=HTMLResponse,
+    name="legacy_permissions",
+    include_in_schema=False,
+)
 async def legacy_list_permissions(
     request: Request,
     chain: ChainDep,

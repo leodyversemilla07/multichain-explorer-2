@@ -12,7 +12,7 @@ These dependencies handle common operations like:
 - Pagination parameters
 """
 
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any, Dict, Optional
 
 from fastapi import Depends, HTTPException, Path, Query, Request, status
 from fastapi.templating import Jinja2Templates
@@ -45,10 +45,10 @@ def get_state(request: Request) -> ApplicationState:
 def get_templates(request: Request) -> Jinja2Templates:
     """
     Get Jinja2Templates instance from app state.
-    
+
     Args:
         request: FastAPI request object
-        
+
     Returns:
         Jinja2Templates instance
     """
@@ -58,7 +58,7 @@ def get_templates(request: Request) -> Jinja2Templates:
 def get_base_url(state: ApplicationState = Depends(get_state)) -> str:
     """
     Get the base URL from application settings.
-    
+
     Returns:
         Base URL string
     """
@@ -71,17 +71,17 @@ def get_chain(
 ) -> ChainConfig:
     """
     Get chain object by name.
-    
+
     This is a dependency that retrieves the chain configuration
     from the application state.
-    
+
     Args:
         chain_name: The path name of the chain
         state: Application state dependency
-        
+
     Returns:
         ChainConfig object
-        
+
     Raises:
         ChainNotFoundError: If chain doesn't exist
     """
@@ -115,7 +115,7 @@ def get_blockchain_service(
 def get_pagination_service() -> PaginationService:
     """
     Get PaginationService instance.
-    
+
     Returns:
         PaginationService instance
     """
@@ -125,10 +125,10 @@ def get_pagination_service() -> PaginationService:
 class PaginationParams:
     """
     Common pagination parameters.
-    
+
     Use as a dependency to get standard pagination parameters.
     """
-    
+
     def __init__(
         self,
         start: int = Query(0, ge=0, description="Starting offset"),
@@ -136,7 +136,7 @@ class PaginationParams:
     ):
         self.start = start
         self.count = count
-    
+
     def to_dict(self) -> Dict[str, int]:
         """Convert to dictionary for passing to handlers."""
         return {"start": self.start, "count": self.count}
@@ -145,10 +145,10 @@ class PaginationParams:
 class CommonContext:
     """
     Common template context provider.
-    
+
     Provides common context variables needed by all templates.
     """
-    
+
     def __init__(
         self,
         request: Request,
@@ -163,14 +163,14 @@ class CommonContext:
         self.base_url = base.rstrip("/") if len(base) > 1 else base
         self.chain_name = chain.display_name
         self.chain_path = "/" + chain.path_name
-    
+
     def build_context(self, **kwargs) -> Dict[str, Any]:
         """
         Build template context with common variables.
-        
+
         Args:
             **kwargs: Additional context variables
-            
+
         Returns:
             Complete context dictionary
         """
@@ -197,10 +197,10 @@ CommonContextDep = Annotated[CommonContext, Depends()]
 def get_query_params(request: Request) -> Dict[str, str]:
     """
     Extract query parameters from request.
-    
+
     Args:
         request: FastAPI request object
-        
+
     Returns:
         Dictionary of query parameters (never None, always a dict)
     """
@@ -218,7 +218,9 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def raise_backend_http_error(exc: Exception, not_found_detail: str | None = None) -> None:
+def raise_backend_http_error(
+    exc: Exception, not_found_detail: Optional[str] = None
+) -> None:
     """Map backend service exceptions to the correct HTTP response."""
     if isinstance(exc, HTTPException):
         raise exc

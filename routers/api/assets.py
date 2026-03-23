@@ -20,7 +20,9 @@ from routers.dependencies import (
 router = APIRouter(tags=["API Assets"])
 
 
-async def _get_asset_or_raise(service: BlockchainServiceDep, asset_ref: str) -> Dict[str, Any]:
+async def _get_asset_or_raise(
+    service: BlockchainServiceDep, asset_ref: str
+) -> Dict[str, Any]:
     """Load an asset or raise the correct HTTP error."""
     try:
         asset = await service.get_asset(asset_ref)
@@ -59,21 +61,23 @@ async def list_assets(
         assets = await service.call("listassets", ["*", True])
     except Exception as exc:
         raise_backend_http_error(exc)
-    
+
     # Sort by name
     assets.sort(key=lambda x: x.get("name", ""))
-    
+
     # Pagination
     page, count = get_page_count(query_params)
-    
+
     page_info = pagination.get_pagination_info(
         total=len(assets),
         page=page,
         items_per_page=count,
     )
-    
-    paginated_assets = assets[page_info["start"] : page_info["start"] + page_info["count"]]
-    
+
+    paginated_assets = assets[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
+
     return [AssetResponse(**a) for a in paginated_assets]
 
 
@@ -125,7 +129,9 @@ async def list_asset_transactions(
     await _get_asset_or_raise(service, asset_ref)
 
     try:
-        tx_list = await service.call("listassettransactions", [asset_ref, True, count, start])
+        tx_list = await service.call(
+            "listassettransactions", [asset_ref, True, count, start]
+        )
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
 

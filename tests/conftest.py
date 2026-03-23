@@ -3,8 +3,6 @@ MultiChain Explorer 2 - Test Suite
 Pytest configuration and fixtures
 """
 
-import json
-from collections import OrderedDict
 from typing import Any, Dict, Optional
 from unittest.mock import Mock, patch, AsyncMock
 
@@ -239,7 +237,9 @@ class MockChain:
                 },
             }
         self.config = config
-        self.name = config.get("name", "test-chain")  # Add name attribute for compatibility
+        self.name = config.get(
+            "name", "test-chain"
+        )  # Add name attribute for compatibility
         self.responses = {}
 
     def request(self, method: str, params: Optional[list] = None) -> Dict[str, Any]:
@@ -277,7 +277,9 @@ class MockChain:
             },
         }
 
-        return defaults.get(method, {"result": None, "error": f"Unknown method: {method}"})
+        return defaults.get(
+            method, {"result": None, "error": f"Unknown method: {method}"}
+        )
 
     def set_response(self, method: str, response: Dict[str, Any]):
         """Set a custom response for a method"""
@@ -294,34 +296,34 @@ def mock_chain():
 def mock_rpc_calls(mock_chain):
     """
     Patch httpx.AsyncClient to use MockChain.
-    
+
     Since BlockchainService creates the client in __init__, we patch the
     AsyncClient constructor to return a mock that routes requests through MockChain.
     """
     with patch("services.blockchain_service.httpx.AsyncClient") as MockClientClass:
         # Create an AsyncMock for the client
         mock_client = AsyncMock()
-        
+
         # The constructor now returns the client directly (no context manager)
         MockClientClass.return_value = mock_client
-        
+
         # Define mock post behavior
         async def mock_post(url, json=None, **kwargs):
             method = json.get("method")
             val_params = json.get("params", []) if json else []
-            
+
             # Get response from mock chain logic (which is sync, but that's fine)
             result_data = mock_chain.request(method, val_params)
-            
+
             # Mock HTTP response
             resp = Mock()
             resp.status_code = 200
             resp.json.return_value = result_data
             resp.raise_for_status = Mock()
             return resp
-            
+
         mock_client.post.side_effect = mock_post
-        
+
         yield mock_chain
 
 
@@ -419,10 +421,33 @@ def app_mock_blockchain_service():
             return []
         if method == "listassets":
             if params and params[0] != "*":
-                return [{"name": "asset1", "assetref": "1-2-3", "multiple": 1, "units": 0.1, "open": True, "issues": []}]
+                return [
+                    {
+                        "name": "asset1",
+                        "assetref": "1-2-3",
+                        "multiple": 1,
+                        "units": 0.1,
+                        "open": True,
+                        "issues": [],
+                    }
+                ]
             return [
-                {"name": "asset1", "assetref": "1-2-3", "multiple": 1, "units": 0.1, "open": True, "issues": []},
-                {"name": "assetA", "assetref": "2-3-4", "multiple": 1, "units": 1.0, "open": False, "issues": []},
+                {
+                    "name": "asset1",
+                    "assetref": "1-2-3",
+                    "multiple": 1,
+                    "units": 0.1,
+                    "open": True,
+                    "issues": [],
+                },
+                {
+                    "name": "assetA",
+                    "assetref": "2-3-4",
+                    "multiple": 1,
+                    "units": 1.0,
+                    "open": False,
+                    "issues": [],
+                },
             ]
         if method == "listassetholders":
             return []
@@ -431,11 +456,32 @@ def app_mock_blockchain_service():
         if method == "liststreams":
             if params and params[0] != "*":
                 stream_name = params[0]
-                return [{"name": stream_name, "streamref": "5-6-7", "createtxid": "tx_str", "items": 10}]
-            return [{"name": "stream1", "streamref": "5-6-7", "createtxid": "tx_str", "items": 10}]
+                return [
+                    {
+                        "name": stream_name,
+                        "streamref": "5-6-7",
+                        "createtxid": "tx_str",
+                        "items": 10,
+                    }
+                ]
+            return [
+                {
+                    "name": "stream1",
+                    "streamref": "5-6-7",
+                    "createtxid": "tx_str",
+                    "items": 10,
+                }
+            ]
         if method == "liststreamitems":
             return [
-                {"publishers": ["pub1"], "key": "key1", "data": "hexdata", "confirmations": 1, "blocktime": 1000, "txid": "tx_item"}
+                {
+                    "publishers": ["pub1"],
+                    "key": "key1",
+                    "data": "hexdata",
+                    "confirmations": 1,
+                    "blocktime": 1000,
+                    "txid": "tx_item",
+                }
             ]
         if method in {
             "liststreamkeys",
@@ -480,7 +526,9 @@ def app_mock_blockchain_service():
     service.get_asset = AsyncMock(side_effect=mock_get_asset)
     service.get_stream = AsyncMock(side_effect=mock_get_stream)
     service.count_rpc_list_results = AsyncMock(side_effect=mock_count_rpc_list_results)
-    service.count_address_transactions = AsyncMock(side_effect=mock_count_address_transactions)
+    service.count_address_transactions = AsyncMock(
+        side_effect=mock_count_address_transactions
+    )
     service.count_address_streams = AsyncMock(side_effect=mock_count_address_streams)
     service.get_address_info = AsyncMock(
         return_value={
@@ -492,10 +540,16 @@ def app_mock_blockchain_service():
         }
     )
     service.get_address_balances = AsyncMock(
-        return_value=[{"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}]
+        return_value=[
+            {"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}
+        ]
     )
-    service.get_address_permissions = AsyncMock(return_value=["connect", "send", "receive"])
-    service.get_address_transactions = AsyncMock(return_value=[{"txid": "tx1", "balance": {}, "addresses": ["addr1"]}])
+    service.get_address_permissions = AsyncMock(
+        return_value=["connect", "send", "receive"]
+    )
+    service.get_address_transactions = AsyncMock(
+        return_value=[{"txid": "tx1", "balance": {}, "addresses": ["addr1"]}]
+    )
     service.get_address_summary = AsyncMock(
         return_value={
             "address": "addr1",
@@ -503,7 +557,14 @@ def app_mock_blockchain_service():
             "iswatchonly": False,
             "isscript": False,
             "isvalid": True,
-            "balances": [{"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}],
+            "balances": [
+                {
+                    "asset": "asset1",
+                    "assetref": "1-2-3",
+                    "qty": 100.0,
+                    "raw": 10000000000,
+                }
+            ],
             "permissions": ["connect", "send", "receive"],
         }
     )
@@ -533,7 +594,9 @@ def api_test_client(app_mock_chain, app_mock_blockchain_service, app_test_state)
 
     app = create_app()
     app.state.config = app_test_state
-    app.dependency_overrides[get_blockchain_service] = lambda: app_mock_blockchain_service
+    app.dependency_overrides[get_blockchain_service] = (
+        lambda: app_mock_blockchain_service
+    )
 
     yield TestClient(app, raise_server_exceptions=True)
 
@@ -550,10 +613,12 @@ def html_test_app(app_mock_chain, app_test_state):
     mock_cache_provider = Mock()
     mock_cache_provider.close = AsyncMock()
 
-    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
-         patch("main.app_state.init_from_env", return_value=True), \
-         patch("main.app_state.get_state", return_value=app_test_state), \
-         patch("main.create_cache_provider", return_value=mock_cache_provider):
+    with (
+        patch("main.httpx.AsyncClient", return_value=mock_http_client),
+        patch("main.app_state.init_from_env", return_value=True),
+        patch("main.app_state.get_state", return_value=app_test_state),
+        patch("main.create_cache_provider", return_value=mock_cache_provider),
+    ):
         app = create_app()
 
     app.state.config = app_test_state
@@ -571,11 +636,15 @@ def html_test_client(html_test_app, app_mock_blockchain_service):
     mock_cache_provider.close = AsyncMock()
     state = html_test_app.state.config
 
-    html_test_app.dependency_overrides[get_blockchain_service] = lambda: app_mock_blockchain_service
-    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
-         patch("main.app_state.init_from_env", return_value=True), \
-         patch("main.app_state.get_state", return_value=state), \
-         patch("main.create_cache_provider", return_value=mock_cache_provider):
+    html_test_app.dependency_overrides[get_blockchain_service] = (
+        lambda: app_mock_blockchain_service
+    )
+    with (
+        patch("main.httpx.AsyncClient", return_value=mock_http_client),
+        patch("main.app_state.init_from_env", return_value=True),
+        patch("main.app_state.get_state", return_value=state),
+        patch("main.create_cache_provider", return_value=mock_cache_provider),
+    ):
         with TestClient(html_test_app, raise_server_exceptions=False) as client:
             html_test_app.state.config = state
             yield client

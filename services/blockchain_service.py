@@ -66,7 +66,9 @@ class BlockchainService:
             except (httpx.TransportError, httpx.TimeoutException) as exc:
                 if attempt >= self._max_retries:
                     raise
-                delay = min(self._retry_base_delay * (2**attempt), self._retry_max_delay)
+                delay = min(
+                    self._retry_base_delay * (2**attempt), self._retry_max_delay
+                )
                 logger.warning(
                     "Transient RPC transport error on %s (attempt %s/%s): %s. Retrying in %.2fs",
                     self.chain_name,
@@ -111,7 +113,7 @@ class BlockchainService:
 
         try:
             response = await self._post_with_retry(payload)
-            
+
             # Check for HTTP errors (like 401 Unauthorized, 500 Internal Server Error)
             # Note: MultiChain might return 500 for RPC errors, so we parse JSON first if possible
             try:
@@ -129,7 +131,9 @@ class BlockchainService:
                     # String error (from test mocks or legacy systems)
                     error_msg = str(data["error"])
                     error_code = -1
-                logger.error(f"RPC error on {self.chain_name}: {error_code} - {error_msg}")
+                logger.error(
+                    f"RPC error on {self.chain_name}: {error_code} - {error_msg}"
+                )
                 raise RPCError(
                     method=method,
                     error_message=error_msg,
@@ -141,7 +145,8 @@ class BlockchainService:
         except httpx.HTTPError as e:
             logger.error(f"Connection error to {self.chain_name}: {e}")
             raise ChainConnectionError(
-                chain_name=self.chain_name, details={"error": str(e), "rpc_url": self.rpc_url}
+                chain_name=self.chain_name,
+                details={"error": str(e), "rpc_url": self.rpc_url},
             )
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from {self.chain_name}: {e}")
@@ -174,9 +179,13 @@ class BlockchainService:
         """Get transaction by ID. Cached for 1 hour (immutable)."""
         return await self.call("getrawtransaction", [txid, 1 if verbose else 0])
 
-    async def list_blocks(self, start_height: int, count: int = 10) -> List[Dict[str, Any]]:
+    async def list_blocks(
+        self, start_height: int, count: int = 10
+    ) -> List[Dict[str, Any]]:
         """List blocks starting from height."""
-        return await self.call("listblocks", [f"{start_height}-{start_height + count - 1}"])
+        return await self.call(
+            "listblocks", [f"{start_height}-{start_height + count - 1}"]
+        )
 
     async def list_addresses(self, addresses: Optional[List[str]] = None) -> List[Any]:
         """List address information."""
@@ -187,12 +196,16 @@ class BlockchainService:
         """Get address asset balances."""
         return await self.call("getaddressbalances", [address, 0, True])
 
-    async def list_assets(self, asset_name: Optional[str] = None, verbose: bool = True) -> List[Any]:
+    async def list_assets(
+        self, asset_name: Optional[str] = None, verbose: bool = True
+    ) -> List[Any]:
         """List assets."""
         params = [] if asset_name is None else [asset_name, verbose]
         return await self.call("listassets", params)
 
-    async def list_streams(self, stream_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_streams(
+        self, stream_name: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """List streams."""
         params = [] if stream_name is None else [stream_name]
         return await self.call("liststreams", params)
@@ -205,7 +218,9 @@ class BlockchainService:
         start: int = -10,
     ) -> List[Dict[str, Any]]:
         """List items in a stream."""
-        return await self.call("liststreamitems", [stream_identifier, verbose, count, start])
+        return await self.call(
+            "liststreamitems", [stream_identifier, verbose, count, start]
+        )
 
     async def list_stream_keys(self, stream_identifier: str) -> List[Any]:
         """List keys in a stream."""
@@ -228,7 +243,9 @@ class BlockchainService:
         self, address: str, count: int = 10, skip: int = 0, verbose: bool = True
     ) -> List[Any]:
         """Get transactions for an address."""
-        return await self.call("listaddresstransactions", [address, count, skip, verbose])
+        return await self.call(
+            "listaddresstransactions", [address, count, skip, verbose]
+        )
 
     async def is_healthy(self) -> bool:
         """
@@ -342,24 +359,22 @@ class BlockchainService:
         Fetches info, balances, and permissions.
         """
         import asyncio
-        
+
         # Define tasks
         async def fetch_info():
             return await self.get_address_info(address)
-            
+
         async def fetch_permissions():
             return await self.get_address_permissions(address)
-            
+
         # Run in parallel
         results = await asyncio.gather(
-            fetch_info(),
-            fetch_permissions(),
-            return_exceptions=True
+            fetch_info(), fetch_permissions(), return_exceptions=True
         )
-        
+
         info = results[0]
         permissions = results[1]
-        
+
         if isinstance(info, Exception) or not info:
             # Distinguish missing/invalid addresses from backend failures.
             try:
@@ -379,9 +394,9 @@ class BlockchainService:
 
         if isinstance(permissions, Exception):
             raise permissions
-            
+
         # Merge results
         result = info.copy()
         result["permissions"] = permissions
-        
+
         return result

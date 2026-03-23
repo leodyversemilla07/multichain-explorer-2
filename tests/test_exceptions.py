@@ -1,9 +1,9 @@
 """
 Tests for exception handling and error responses
 """
-from unittest.mock import MagicMock, patch
 
-import pytest
+from unittest.mock import patch
+
 
 from exceptions import (
     ERROR_HTTP_CODES,
@@ -165,7 +165,9 @@ class TestRPCError:
 
     def test_is_rpc_not_found_error(self):
         """Test helper for missing-resource RPC errors."""
-        assert is_rpc_not_found_error(RPCError("getblock", "Block not found", -5)) is True
+        assert (
+            is_rpc_not_found_error(RPCError("getblock", "Block not found", -5)) is True
+        )
         assert is_rpc_not_found_error(RPCError("getblock", "Boom", -1)) is False
         assert is_rpc_not_found_error(ValueError("boom")) is False
 
@@ -445,4 +447,3 @@ class TestExceptionLogging:
         args = mock_logger.error.call_args
         extra = args[1]["extra"]
         assert extra["chain"] == "chain1"
-

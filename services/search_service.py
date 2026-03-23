@@ -208,7 +208,9 @@ async def search_all_entities(
             if not stream_name:
                 return []
 
-            keys = await service.call("liststreamkeys", [stream_name, query, False, limit, 0])
+            keys = await service.call(
+                "liststreamkeys", [stream_name, query, False, limit, 0]
+            )
 
             results = []
             for key_info in (keys or [])[:limit]:

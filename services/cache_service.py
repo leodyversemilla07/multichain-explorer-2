@@ -11,7 +11,7 @@ import functools
 import hashlib
 import time
 import abc
-from typing import Any, Callable, Dict, Optional, Tuple, List
+from typing import Any, Callable, Dict, Optional, Tuple
 import logging
 import inspect
 
@@ -37,7 +37,7 @@ class CacheProvider(abc.ABC):
     @abc.abstractmethod
     async def clear(self) -> None:
         pass
-    
+
     @abc.abstractmethod
     def get_stats(self) -> Dict[str, Any]:
         pass
@@ -82,12 +82,14 @@ class MemoryCacheProvider(CacheProvider):
         count = len(self._cache)
         self._cache.clear()
         self._stats["deletes"] += count
-        
+
     async def cleanup_expired(self) -> int:
         """Memory-specific cleanup."""
         current_time = time.time()
         expired_keys = [
-            key for key, (_, expiry) in self._cache.items() if expiry > 0 and current_time > expiry
+            key
+            for key, (_, expiry) in self._cache.items()
+            if expiry > 0 and current_time > expiry
         ]
         for key in expired_keys:
             del self._cache[key]
@@ -160,9 +162,12 @@ def cached(ttl: int = 60, key_prefix: str = "") -> Callable:
     """
     Decorator for caching function results (Async only).
     """
+
     def decorator(func: Callable) -> Callable:
         if not inspect.iscoroutinefunction(func):
-             raise TypeError(f"@cached decorator only supports async functions. {func.__name__} is synchronous.")
+            raise TypeError(
+                f"@cached decorator only supports async functions. {func.__name__} is synchronous."
+            )
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -174,9 +179,9 @@ def cached(ttl: int = 60, key_prefix: str = "") -> Callable:
                     key_parts.append(str(arg))
             for k in sorted(kwargs.keys()):
                 key_parts.append(f"{k}={kwargs[k]}")
-            
+
             key_str = ":".join(key_parts)
-            cache_key = hashlib.md5(key_str.encode()).hexdigest()
+            cache_key = hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
             cache = get_cache()
             result = await cache.get(cache_key)
@@ -197,10 +202,10 @@ def cached(ttl: int = 60, key_prefix: str = "") -> Callable:
 
 def invalidate_pattern(pattern: str) -> int:
     """Invalidate cache entries matching a pattern.
-    
+
     Args:
         pattern: Substring pattern to match against cache keys.
-        
+
     Returns:
         Number of invalidated entries.
     """
@@ -208,9 +213,7 @@ def invalidate_pattern(pattern: str) -> int:
     provider = cache.provider
     if not isinstance(provider, MemoryCacheProvider):
         return 0
-    keys_to_delete = [
-        key for key in provider._cache if pattern in key
-    ]
+    keys_to_delete = [key for key in provider._cache if pattern in key]
     for key in keys_to_delete:
         del provider._cache[key]
         provider._stats["deletes"] += 1
@@ -238,6 +241,7 @@ class RedisCacheProvider(CacheProvider):
 
     async def get(self, key: str):
         import json
+
         raw = await self._client.get(key)
         if raw is None:
             self._stats["misses"] += 1
@@ -247,6 +251,7 @@ class RedisCacheProvider(CacheProvider):
 
     async def set(self, key: str, value: Any, ttl: int = 60) -> None:
         import json
+
         encoded = json.dumps(value)
         if ttl > 0:
             await self._client.setex(key, ttl, encoded)

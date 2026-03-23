@@ -7,7 +7,7 @@ timestamps, etc.) used throughout the application.
 
 import hashlib
 from datetime import datetime, timezone
-from typing import Any, Optional, Union
+from typing import Union
 
 
 class FormattingService:
@@ -32,7 +32,9 @@ class FormattingService:
         return f"{hash_value[:half]}...{hash_value[-half:]}"
 
     @staticmethod
-    def format_amount(amount: Union[int, float], decimals: int = 8, symbol: str = "") -> str:
+    def format_amount(
+        amount: Union[int, float], decimals: int = 8, symbol: str = ""
+    ) -> str:
         """
         Format an amount with proper decimal places.
 
@@ -50,7 +52,9 @@ class FormattingService:
         return str(amount)
 
     @staticmethod
-    def format_timestamp(timestamp: Union[int, float], fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    def format_timestamp(
+        timestamp: Union[int, float], fmt: str = "%Y-%m-%d %H:%M:%S"
+    ) -> str:
         """
         Format a Unix timestamp.
 

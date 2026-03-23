@@ -3,7 +3,7 @@ Tests for main.py - FastAPI application.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
 
 import app_state
@@ -93,8 +93,14 @@ class TestHealthEndpoint:
         state.settings = {"main": {"base": "/"}}
         app.state.config = state
 
-        with patch("main.app_state.init_from_env", return_value=False), \
-             patch("main.BlockchainService.is_healthy", new_callable=AsyncMock, return_value=False):
+        with (
+            patch("main.app_state.init_from_env", return_value=False),
+            patch(
+                "main.BlockchainService.is_healthy",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
             with TestClient(app, raise_server_exceptions=False) as client:
                 response = client.get("/health")
 
@@ -177,7 +183,6 @@ class TestTemplateFilters:
         from main import _register_template_filters
         from fastapi.templating import Jinja2Templates
         import tempfile
-        import os
 
         # Create temp directory for templates
         with tempfile.TemporaryDirectory() as temp_dir:

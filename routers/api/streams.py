@@ -55,17 +55,19 @@ async def list_streams(
         streams = await service.call("liststreams", ["*", True])
     except Exception as exc:
         raise_backend_http_error(exc)
-    
+
     streams.sort(key=lambda x: x.get("name", ""))
     page, count = get_page_count(query_params)
-    
+
     page_info = pagination.get_pagination_info(
         total=len(streams),
         page=page,
         items_per_page=count,
     )
-    
-    paginated_streams = streams[page_info["start"] : page_info["start"] + page_info["count"]]
+
+    paginated_streams = streams[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
     return [StreamResponse(**s) for s in paginated_streams]
 

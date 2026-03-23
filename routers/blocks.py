@@ -11,7 +11,7 @@ Handles:
 """
 
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict
 
 from fastapi import APIRouter, Depends, Path, Request, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -31,8 +31,12 @@ from routers.dependencies import (
 router = APIRouter(tags=["Blocks"])
 
 
-@router.get("/{chain_name}/blocks", response_class=HTMLResponse, name="blocks",
-            summary="List blocks")
+@router.get(
+    "/{chain_name}/blocks",
+    response_class=HTMLResponse,
+    name="blocks",
+    summary="List blocks",
+)
 async def list_blocks(
     request: Request,
     chain: ChainDep,
@@ -44,7 +48,7 @@ async def list_blocks(
 ):
     """
     List blocks in the blockchain.
-    
+
     Displays paginated list of blocks with height, hash, time,
     and transaction count.
     """
@@ -66,7 +70,7 @@ async def list_blocks(
     end_height = total_blocks - 1 - page_info["start"]
     start_height = max(0, end_height - page_info["count"] + 1)
     blocks_to_fetch = end_height - start_height + 1
-    
+
     # Use list_blocks API for batch fetching (much faster than individual calls)
     if blocks_to_fetch > 0 and start_height <= end_height:
         blocks = await service.list_blocks(start_height, blocks_to_fetch)
@@ -89,24 +93,34 @@ async def list_blocks(
             title=f"Blocks - {chain.display_name}",
             blocks=blocks,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/block", response_class=RedirectResponse, name="block_redirect",
-            summary="Redirect /block to /blocks")
+@router.get(
+    "/{chain_name}/block",
+    response_class=RedirectResponse,
+    name="block_redirect",
+    summary="Redirect /block to /blocks",
+)
 async def block_redirect(
     chain_name: str = Path(..., description="Chain path name"),
 ):
     """
     Redirect /block to /blocks (common typo handling).
     """
-    return RedirectResponse(url=f"/{chain_name}/blocks", status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(
+        url=f"/{chain_name}/blocks", status_code=status.HTTP_302_FOUND
+    )
 
 
-@router.get("/{chain_name}/block/{identifier}", response_class=HTMLResponse, name="block",
-            summary="Block details by height or hash")
+@router.get(
+    "/{chain_name}/block/{identifier}",
+    response_class=HTMLResponse,
+    name="block",
+    summary="Block details by height or hash",
+)
 async def block_by_identifier(
     request: Request,
     chain: ChainDep,
@@ -127,12 +141,18 @@ async def block_by_identifier(
             block = await service.get_block_by_hash(identifier)
             height = block.get("height") if block else None
         else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid block identifier. Must be a height or 64-character hash.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid block identifier. Must be a height or 64-character hash.",
+            )
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Block {identifier} not found")
 
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Block {identifier} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Block {identifier} not found",
+        )
 
     height = block.get("height", 0)
 
@@ -158,8 +178,12 @@ async def block_by_identifier(
     )
 
 
-@router.get("/{chain_name}/blockhash/{block_hash}", response_class=HTMLResponse, name="block_by_hash",
-            summary="Block details by hash")
+@router.get(
+    "/{chain_name}/blockhash/{block_hash}",
+    response_class=HTMLResponse,
+    name="block_by_hash",
+    summary="Block details by hash",
+)
 async def block_by_hash(
     request: Request,
     chain: ChainDep,
@@ -177,7 +201,10 @@ async def block_by_hash(
         raise_backend_http_error(exc, not_found_detail=f"Block {block_hash} not found")
 
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Block {block_hash} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Block {block_hash} not found",
+        )
 
     return templates.TemplateResponse(
         name="pages/block.html",
@@ -188,8 +215,12 @@ async def block_by_hash(
     )
 
 
-@router.get("/{chain_name}/block/{height}/transactions", response_class=HTMLResponse, name="block_transactions",
-            summary="Transactions in a block")
+@router.get(
+    "/{chain_name}/block/{height}/transactions",
+    response_class=HTMLResponse,
+    name="block_transactions",
+    summary="Transactions in a block",
+)
 async def block_transactions(
     request: Request,
     chain: ChainDep,
@@ -225,8 +256,10 @@ async def block_transactions(
 
     # Get transaction details
     transactions = []
-    paginated_tx_ids = tx_ids[page_info["start"] : page_info["start"] + page_info["count"]]
-    
+    paginated_tx_ids = tx_ids[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
+
     # Concurent fetch
     tasks = [service.get_transaction(txid) for txid in paginated_tx_ids]
     if tasks:
@@ -247,13 +280,18 @@ async def block_transactions(
             block_height=height,
             transactions=transactions,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}/blocks", response_class=HTMLResponse, name="legacy_blocks", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/blocks",
+    response_class=HTMLResponse,
+    name="legacy_blocks",
+    include_in_schema=False,
+)
 async def legacy_list_blocks(
     request: Request,
     chain: ChainDep,
@@ -264,10 +302,17 @@ async def legacy_list_blocks(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy blocks list route."""
-    return await list_blocks(request, chain, service, pagination, templates, context, query_params)
+    return await list_blocks(
+        request, chain, service, pagination, templates, context, query_params
+    )
 
 
-@router.get("/chain/{chain_name}/block/{identifier}", response_class=HTMLResponse, name="legacy_block", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/block/{identifier}",
+    response_class=HTMLResponse,
+    name="legacy_block",
+    include_in_schema=False,
+)
 async def legacy_block_by_identifier(
     request: Request,
     chain: ChainDep,
@@ -277,4 +322,6 @@ async def legacy_block_by_identifier(
     identifier: str = Path(...),
 ):
     """Legacy block detail route."""
-    return await block_by_identifier(request, chain, service, templates, context, identifier)
+    return await block_by_identifier(
+        request, chain, service, templates, context, identifier
+    )

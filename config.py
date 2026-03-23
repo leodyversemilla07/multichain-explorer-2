@@ -5,8 +5,7 @@ Replaces global state with proper configuration management
 
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -84,5 +83,3 @@ class ServerConfig:
             port=int(os.getenv("MCE_PORT", config_dict.get("port", cls.port))),
             base_url=os.getenv("MCE_BASE_URL", config_dict.get("base", cls.base_url)),
         )
-
-

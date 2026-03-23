@@ -47,9 +47,10 @@ class TestRequestTimer:
         """Slow requests should log at warning level."""
         from performance import RequestTimer
 
-        with patch("performance.time.time", side_effect=[0.0, 1.0]), patch(
-            "performance.logger.warning"
-        ) as mock_warning:
+        with (
+            patch("performance.time.time", side_effect=[0.0, 1.0]),
+            patch("performance.logger.warning") as mock_warning,
+        ):
             with RequestTimer("/test-path"):
                 pass
 
@@ -85,9 +86,10 @@ class TestPerformanceStats:
             },
         )()
 
-        with patch("performance.get_cache", return_value=fake_cache), patch(
-            "performance.logger.info"
-        ) as mock_info:
+        with (
+            patch("performance.get_cache", return_value=fake_cache),
+            patch("performance.logger.info") as mock_info,
+        ):
             log_performance_stats()
 
         logged_lines = [call.args[0] for call in mock_info.call_args_list]

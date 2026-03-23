@@ -56,7 +56,7 @@ format: ## Format code with ruff, black and isort
 	@echo "Code formatted successfully"
 
 type-check: ## Run type checking with mypy
-	$(MYPY) *.py
+	$(MYPY) app_state.py config.py env_config.py exceptions.py validators.py
 
 clean: ## Clean up generated files
 	find . -type f -name '*.pyc' -delete

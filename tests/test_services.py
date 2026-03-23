@@ -4,10 +4,8 @@ Tests for service layer.
 Tests for BlockchainService, PaginationService, and FormattingService.
 """
 
-import json
 from datetime import datetime
-from unittest.mock import MagicMock, patch, AsyncMock, Mock
-from urllib.error import HTTPError, URLError
+from unittest.mock import patch, AsyncMock, Mock
 
 import httpx
 import pytest
@@ -50,9 +48,13 @@ class TestBlockchainService:
     async def test_successful_rpc_call(self, service):
         """Test successful RPC call."""
         mock_response = Mock()
-        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"blocks": 100}}
+        mock_response.json.return_value = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"blocks": 100},
+        }
         mock_response.status_code = 200
-        
+
         service._client = AsyncMock()
         service._client.post.return_value = mock_response
 
@@ -65,11 +67,11 @@ class TestBlockchainService:
         """Test RPC error is properly raised."""
         mock_response = Mock()
         mock_response.json.return_value = {
-            "jsonrpc": "2.0", 
-            "id": 1, 
-            "error": {"code": -5, "message": "Block not found"}
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {"code": -5, "message": "Block not found"},
         }
-        
+
         service._client = AsyncMock()
         service._client.post.return_value = mock_response
 
@@ -81,7 +83,11 @@ class TestBlockchainService:
     async def test_call_retries_transient_transport_error(self, service):
         """Test transient transport failures are retried before succeeding."""
         mock_response = Mock()
-        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}}
+        mock_response.json.return_value = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"ok": True},
+        }
         mock_response.status_code = 200
         connect_error = httpx.ConnectError(
             "temporary network issue",
@@ -116,21 +122,23 @@ class TestBlockchainService:
         # Mock internal methods on the service instance directly
         service.get_address_info = AsyncMock(return_value={"image": "info"})
         service.get_address_permissions = AsyncMock(return_value=["perm"])
-        service.call = AsyncMock(return_value={"isvalid": True}) # for fallback
+        service.call = AsyncMock(return_value={"isvalid": True})  # for fallback
 
         # Test
         result = await service.get_address_summary("addr")
-        
+
         assert result["image"] == "info"
         assert result["permissions"] == ["perm"]
-        
+
         # Verify calls
         service.get_address_info.assert_called_with("addr")
         service.get_address_permissions.assert_called_with("addr")
 
     async def test_get_address_info_raises_connection_errors(self, service):
         """Test address info does not hide balance fetch connection failures."""
-        service.get_address_balances = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+        service.get_address_balances = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
 
         with pytest.raises(ChainConnectionError):
             await service.get_address_info("addr")
@@ -142,7 +150,9 @@ class TestBlockchainService:
         with pytest.raises(RPCError):
             await service.get_address_permissions("addr")
 
-    async def test_get_address_summary_returns_empty_for_invalid_addresses(self, service):
+    async def test_get_address_summary_returns_empty_for_invalid_addresses(
+        self, service
+    ):
         """Test invalid addresses fall back to an empty summary."""
         service.get_address_info = AsyncMock(
             side_effect=RPCError("getaddressbalances", "not found", error_code=-5)
@@ -156,8 +166,12 @@ class TestBlockchainService:
 
     async def test_get_address_summary_raises_permission_failures(self, service):
         """Test address summary no longer hides permission backend failures."""
-        service.get_address_info = AsyncMock(return_value={"address": "addr", "balances": []})
-        service.get_address_permissions = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+        service.get_address_info = AsyncMock(
+            return_value={"address": "addr", "balances": []}
+        )
+        service.get_address_permissions = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
 
         with pytest.raises(ChainConnectionError):
             await service.get_address_summary("addr")
@@ -174,14 +188,18 @@ class TestBlockchainService:
 
     async def test_get_block_by_height_raises_connection_errors(self, service):
         """Test connection failures are not swallowed by get_block_by_height."""
-        service.get_block_hash = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+        service.get_block_hash = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
 
         with pytest.raises(ChainConnectionError):
             await service.get_block_by_height(999)
 
     async def test_get_block_by_hash_raises_non_not_found_rpc_errors(self, service):
         """Test non-not-found RPC failures still propagate for block lookups."""
-        service.get_block = AsyncMock(side_effect=RPCError("getblock", "boom", error_code=-1))
+        service.get_block = AsyncMock(
+            side_effect=RPCError("getblock", "boom", error_code=-1)
+        )
 
         with pytest.raises(RPCError):
             await service.get_block_by_hash("a" * 64)
@@ -237,23 +255,33 @@ class TestSearchService:
         service.call = AsyncMock(return_value=[])
         return service
 
-    async def test_search_all_entities_ignores_missing_transactions(self, chain, search_service_mock):
+    async def test_search_all_entities_ignores_missing_transactions(
+        self, chain, search_service_mock
+    ):
         """Test not-found transaction lookups are treated as empty search results."""
         txid = "a" * 64
         search_service_mock.get_transaction = AsyncMock(
             side_effect=RPCError("getrawtransaction", "not found", error_code=-5)
         )
 
-        result = await search_all_entities(chain, search_service_mock, txid, include_stream_keys=False)
+        result = await search_all_entities(
+            chain, search_service_mock, txid, include_stream_keys=False
+        )
 
         assert result == {"results": [], "total": 0}
 
-    async def test_search_all_entities_raises_backend_failures(self, chain, search_service_mock):
+    async def test_search_all_entities_raises_backend_failures(
+        self, chain, search_service_mock
+    ):
         """Test backend failures are no longer silently swallowed by search."""
-        search_service_mock.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+        search_service_mock.call = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
 
         with pytest.raises(ChainConnectionError):
-            await search_all_entities(chain, search_service_mock, "asset1", include_stream_keys=False)
+            await search_all_entities(
+                chain, search_service_mock, "asset1", include_stream_keys=False
+            )
 
 
 class TestPaginationService:

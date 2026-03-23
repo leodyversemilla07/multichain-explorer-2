@@ -5,6 +5,7 @@
 
 import base64
 import json
+import logging
 import time
 import urllib
 import urllib.error
@@ -14,7 +15,8 @@ from collections import OrderedDict
 from urllib import parse, request
 
 import app_state
-import utils
+
+logger = logging.getLogger(__name__)
 
 
 def is_missing(config, key):
@@ -30,7 +32,7 @@ def is_missing(config, key):
 
 class MCEChain:
     """MultiChain blockchain connection wrapper."""
-    
+
     def __init__(self, name):
         self.name = name
         self.config = app_state.get_state().settings[name].copy()
@@ -58,8 +60,6 @@ class MCEChain:
         self.config["multichain-url"] = url
         self.config["multichain-headers"] = headers
 
-        #        print(self.config)
-
         return True
 
     def request(self, method, params=[]):
@@ -71,46 +71,56 @@ class MCEChain:
         headers["Content-Length"] = str(len(payload))
 
         try:
-            #        req = requests.post(cfg.multichain_url, data=payload, headers=headers)
-
             data = str(payload)
             data = data.encode("utf-8")
             ureq = request.Request(self.config["multichain-url"], data=data)
             for header, value in headers.items():
                 ureq.add_header(header, value)
-            req = request.urlopen(ureq)
+            req = request.urlopen(ureq)  # nosec B310: URL is built from trusted RPC config
         except urllib.error.HTTPError as e:
             resp = e.read()
-            req_json = json.loads(resp.decode("utf-8"))
+            try:
+                req_json = json.loads(resp.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return {
+                    "result": None,
+                    "error": f"HTTP {e.code}: {e.reason}",
+                    "connection-error": False,
+                }
             if req_json["error"] is not None:
                 req_json["error"] = (
-                    "Error " + str(req_json["error"]["code"]) + ": " + req_json["error"]["message"]
+                    "Error "
+                    + str(req_json["error"]["code"])
+                    + ": "
+                    + req_json["error"]["message"]
                 )
             return req_json
         except urllib.error.URLError as e:
             error_str = "MultiChain is not running: " + str(e.reason)
             req_json = {"result": None, "error": error_str, "connection-error": True}
             return req_json
-
-        #        except Exception as error:
-        #            print("C")
-        #            error_str="MultiChain is not running: " + str(error)
-        #            print(str(error))
-        #            req_json={
-        #                'result': None,
-        #                'error' : error_str,
-        #                'connection-error' : True
-        #            }
-        #            utils.print_error(error_str)
-        #            return req_json
+        except (OSError, ValueError, TypeError) as error:
+            error_str = "MultiChain is not running: " + str(error)
+            logger.warning("Legacy MultiChain RPC request failed: %s", error)
+            return {
+                "result": None,
+                "error": error_str,
+                "connection-error": True,
+            }
 
         resp = req.read()
-        #        req_json=json.loads(resp.decode('utf-8'))
-        req_json = json.loads(resp.decode("utf-8"), object_pairs_hook=OrderedDict)
+        try:
+            req_json = json.loads(resp.decode("utf-8"), object_pairs_hook=OrderedDict)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            logger.warning("Legacy MultiChain RPC returned invalid JSON: %s", error)
+            return {
+                "result": None,
+                "error": "Invalid JSON response from MultiChain",
+                "connection-error": True,
+            }
 
         if req_json is None:
             error_str = "MultiChain connection error"
             req_json = {"result": None, "error": error_str, "connection-error": True}
-        #            utils.print_error(error_str)
 
         return req_json

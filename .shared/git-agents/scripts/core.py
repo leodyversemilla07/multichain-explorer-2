@@ -18,42 +18,106 @@ CSV_CONFIG = {
     "commits": {
         "file": "commits.csv",
         "search_cols": ["Command Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Command Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Command Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "branching": {
         "file": "branching.csv",
         "search_cols": ["Command Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Command Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Command Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "merging": {
         "file": "merging.csv",
         "search_cols": ["Command Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Command Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Command Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "history": {
         "file": "history.csv",
         "search_cols": ["Command Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Command Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Command Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "remotes": {
         "file": "remotes.csv",
         "search_cols": ["Command Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Command Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Command Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "hooks": {
         "file": "hooks.csv",
         "search_cols": ["Hook Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Hook Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Hook Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "debugging": {
         "file": "debugging.csv",
         "search_cols": ["Command Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Command Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Command Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "workflows": {
         "file": "workflows.csv",
         "search_cols": ["Workflow Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Workflow Name", "Keywords", "Description", "When to Use", "Command Example", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Workflow Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Command Example",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
 }
 
@@ -74,7 +138,7 @@ class BM25:
 
     def tokenize(self, text):
         """Lowercase, split, remove punctuation, filter short words"""
-        text = re.sub(r'[^\w\s]', ' ', str(text).lower())
+        text = re.sub(r"[^\w\s]", " ", str(text).lower())
         return [w for w in text.split() if len(w) > 2]
 
     def fit(self, documents):
@@ -113,7 +177,9 @@ class BM25:
                     tf = term_freqs[token]
                     idf = self.idf[token]
                     numerator = tf * (self.k1 + 1)
-                    denominator = tf + self.k1 * (1 - self.b + self.b * doc_len / self.avgdl)
+                    denominator = tf + self.k1 * (
+                        1 - self.b + self.b * doc_len / self.avgdl
+                    )
                     score += idf * numerator / denominator
 
             scores.append((idx, score))
@@ -124,7 +190,7 @@ class BM25:
 # ============ SEARCH FUNCTIONS ============
 def _load_csv(filepath):
     """Load CSV and return list of dicts"""
-    with open(filepath, 'r', encoding='utf-8') as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -154,17 +220,100 @@ def detect_domain(query):
     query_lower = query.lower()
 
     domain_keywords = {
-        "commits": ["commit", "message", "amend", "squash", "sign", "conventional", "fixup", "reword", "gpg"],
-        "branching": ["branch", "checkout", "switch", "create", "delete", "rename", "protect", "strategy", "naming"],
-        "merging": ["merge", "rebase", "conflict", "squash", "fast-forward", "cherry-pick", "integrate"],
-        "history": ["log", "blame", "bisect", "reflog", "history", "search", "grep", "find", "diff", "show"],
-        "remotes": ["remote", "push", "pull", "fetch", "clone", "fork", "upstream", "origin", "track", "pr"],
-        "hooks": ["hook", "pre-commit", "pre-push", "commit-msg", "husky", "lefthook", "automation", "lint"],
-        "debugging": ["debug", "stash", "patch", "recover", "reset", "revert", "undo", "lost", "restore", "clean"],
-        "workflows": ["workflow", "gitflow", "trunk", "release", "tag", "version", "ci", "pipeline", "deploy"],
+        "commits": [
+            "commit",
+            "message",
+            "amend",
+            "squash",
+            "sign",
+            "conventional",
+            "fixup",
+            "reword",
+            "gpg",
+        ],
+        "branching": [
+            "branch",
+            "checkout",
+            "switch",
+            "create",
+            "delete",
+            "rename",
+            "protect",
+            "strategy",
+            "naming",
+        ],
+        "merging": [
+            "merge",
+            "rebase",
+            "conflict",
+            "squash",
+            "fast-forward",
+            "cherry-pick",
+            "integrate",
+        ],
+        "history": [
+            "log",
+            "blame",
+            "bisect",
+            "reflog",
+            "history",
+            "search",
+            "grep",
+            "find",
+            "diff",
+            "show",
+        ],
+        "remotes": [
+            "remote",
+            "push",
+            "pull",
+            "fetch",
+            "clone",
+            "fork",
+            "upstream",
+            "origin",
+            "track",
+            "pr",
+        ],
+        "hooks": [
+            "hook",
+            "pre-commit",
+            "pre-push",
+            "commit-msg",
+            "husky",
+            "lefthook",
+            "automation",
+            "lint",
+        ],
+        "debugging": [
+            "debug",
+            "stash",
+            "patch",
+            "recover",
+            "reset",
+            "revert",
+            "undo",
+            "lost",
+            "restore",
+            "clean",
+        ],
+        "workflows": [
+            "workflow",
+            "gitflow",
+            "trunk",
+            "release",
+            "tag",
+            "version",
+            "ci",
+            "pipeline",
+            "deploy",
+        ],
     }
 
-    scores = {domain: sum(1 for kw in keywords if kw in query_lower) for domain, keywords in domain_keywords.items()}
+    scores = {
+        domain: sum(1 for kw in keywords if kw in query_lower)
+        for domain, keywords in domain_keywords.items()
+    }
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else "commits"
 
@@ -180,12 +329,14 @@ def search(query, domain=None, max_results=MAX_RESULTS):
     if not filepath.exists():
         return {"error": f"File not found: {filepath}", "domain": domain}
 
-    results = _search_csv(filepath, config["search_cols"], config["output_cols"], query, max_results)
+    results = _search_csv(
+        filepath, config["search_cols"], config["output_cols"], query, max_results
+    )
 
     return {
         "domain": domain,
         "query": query,
         "file": config["file"],
         "count": len(results),
-        "results": results
+        "results": results,
     }

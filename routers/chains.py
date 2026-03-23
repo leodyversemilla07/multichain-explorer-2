@@ -114,14 +114,16 @@ async def list_chains(
 ):
     """
     List all configured chains (homepage).
-    
+
     This is the main entry point of the explorer.
     """
     chains = state.chains or []
     http_client = getattr(request.app.state, "http_client", None)
-    
+
     # Run all chain summaries concurrently
-    chains_data = await asyncio.gather(*[get_chain_summary(c, client=http_client) for c in chains])
+    chains_data = await asyncio.gather(
+        *[get_chain_summary(c, client=http_client) for c in chains]
+    )
 
     base_url = state.get_setting("main", "base", "/")
 
@@ -136,7 +138,12 @@ async def list_chains(
     )
 
 
-@router.get("/{chain_name}", response_class=HTMLResponse, name="chain_home", summary="Chain dashboard")
+@router.get(
+    "/{chain_name}",
+    response_class=HTMLResponse,
+    name="chain_home",
+    summary="Chain dashboard",
+)
 async def chain_home(
     request: Request,
     chain: ChainDep,
@@ -147,7 +154,7 @@ async def chain_home(
 ):
     """
     Chain homepage/dashboard.
-    
+
     Shows overview of the blockchain including recent blocks,
     transaction count, and other statistics.
     """
@@ -210,7 +217,12 @@ async def chain_home(
     )
 
 
-@router.get("/{chain_name}/chain", response_class=HTMLResponse, name="chain_dashboard", summary="Chain dashboard (alias)")
+@router.get(
+    "/{chain_name}/chain",
+    response_class=HTMLResponse,
+    name="chain_dashboard",
+    summary="Chain dashboard (alias)",
+)
 async def chain_dashboard(
     request: Request,
     chain: ChainDep,
@@ -225,7 +237,12 @@ async def chain_dashboard(
     return await chain_home(request, chain, service, templates, context, query_params)
 
 
-@router.get("/{chain_name}/parameters", response_class=HTMLResponse, name="chain_parameters", summary="Chain parameters")
+@router.get(
+    "/{chain_name}/parameters",
+    response_class=HTMLResponse,
+    name="chain_parameters",
+    summary="Chain parameters",
+)
 async def chain_parameters(
     request: Request,
     chain: ChainDep,
@@ -235,7 +252,7 @@ async def chain_parameters(
 ):
     """
     Display chain parameters.
-    
+
     Shows blockchain configuration parameters like block size,
     mining settings, permissions, etc.
     """
@@ -253,7 +270,12 @@ async def chain_parameters(
     )
 
 
-@router.get("/{chain_name}/peers", response_class=HTMLResponse, name="peers", summary="Network peers")
+@router.get(
+    "/{chain_name}/peers",
+    response_class=HTMLResponse,
+    name="peers",
+    summary="Network peers",
+)
 async def list_peers(
     request: Request,
     chain: ChainDep,
@@ -263,7 +285,7 @@ async def list_peers(
 ):
     """
     List network peers.
-    
+
     Shows connected nodes in the blockchain network.
     """
     try:
@@ -280,7 +302,12 @@ async def list_peers(
     )
 
 
-@router.get("/{chain_name}/miners", response_class=HTMLResponse, name="miners", summary="Mining statistics")
+@router.get(
+    "/{chain_name}/miners",
+    response_class=HTMLResponse,
+    name="miners",
+    summary="Mining statistics",
+)
 async def list_miners(
     request: Request,
     chain: ChainDep,
@@ -290,7 +317,7 @@ async def list_miners(
 ):
     """
     Show mining statistics.
-    
+
     Displays information about miners/validators in the network.
     """
     # Get recent blocks to analyze miners
@@ -326,7 +353,9 @@ async def list_miners(
 
     # Calculate percentages
     for miner in miner_stats:
-        miner_stats[miner]["percentage"] = miner_stats[miner]["blocks"] / block_count * 100
+        miner_stats[miner]["percentage"] = (
+            miner_stats[miner]["blocks"] / block_count * 100
+        )
 
     # Convert to list and sort by blocks
     miners_list = [{"address": miner, **stats} for miner, stats in miner_stats.items()]
@@ -343,7 +372,12 @@ async def list_miners(
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}", response_class=HTMLResponse, name="legacy_chain_home", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}",
+    response_class=HTMLResponse,
+    name="legacy_chain_home",
+    include_in_schema=False,
+)
 async def legacy_chain_home(
     request: Request,
     chain: ChainDep,

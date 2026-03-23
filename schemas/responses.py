@@ -5,13 +5,13 @@ These models define the standardized JSON structure for API responses,
 decoupling the internal representation from the external API contract.
 """
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class PaginationInfo(BaseModel):
     """Pagination metadata."""
+
     page: int
     page_count: int
     has_next: bool
@@ -29,13 +29,16 @@ class BaseResponse(BaseModel):
     model_validate() to work on ORM objects or attribute-access objects.
     Skill ref: fastapi-agents > schemas > ConfigDict from_attributes
     """
+
     model_config = ConfigDict(from_attributes=True)
 
 
 # --- Block Models ---
 
+
 class BlockResponse(BaseResponse):
     """Block details response."""
+
     hash: str
     height: int
     confirmations: int
@@ -56,8 +59,10 @@ class BlockResponse(BaseResponse):
 
 # --- Transaction Models ---
 
+
 class TransactionInput(BaseModel):
     """Transaction input."""
+
     txid: Optional[str] = None
     vout: Optional[int] = None
     scriptSig: Optional[Dict[str, Any]] = None
@@ -67,6 +72,7 @@ class TransactionInput(BaseModel):
 
 class TransactionOutput(BaseModel):
     """Transaction output."""
+
     value: float
     n: int
     scriptPubKey: Dict[str, Any]
@@ -77,6 +83,7 @@ class TransactionOutput(BaseModel):
 
 class TransactionResponse(BaseResponse):
     """Transaction details response."""
+
     txid: str
     version: int
     locktime: int
@@ -93,8 +100,10 @@ class TransactionResponse(BaseResponse):
 
 # --- Address Models ---
 
+
 class AddressBalance(BaseModel):
     """Address asset balance."""
+
     asset: str
     assetref: str
     qty: float
@@ -104,6 +113,7 @@ class AddressBalance(BaseModel):
 
 class AddressResponse(BaseResponse):
     """Address details response."""
+
     address: str
     ismine: bool = False
     iswatchonly: bool = False
@@ -117,8 +127,10 @@ class AddressResponse(BaseResponse):
 
 # --- Asset Models ---
 
+
 class AssetResponse(BaseResponse):
     """Asset details response."""
+
     name: str
     assetref: str
     multiple: int
@@ -137,8 +149,10 @@ class AssetResponse(BaseResponse):
 
 # --- Stream Models ---
 
+
 class StreamResponse(BaseResponse):
     """Stream details response."""
+
     name: str
     streamref: str
     createtxid: str
@@ -155,6 +169,7 @@ class StreamResponse(BaseResponse):
 
 class StreamItemResponse(BaseResponse):
     """Stream item details."""
+
     publishers: List[str]
     key: str
     data: Any
@@ -169,8 +184,10 @@ class StreamItemResponse(BaseResponse):
 
 # --- Chain Info Models ---
 
+
 class ChainInfoResponse(BaseResponse):
     """Blockchain info response."""
+
     chainname: str
     description: str
     protocol: str

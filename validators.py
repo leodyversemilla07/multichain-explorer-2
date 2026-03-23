@@ -4,7 +4,6 @@ Type-safe validation for all request parameters
 """
 
 import re
-from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -12,7 +11,9 @@ from pydantic import BaseModel, Field, field_validator
 class BlockHeightParams(BaseModel):
     """Validate block height parameter"""
 
-    height: int = Field(..., ge=0, le=999_999_999, description="Block height (0 to 999,999,999)")
+    height: int = Field(
+        ..., ge=0, le=999_999_999, description="Block height (0 to 999,999,999)"
+    )
 
     class Config:
         str_strip_whitespace = True
@@ -22,7 +23,10 @@ class TransactionParams(BaseModel):
     """Validate transaction ID parameter"""
 
     txid: str = Field(
-        ..., min_length=64, max_length=64, description="Transaction ID (64 hex characters)"
+        ...,
+        min_length=64,
+        max_length=64,
+        description="Transaction ID (64 hex characters)",
     )
 
     @field_validator("txid")
@@ -36,7 +40,9 @@ class TransactionParams(BaseModel):
 class AddressParams(BaseModel):
     """Validate MultiChain address parameter"""
 
-    address: str = Field(..., min_length=26, max_length=35, description="MultiChain address")
+    address: str = Field(
+        ..., min_length=26, max_length=35, description="MultiChain address"
+    )
 
     @field_validator("address")
     @classmethod
@@ -53,7 +59,9 @@ class PaginationParams(BaseModel):
 
     size: int = Field(default=20, ge=1, le=500, description="Items per page (1-500)")
 
-    from_: int = Field(default=0, ge=0, alias="from", description="Starting offset (0+)")
+    from_: int = Field(
+        default=0, ge=0, alias="from", description="Starting offset (0+)"
+    )
 
     class Config:
         populate_by_name = True
@@ -62,21 +70,27 @@ class PaginationParams(BaseModel):
 class EntityNameParams(BaseModel):
     """Validate asset/stream name parameter"""
 
-    name: str = Field(..., min_length=1, max_length=32, description="Asset or stream name")
+    name: str = Field(
+        ..., min_length=1, max_length=32, description="Asset or stream name"
+    )
 
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
         # Allow alphanumeric, dash, underscore
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
-            raise ValueError("Name must contain only letters, numbers, dash, and underscore")
+            raise ValueError(
+                "Name must contain only letters, numbers, dash, and underscore"
+            )
         return v
 
 
 class SearchParams(BaseModel):
     """Validate search query parameters"""
 
-    search_value: str = Field(..., min_length=1, max_length=128, description="Search query")
+    search_value: str = Field(
+        ..., min_length=1, max_length=128, description="Search query"
+    )
 
     @field_validator("search_value")
     @classmethod
@@ -216,7 +230,9 @@ def sanitize_sql(text: str) -> str:
     return text
 
 
-def validate_numeric_string(value: str, min_val: int = 0, max_val: int = 999999999) -> int:
+def validate_numeric_string(
+    value: str, min_val: int = 0, max_val: int = 999999999
+) -> int:
     """Validate numeric string parameter"""
     try:
         num = int(value)

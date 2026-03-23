@@ -38,7 +38,7 @@ async def get_address(
 ):
     """
     Get address details (JSON).
-    
+
     Fetches info, balances, and permissions in parallel.
     """
     try:

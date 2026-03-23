@@ -77,7 +77,7 @@ async def list_blocks(
     end_height = total_blocks - 1 - page_info["start"]
     start_height = max(0, end_height - page_info["count"] + 1)
     blocks_to_fetch = end_height - start_height + 1
-    
+
     blocks = []
     if blocks_to_fetch > 0 and start_height <= end_height:
         # Batch fetch blocks
@@ -87,7 +87,7 @@ async def list_blocks(
             raise_backend_http_error(exc)
         # Sort blocks by height descending (newest first)
         raw_blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
-        
+
         # Map to Reponse Model
         for b in raw_blocks:
             # Helper to map fields if needed
@@ -98,7 +98,7 @@ async def list_blocks(
                 block_data["tx_count"] = block_data.pop("nTx")
             elif "transactions" in block_data:
                 block_data["tx_count"] = len(block_data["transactions"])
-            
+
             blocks.append(BlockResponse(**block_data))
 
     return blocks

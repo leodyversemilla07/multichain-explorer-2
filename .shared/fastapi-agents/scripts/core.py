@@ -18,42 +18,114 @@ CSV_CONFIG = {
     "routing": {
         "file": "routing.csv",
         "search_cols": ["Pattern Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Pattern Name", "Keywords", "Description", "When to Use", "Code Example", "Anti-Pattern", "Complexity", "Docs URL"]
+        "output_cols": [
+            "Pattern Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "Anti-Pattern",
+            "Complexity",
+            "Docs URL",
+        ],
     },
     "dependencies": {
         "file": "dependencies.csv",
         "search_cols": ["Pattern Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Pattern Name", "Keywords", "Description", "When to Use", "Code Example", "Anti-Pattern", "Complexity", "Docs URL"]
+        "output_cols": [
+            "Pattern Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "Anti-Pattern",
+            "Complexity",
+            "Docs URL",
+        ],
     },
     "middleware": {
         "file": "middleware.csv",
         "search_cols": ["Middleware Name", "Keywords", "Description", "Use Case"],
-        "output_cols": ["Middleware Name", "Keywords", "Description", "Use Case", "Code Example", "Configuration Tips", "Gotchas", "Docs URL"]
+        "output_cols": [
+            "Middleware Name",
+            "Keywords",
+            "Description",
+            "Use Case",
+            "Code Example",
+            "Configuration Tips",
+            "Gotchas",
+            "Docs URL",
+        ],
     },
     "schemas": {
         "file": "schemas.csv",
         "search_cols": ["Pattern Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Pattern Name", "Keywords", "Description", "When to Use", "Code Example", "Anti-Pattern", "Pydantic Version", "Docs URL"]
+        "output_cols": [
+            "Pattern Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "Anti-Pattern",
+            "Pydantic Version",
+            "Docs URL",
+        ],
     },
     "auth": {
         "file": "auth.csv",
         "search_cols": ["Strategy Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Strategy Name", "Keywords", "Description", "When to Use", "Code Example", "Security Notes", "Packages", "Docs URL"]
+        "output_cols": [
+            "Strategy Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "Security Notes",
+            "Packages",
+            "Docs URL",
+        ],
     },
     "testing": {
         "file": "testing.csv",
         "search_cols": ["Strategy Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Strategy Name", "Keywords", "Description", "When to Use", "Code Example", "Fixtures", "Anti-Pattern", "Docs URL"]
+        "output_cols": [
+            "Strategy Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "Fixtures",
+            "Anti-Pattern",
+            "Docs URL",
+        ],
     },
     "performance": {
         "file": "performance.csv",
         "search_cols": ["Pattern Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Pattern Name", "Keywords", "Description", "When to Use", "Code Example", "Trade-offs", "Packages", "Docs URL"]
+        "output_cols": [
+            "Pattern Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "Trade-offs",
+            "Packages",
+            "Docs URL",
+        ],
     },
     "errors": {
         "file": "errors.csv",
         "search_cols": ["Pattern Name", "Keywords", "Description", "When to Use"],
-        "output_cols": ["Pattern Name", "Keywords", "Description", "When to Use", "Code Example", "HTTP Status", "Anti-Pattern", "Docs URL"]
+        "output_cols": [
+            "Pattern Name",
+            "Keywords",
+            "Description",
+            "When to Use",
+            "Code Example",
+            "HTTP Status",
+            "Anti-Pattern",
+            "Docs URL",
+        ],
     },
 }
 
@@ -74,7 +146,7 @@ class BM25:
 
     def tokenize(self, text):
         """Lowercase, split, remove punctuation, filter short words"""
-        text = re.sub(r'[^\w\s]', ' ', str(text).lower())
+        text = re.sub(r"[^\w\s]", " ", str(text).lower())
         return [w for w in text.split() if len(w) > 2]
 
     def fit(self, documents):
@@ -113,7 +185,9 @@ class BM25:
                     tf = term_freqs[token]
                     idf = self.idf[token]
                     numerator = tf * (self.k1 + 1)
-                    denominator = tf + self.k1 * (1 - self.b + self.b * doc_len / self.avgdl)
+                    denominator = tf + self.k1 * (
+                        1 - self.b + self.b * doc_len / self.avgdl
+                    )
                     score += idf * numerator / denominator
 
             scores.append((idx, score))
@@ -124,7 +198,7 @@ class BM25:
 # ============ SEARCH FUNCTIONS ============
 def _load_csv(filepath):
     """Load CSV and return list of dicts"""
-    with open(filepath, 'r', encoding='utf-8') as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -158,17 +232,98 @@ def detect_domain(query):
     query_lower = query.lower()
 
     domain_keywords = {
-        "routing": ["router", "route", "endpoint", "path", "get", "post", "put", "delete", "patch", "prefix", "tags", "include_router"],
-        "dependencies": ["depends", "dependency", "inject", "lifespan", "startup", "shutdown", "yield", "session"],
-        "middleware": ["middleware", "cors", "gzip", "trusted", "request", "response", "starlette", "rate limit"],
-        "schemas": ["schema", "pydantic", "model", "validator", "field", "basemodel", "response_model", "serialize"],
-        "auth": ["auth", "jwt", "token", "oauth", "bearer", "api key", "security", "password", "login"],
-        "testing": ["test", "pytest", "testclient", "mock", "fixture", "assert", "async test", "anyio"],
-        "performance": ["async", "background", "cache", "redis", "websocket", "worker", "celery", "concurrency"],
-        "errors": ["error", "exception", "handler", "http", "raise", "status code", "422", "404", "500"],
+        "routing": [
+            "router",
+            "route",
+            "endpoint",
+            "path",
+            "get",
+            "post",
+            "put",
+            "delete",
+            "patch",
+            "prefix",
+            "tags",
+            "include_router",
+        ],
+        "dependencies": [
+            "depends",
+            "dependency",
+            "inject",
+            "lifespan",
+            "startup",
+            "shutdown",
+            "yield",
+            "session",
+        ],
+        "middleware": [
+            "middleware",
+            "cors",
+            "gzip",
+            "trusted",
+            "request",
+            "response",
+            "starlette",
+            "rate limit",
+        ],
+        "schemas": [
+            "schema",
+            "pydantic",
+            "model",
+            "validator",
+            "field",
+            "basemodel",
+            "response_model",
+            "serialize",
+        ],
+        "auth": [
+            "auth",
+            "jwt",
+            "token",
+            "oauth",
+            "bearer",
+            "api key",
+            "security",
+            "password",
+            "login",
+        ],
+        "testing": [
+            "test",
+            "pytest",
+            "testclient",
+            "mock",
+            "fixture",
+            "assert",
+            "async test",
+            "anyio",
+        ],
+        "performance": [
+            "async",
+            "background",
+            "cache",
+            "redis",
+            "websocket",
+            "worker",
+            "celery",
+            "concurrency",
+        ],
+        "errors": [
+            "error",
+            "exception",
+            "handler",
+            "http",
+            "raise",
+            "status code",
+            "422",
+            "404",
+            "500",
+        ],
     }
 
-    scores = {domain: sum(1 for kw in keywords if kw in query_lower) for domain, keywords in domain_keywords.items()}
+    scores = {
+        domain: sum(1 for kw in keywords if kw in query_lower)
+        for domain, keywords in domain_keywords.items()
+    }
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else "routing"
 
@@ -184,12 +339,14 @@ def search(query, domain=None, max_results=MAX_RESULTS):
     if not filepath.exists():
         return {"error": f"File not found: {filepath}", "domain": domain}
 
-    results = _search_csv(filepath, config["search_cols"], config["output_cols"], query, max_results)
+    results = _search_csv(
+        filepath, config["search_cols"], config["output_cols"], query, max_results
+    )
 
     return {
         "domain": domain,
         "query": query,
         "file": config["file"],
         "count": len(results),
-        "results": results
+        "results": results,
     }

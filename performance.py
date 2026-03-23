@@ -10,7 +10,7 @@
 import gzip
 import logging
 import time
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from services.cache_service import get_cache as get_service_cache
 
@@ -109,8 +109,6 @@ def get_cache():
     return get_service_cache()
 
 
-
-
 def compress_response(content: bytes, min_size: int = 1024) -> Tuple[bytes, bool]:
     """
     Compress response content using gzip.
@@ -132,7 +130,7 @@ def compress_response(content: bytes, min_size: int = 1024) -> Tuple[bytes, bool
         if len(compressed) < len(content):
             logger.debug(
                 f"Compressed response: {len(content)} -> {len(compressed)} bytes "
-                f"({(1 - len(compressed)/len(content)) * 100:.1f}% reduction)"
+                f"({(1 - len(compressed) / len(content)) * 100:.1f}% reduction)"
             )
             return compressed, True
         else:
@@ -200,7 +198,9 @@ class RequestTimer:
 
         # Log slow requests (>500ms)
         if self.elapsed_ms > 500:
-            logger.warning(f"SLOW REQUEST: {self.request_path} took {self.elapsed_ms:.2f}ms")
+            logger.warning(
+                f"SLOW REQUEST: {self.request_path} took {self.elapsed_ms:.2f}ms"
+            )
         else:
             logger.debug(f"Request: {self.request_path} took {self.elapsed_ms:.2f}ms")
 
@@ -214,7 +214,11 @@ def log_performance_stats():
     if hit_rate is None:
         raw_hit_rate = cache_stats.get("hit_rate", 0)
         if isinstance(raw_hit_rate, (int, float)):
-            hit_rate = round(raw_hit_rate * 100, 2) if raw_hit_rate <= 1 else round(raw_hit_rate, 2)
+            hit_rate = (
+                round(raw_hit_rate * 100, 2)
+                if raw_hit_rate <= 1
+                else round(raw_hit_rate, 2)
+            )
         else:
             hit_rate = 0
 
@@ -224,7 +228,9 @@ def log_performance_stats():
     logger.info(f"Cache hits: {cache_stats.get('hits', 0)}")
     logger.info(f"Cache misses: {cache_stats.get('misses', 0)}")
     logger.info(f"Cache hit rate: {hit_rate}%")
-    logger.info(f"Items in cache: {cache_stats.get('size', cache_stats.get('items_cached', 0))}")
+    logger.info(
+        f"Items in cache: {cache_stats.get('size', cache_stats.get('items_cached', 0))}"
+    )
     logger.info("=" * 60)
 
 

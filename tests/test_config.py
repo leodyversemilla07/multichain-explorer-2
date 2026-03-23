@@ -4,13 +4,12 @@ Tests for Type-Safe Configuration System
 
 import os
 import sys
-from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import (
+from config import (  # noqa: E402
     ChainConfig,
     ServerConfig,
 )

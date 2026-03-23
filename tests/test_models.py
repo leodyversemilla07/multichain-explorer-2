@@ -4,7 +4,6 @@ Tests for domain models.
 
 from datetime import datetime
 
-import pytest
 
 from models import (
     Address,
@@ -125,7 +124,9 @@ class TestTransaction:
 
     def test_coinbase_transaction(self):
         """Test coinbase transaction detection."""
-        coinbase_input = TransactionInput(txid="0" * 64, vout=0, coinbase="coinbase_data")
+        coinbase_input = TransactionInput(
+            txid="0" * 64, vout=0, coinbase="coinbase_data"
+        )
         coinbase = Transaction(txid="tx1", version=1, locktime=0, vin=[coinbase_input])
 
         assert coinbase.is_coinbase is True
@@ -224,7 +225,9 @@ class TestAddress:
 
     def test_address_with_balances(self):
         """Test address with balances."""
-        balance = AddressBalance(asset="USD", assetref="123-456-789", qty=100.0, raw=10000)
+        balance = AddressBalance(
+            asset="USD", assetref="123-456-789", qty=100.0, raw=10000
+        )
 
         addr = Address(
             address="addr1",
@@ -280,8 +283,12 @@ class TestAsset:
 
     def test_open_asset(self):
         """Test open asset detection."""
-        open_asset = Asset(name="OPEN", assetref="ref1", multiple=1, units=1.0, open=True)
-        closed_asset = Asset(name="CLOSED", assetref="ref2", multiple=1, units=1.0, open=False)
+        open_asset = Asset(
+            name="OPEN", assetref="ref1", multiple=1, units=1.0, open=True
+        )
+        closed_asset = Asset(
+            name="CLOSED", assetref="ref2", multiple=1, units=1.0, open=False
+        )
 
         assert open_asset.is_open is True
         assert closed_asset.is_open is False
@@ -319,7 +326,9 @@ class TestStream:
     def test_open_stream(self):
         """Test open stream detection."""
         open_stream = Stream(name="open", streamref="ref1", createtxid="tx1", open=True)
-        closed_stream = Stream(name="closed", streamref="ref2", createtxid="tx2", open=False)
+        closed_stream = Stream(
+            name="closed", streamref="ref2", createtxid="tx2", open=False
+        )
 
         assert open_stream.is_open is True
         assert closed_stream.is_open is False
@@ -405,7 +414,9 @@ class TestPermission:
     def test_active_permission(self):
         """Test active permission detection."""
         active = Permission(address="addr1", type="send", startblock=0, endblock=None)
-        expired = Permission(address="addr2", type="receive", startblock=0, endblock=1000)
+        expired = Permission(
+            address="addr2", type="receive", startblock=0, endblock=1000
+        )
 
         assert active.is_active is True
         assert expired.is_active is False

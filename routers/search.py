@@ -3,7 +3,7 @@
 
 """Search Router - FastAPI routes for search operations."""
 
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -26,7 +26,7 @@ async def _run_search(
     service: BlockchainServiceDep,
     query: str,
     *,
-    limit: int | None = None,
+    limit: Optional[int] = None,
 ) -> dict:
     """Execute shared search and preserve backend HTTP semantics."""
     try:
@@ -56,13 +56,13 @@ async def search(
     query = search_value
 
     results = await _run_search(chain, service, query)
-    
+
     # Check if single result for redirect
     if results["total"] == 1:
         # Get the URL from the single result
         redirect_url = results["results"][0]["url"]
         return RedirectResponse(url=redirect_url, status_code=302)
-    
+
     return templates.TemplateResponse(
         name="pages/search_results.html",
         context=context.build_context(
@@ -74,8 +74,12 @@ async def search(
     )
 
 
-@router.get("/{chain_name}/search", response_class=HTMLResponse, name="search_get",
-            summary="Search the blockchain")
+@router.get(
+    "/{chain_name}/search",
+    response_class=HTMLResponse,
+    name="search_get",
+    summary="Search the blockchain",
+)
 async def search_get(
     request: Request,
     chain: ChainDep,
@@ -90,7 +94,7 @@ async def search_get(
     query = query_params.get("q", "")
 
     results = await _run_search(chain, service, query)
-    
+
     # Check if single result for redirect
     if results["total"] == 1:
         # Get the URL from the single result
@@ -107,8 +111,13 @@ async def search_get(
         ),
     )
 
-@router.get("/{chain_name}/search/suggest", response_class=JSONResponse, name="search_suggest",
-            summary="Search suggestions (autocomplete)")
+
+@router.get(
+    "/{chain_name}/search/suggest",
+    response_class=JSONResponse,
+    name="search_suggest",
+    summary="Search suggestions (autocomplete)",
+)
 async def search_suggest(
     request: Request,
     chain: ChainDep,

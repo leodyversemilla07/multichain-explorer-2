@@ -23,6 +23,8 @@ async def search(
     """
     query = query_params.get("q", "")
     try:
-        return await search_all_entities(chain, service, query, include_stream_keys=False)
+        return await search_all_entities(
+            chain, service, query, include_stream_keys=False
+        )
     except Exception as exc:
         raise_backend_http_error(exc)

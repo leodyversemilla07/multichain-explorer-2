@@ -4,7 +4,7 @@ Tests for utils.py - Utility functions.
 
 import os
 import tempfile
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 import pytest
 

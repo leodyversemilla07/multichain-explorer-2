@@ -5,7 +5,6 @@ Tests for env_config.py - Environment configuration loading.
 import os
 from unittest.mock import patch
 
-import pytest
 
 
 class TestSettings:

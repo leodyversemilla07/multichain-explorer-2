@@ -3,7 +3,7 @@ Tests for multichain.py - MultiChain RPC client.
 """
 
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -169,7 +169,9 @@ class TestMCEChain:
             {"result": "blockhash123", "error": None, "id": 1}
         ).encode("utf-8")
 
-        with patch("multichain.request.urlopen", return_value=mock_response) as mock_urlopen:
+        with patch(
+            "multichain.request.urlopen", return_value=mock_response
+        ) as mock_urlopen:
             result = chain.request("getblockhash", [100])
 
         assert result["result"] == "blockhash123"
@@ -189,7 +191,11 @@ class TestMCEChain:
         chain.initialize()
 
         error_response = json.dumps(
-            {"result": None, "error": {"code": -5, "message": "Block not found"}, "id": 1}
+            {
+                "result": None,
+                "error": {"code": -5, "message": "Block not found"},
+                "id": 1,
+            }
         ).encode("utf-8")
 
         mock_error = urllib.error.HTTPError(
@@ -206,6 +212,31 @@ class TestMCEChain:
 
         assert result["result"] is None
         assert "Error -5" in result["error"]
+
+    def test_request_http_error_with_invalid_json_payload(self, chain_settings):
+        """Test HTTP error fallback when the response body is not valid JSON."""
+        from multichain import MCEChain
+        import urllib.error
+
+        chain = MCEChain("test-chain")
+        chain.initialize()
+
+        invalid_response = b"<html>gateway error</html>"
+        mock_error = urllib.error.HTTPError(
+            url="http://localhost:8570",
+            code=502,
+            msg="Bad Gateway",
+            hdrs={},
+            fp=Mock(read=Mock(return_value=invalid_response)),
+        )
+        mock_error.read = Mock(return_value=invalid_response)
+
+        with patch("multichain.request.urlopen", side_effect=mock_error):
+            result = chain.request("getinfo")
+
+        assert result["result"] is None
+        assert result["error"] == "HTTP 502: Bad Gateway"
+        assert result["connection-error"] is False
 
     def test_request_url_error(self, chain_settings):
         """Test RPC request with URL error (connection refused)."""
@@ -224,10 +255,42 @@ class TestMCEChain:
         assert "MultiChain is not running" in result["error"]
         assert result.get("connection-error") is True
 
+    def test_request_unexpected_os_error_returns_connection_error(self, chain_settings):
+        """Test unexpected transport failures map to connection-error responses."""
+        from multichain import MCEChain
+
+        chain = MCEChain("test-chain")
+        chain.initialize()
+
+        with patch("multichain.request.urlopen", side_effect=OSError("socket closed")):
+            result = chain.request("getinfo")
+
+        assert result["result"] is None
+        assert "MultiChain is not running" in result["error"]
+        assert result["connection-error"] is True
+
+    def test_request_invalid_success_payload_returns_connection_error(
+        self, chain_settings
+    ):
+        """Test invalid JSON success payloads are handled gracefully."""
+        from multichain import MCEChain
+
+        chain = MCEChain("test-chain")
+        chain.initialize()
+
+        mock_response = Mock()
+        mock_response.read.return_value = b"not-json"
+
+        with patch("multichain.request.urlopen", return_value=mock_response):
+            result = chain.request("getinfo")
+
+        assert result["result"] is None
+        assert result["error"] == "Invalid JSON response from MultiChain"
+        assert result["connection-error"] is True
+
     def test_request_preserves_order(self, chain_settings):
         """Test that response preserves JSON object order."""
         from multichain import MCEChain
-        from collections import OrderedDict
 
         chain = MCEChain("test-chain")
         chain.initialize()

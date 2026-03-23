@@ -4,8 +4,8 @@ Pagination service - Pagination logic for lists.
 Provides utilities for paginating results with proper URL generation.
 """
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Literal, Optional, Union, overload
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
 
@@ -51,14 +51,14 @@ class PaginationInfo:
         return self.has_previous
 
     @property
-    def prev_start(self) -> int | None:
+    def prev_start(self) -> Optional[int]:
         """Legacy start offset for the previous page."""
         if self.previous_page is None:
             return None
         return (self.previous_page - 1) * self.items_per_page
 
     @property
-    def next_start(self) -> int | None:
+    def next_start(self) -> Optional[int]:
         """Legacy start offset for the next page."""
         if self.next_page is None:
             return None
