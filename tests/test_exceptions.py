@@ -22,6 +22,7 @@ from exceptions import (
     ValidationError,
     format_error_html,
     get_http_status,
+    is_rpc_not_found_error,
     log_exception,
 )
 
@@ -161,6 +162,12 @@ class TestRPCError:
         exc = RPCError("getblock", "Block not found", -5)
         assert exc.error_code == -5
         assert exc.details["error_code"] == -5
+
+    def test_is_rpc_not_found_error(self):
+        """Test helper for missing-resource RPC errors."""
+        assert is_rpc_not_found_error(RPCError("getblock", "Block not found", -5)) is True
+        assert is_rpc_not_found_error(RPCError("getblock", "Boom", -1)) is False
+        assert is_rpc_not_found_error(ValueError("boom")) is False
 
 
 class TestConfigurationError:
@@ -438,5 +445,4 @@ class TestExceptionLogging:
         args = mock_logger.error.call_args
         extra = args[1]["extra"]
         assert extra["chain"] == "chain1"
-
 

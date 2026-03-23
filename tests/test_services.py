@@ -15,6 +15,7 @@ import pytest
 from config import ChainConfig
 from exceptions import ChainConnectionError, RPCError
 from services import BlockchainService, FormattingService, PaginationService
+from services.search_service import search_all_entities
 
 
 @pytest.mark.asyncio
@@ -126,6 +127,104 @@ class TestBlockchainService:
         # Verify calls
         service.get_address_info.assert_called_with("addr")
         service.get_address_permissions.assert_called_with("addr")
+
+    async def test_get_address_info_raises_connection_errors(self, service):
+        """Test address info does not hide balance fetch connection failures."""
+        service.get_address_balances = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        with pytest.raises(ChainConnectionError):
+            await service.get_address_info("addr")
+
+    async def test_get_address_permissions_raises_rpc_errors(self, service):
+        """Test address permissions do not hide RPC failures."""
+        service.call = AsyncMock(side_effect=RPCError("listpermissions", "boom"))
+
+        with pytest.raises(RPCError):
+            await service.get_address_permissions("addr")
+
+    async def test_get_address_summary_returns_empty_for_invalid_addresses(self, service):
+        """Test invalid addresses fall back to an empty summary."""
+        service.get_address_info = AsyncMock(
+            side_effect=RPCError("getaddressbalances", "not found", error_code=-5)
+        )
+        service.get_address_permissions = AsyncMock(return_value=[])
+        service.call = AsyncMock(return_value={"isvalid": False})
+
+        result = await service.get_address_summary("addr")
+
+        assert result == {"permissions": []}
+
+    async def test_get_address_summary_raises_permission_failures(self, service):
+        """Test address summary no longer hides permission backend failures."""
+        service.get_address_info = AsyncMock(return_value={"address": "addr", "balances": []})
+        service.get_address_permissions = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        with pytest.raises(ChainConnectionError):
+            await service.get_address_summary("addr")
+
+    async def test_get_block_by_height_returns_none_for_not_found_rpc(self, service):
+        """Test missing blocks return None without hiding other backend failures."""
+        service.get_block_hash = AsyncMock(
+            side_effect=RPCError("getblockhash", "Block not found", error_code=-5)
+        )
+
+        result = await service.get_block_by_height(999)
+
+        assert result is None
+
+    async def test_get_block_by_height_raises_connection_errors(self, service):
+        """Test connection failures are not swallowed by get_block_by_height."""
+        service.get_block_hash = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        with pytest.raises(ChainConnectionError):
+            await service.get_block_by_height(999)
+
+    async def test_get_block_by_hash_raises_non_not_found_rpc_errors(self, service):
+        """Test non-not-found RPC failures still propagate for block lookups."""
+        service.get_block = AsyncMock(side_effect=RPCError("getblock", "boom", error_code=-1))
+
+        with pytest.raises(RPCError):
+            await service.get_block_by_hash("a" * 64)
+
+
+@pytest.mark.asyncio
+class TestSearchService:
+    """Tests for the shared search service."""
+
+    @pytest.fixture
+    def chain(self):
+        chain = Mock()
+        chain.path_name = "test-chain"
+        chain.config = {"path-name": "test-chain"}
+        return chain
+
+    @pytest.fixture
+    def search_service_mock(self):
+        service = Mock()
+        service.get_block_by_height = AsyncMock(return_value=None)
+        service.get_block_by_hash = AsyncMock(return_value=None)
+        service.get_transaction = AsyncMock(return_value=None)
+        service.get_address_balances = AsyncMock(return_value=[])
+        service.call = AsyncMock(return_value=[])
+        return service
+
+    async def test_search_all_entities_ignores_missing_transactions(self, chain, search_service_mock):
+        """Test not-found transaction lookups are treated as empty search results."""
+        txid = "a" * 64
+        search_service_mock.get_transaction = AsyncMock(
+            side_effect=RPCError("getrawtransaction", "not found", error_code=-5)
+        )
+
+        result = await search_all_entities(chain, search_service_mock, txid, include_stream_keys=False)
+
+        assert result == {"results": [], "total": 0}
+
+    async def test_search_all_entities_raises_backend_failures(self, chain, search_service_mock):
+        """Test backend failures are no longer silently swallowed by search."""
+        search_service_mock.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        with pytest.raises(ChainConnectionError):
+            await search_all_entities(chain, search_service_mock, "asset1", include_stream_keys=False)
 
 
 class TestPaginationService:

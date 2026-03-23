@@ -49,16 +49,13 @@ async def get_address(
         summary = await service.get_address_summary(address)
     except Exception as exc:
         raise_backend_http_error(exc)
-    
+
     if not summary:
-        # Should not happen as get_address_summary handles errors
         raise HTTPException(status_code=404, detail=f"Address {address} not found")
-        
-    # Check if we have valid data (at least address should be there)
-    # If it's an empty dict or just permissions, it might be invalid
+
     if not summary.get("address"):
         raise HTTPException(status_code=404, detail="Invalid address")
-        
+
     return AddressResponse(**summary)
 
 

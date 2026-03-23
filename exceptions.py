@@ -113,6 +113,11 @@ class RPCError(MCEException):
         self.error_code = error_code
 
 
+def is_rpc_not_found_error(exception: Exception) -> bool:
+    """Return True when an RPC exception represents a missing resource."""
+    return isinstance(exception, RPCError) and exception.error_code == -5
+
+
 class ConfigurationError(MCEException):
     """Raised when configuration is invalid or missing"""
 
@@ -227,5 +232,4 @@ def log_exception(exception: Exception, context: Optional[Dict[str, Any]] = None
     else:
         # Unexpected exceptions - always log at error level with traceback
         logger.error(f"Unexpected exception: {str(exception)}", exc_info=True, extra=context)
-
 

@@ -25,6 +25,7 @@ from routers.dependencies import (
     get_query_params,
     get_page_count,
     get_start_count,
+    raise_backend_http_error,
 )
 
 router = APIRouter(tags=["Blocks"])
@@ -118,24 +119,27 @@ async def block_by_identifier(
     Show block details by height or hash.
     """
     # Determine if identifier is a height (numeric) or hash (64 hex chars)
-    if identifier.isdigit():
-        height = int(identifier)
-        block = await service.get_block_by_height(height)
-    elif len(identifier) == 64:
-        block = await service.get_block_by_hash(identifier)
-        height = block.get("height") if block else None
-    else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid block identifier. Must be a height or 64-character hash.")
+    try:
+        if identifier.isdigit():
+            height = int(identifier)
+            block = await service.get_block_by_height(height)
+        elif len(identifier) == 64:
+            block = await service.get_block_by_hash(identifier)
+            height = block.get("height") if block else None
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid block identifier. Must be a height or 64-character hash.")
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block {identifier} not found")
 
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Block {identifier} not found")
 
     height = block.get("height", 0)
-    
+
     # Fetch full transaction details including size
     tx_ids = block.get("tx", [])
     tx_details = []
-    
+
     # Concurrent fetch for transactions
     tasks = [service.get_transaction(txid) for txid in tx_ids]
     if tasks:
@@ -167,7 +171,10 @@ async def block_by_hash(
     """
     Show block details by hash.
     """
-    block = await service.get_block_by_hash(block_hash)
+    try:
+        block = await service.get_block_by_hash(block_hash)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block {block_hash} not found")
 
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Block {block_hash} not found")
@@ -197,7 +204,10 @@ async def block_transactions(
     List transactions in a specific block.
     """
     # Get block
-    block = await service.get_block_by_height(height)
+    try:
+        block = await service.get_block_by_height(height)
+    except Exception as exc:
+        raise_backend_http_error(exc, not_found_detail=f"Block #{height} not found")
     if not block:
         raise HTTPException(status_code=404, detail=f"Block #{height} not found")
 

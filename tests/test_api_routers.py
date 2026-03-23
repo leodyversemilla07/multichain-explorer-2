@@ -270,6 +270,21 @@ class TestApiAddressesRouter:
         assert len(data["balances"]) == 1
         assert data["balances"][0]["asset"] == "asset1"
 
+    def test_api_get_address_returns_503_on_summary_connection_error(self, api_client, mock_blockchain_service):
+        """Test address endpoint surfaces backend summary failures."""
+        async def validate_ok(method, params=None):
+            if method == "validateaddress":
+                return {"isvalid": True, "address": params[0], "ismine": False}
+            return None
+
+        mock_blockchain_service.call = AsyncMock(side_effect=validate_ok)
+        mock_blockchain_service.get_address_summary = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
+
+        response = api_client.get("/api/v1/test-chain/addresses/addr1")
+        assert response.status_code == 503
+
     def test_api_list_address_transactions(self, api_client):
         """Test GET /api/v1/{chain}/addresses/{address}/transactions."""
         response = api_client.get("/api/v1/test-chain/addresses/addr1/transactions")
@@ -396,3 +411,10 @@ class TestApiSearchRouter:
         data = response.json()
         assert data["total"] >= 1
         assert any(result.get("url") == "/test-chain/asset/asset1" for result in data["results"])
+
+    def test_api_search_returns_503_on_backend_failure(self, api_client, mock_blockchain_service):
+        """Test API search surfaces backend failures from the shared search service."""
+        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        response = api_client.get("/api/v1/test-chain/search", params={"q": "asset1"})
+        assert response.status_code == 503

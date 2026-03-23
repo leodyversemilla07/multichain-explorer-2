@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from config import ChainConfig
-from exceptions import ChainConnectionError, RPCError
+from exceptions import ChainConnectionError, RPCError, is_rpc_not_found_error
 from services.cache_service import cached
 
 logger = logging.getLogger(__name__)
@@ -117,8 +117,8 @@ class BlockchainService:
             try:
                 data = response.json()
             except json.JSONDecodeError:
-                response.raise_for_status() # If not JSON and error status, raise it
-                data = {} # Should not happen if raise_for_status passes
+                response.raise_for_status()
+                data = {}
 
             if "error" in data and data["error"] is not None:
                 # Handle both dict and string error formats
@@ -253,30 +253,28 @@ class BlockchainService:
         try:
             block_hash = await self.get_block_hash(height)
             return await self.get_block(block_hash)
-        except (RPCError, ChainConnectionError):
-            return None
+        except RPCError as exc:
+            if is_rpc_not_found_error(exc):
+                return None
+            raise
 
     async def get_block_by_hash(self, block_hash: str) -> Optional[Dict[str, Any]]:
         """Get block by hash."""
         try:
             return await self.get_block(block_hash)
-        except (RPCError, ChainConnectionError):
-            return None
+        except RPCError as exc:
+            if is_rpc_not_found_error(exc):
+                return None
+            raise
 
     async def get_address_info(self, address: str) -> Dict[str, Any]:
         """Get address information including balance and transactions."""
-        try:
-            balances = await self.get_address_balances(address)
-            return {"address": address, "balances": balances}
-        except (RPCError, ChainConnectionError):
-            return {"address": address, "balances": []}
+        balances = await self.get_address_balances(address)
+        return {"address": address, "balances": balances}
 
     async def get_address_permissions(self, address: str) -> List[Any]:
         """Get permissions for an address."""
-        try:
-            return await self.call("listpermissions", ["*", address])
-        except (RPCError, ChainConnectionError):
-            return []
+        return await self.call("listpermissions", ["*", address])
 
     async def get_address_summary(self, address: str) -> Dict[str, Any]:
         """
@@ -303,15 +301,24 @@ class BlockchainService:
         permissions = results[1]
         
         if isinstance(info, Exception) or not info:
-             # Try validateaddress as fallback if get_address_info (balances) fails
-             try:
-                 val = await self.call("validateaddress", [address])
-                 info = val if val and val.get("isvalid") else {}
-             except Exception:
-                 info = {}
+            # Distinguish missing/invalid addresses from backend failures.
+            try:
+                val = await self.call("validateaddress", [address])
+            except RPCError as exc:
+                if is_rpc_not_found_error(exc):
+                    info = {}
+                else:
+                    raise
+            except ChainConnectionError:
+                raise
+            else:
+                info = val if val and val.get("isvalid") else {}
+
+            if isinstance(info, Exception):
+                raise info
 
         if isinstance(permissions, Exception):
-            permissions = []
+            raise permissions
             
         # Merge results
         result = info.copy()

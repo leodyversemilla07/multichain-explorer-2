@@ -452,6 +452,24 @@ class TestBlocksRouter:
         assert "/test-chain/block/99" in response.text
         assert "/test-chain/block/101" in response.text
 
+    def test_block_detail_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+        """Test block detail surfaces backend connection failures."""
+        mock_blockchain_service.get_block_by_height = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
+
+        response = client.get("/test-chain/block/100")
+        assert response.status_code == 503
+
+    def test_block_transactions_returns_502_for_rpc_errors(self, client, mock_blockchain_service):
+        """Test block transactions surface backend RPC failures."""
+        mock_blockchain_service.get_block_by_height = AsyncMock(
+            side_effect=RPCError("getblockhash", "boom")
+        )
+
+        response = client.get("/test-chain/block/100/transactions")
+        assert response.status_code == 502
+
 
 class TestSearchRouter:
     """Test search router endpoints."""
@@ -465,6 +483,13 @@ class TestSearchRouter:
         assert response.status_code == 200
         data = response.json()
         assert "suggestions" in data
+
+    def test_search_suggest_returns_503_on_backend_failure(self, client, mock_blockchain_service):
+        """Test HTML search suggest surfaces backend failures from shared search."""
+        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+
+        response = client.get("/test-chain/search/suggest?q=asset1")
+        assert response.status_code == 503
 
 
 class TestSystemRoutes:
@@ -557,6 +582,16 @@ class TestPaginationInRoutes:
         response = client.get("/test-chain/blocks?count=50")
         assert response.status_code == 200
         assert 'Page <span class="font-medium">1</span> of <span class="font-medium">20</span>' in response.text
+
+    def test_transactions_returns_503_when_all_recent_block_fetches_fail(self, client, mock_blockchain_service):
+        """Test recent transactions page surfaces total backend block failures."""
+        mock_blockchain_service.get_blockchain_info.return_value = {"blocks": 5}
+        mock_blockchain_service.get_block_by_height = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
+
+        response = client.get("/test-chain/transactions")
+        assert response.status_code == 503
 
     def test_asset_transactions_uses_full_total_for_pagination(self, client, mock_blockchain_service):
         """Test asset transaction pages use the real total, not a one-item probe."""

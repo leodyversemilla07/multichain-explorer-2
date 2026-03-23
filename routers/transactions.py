@@ -72,12 +72,20 @@ async def list_transactions(
 
     # Fetch blocks in parallel
     block_results = await asyncio.gather(
-        *[service.get_block_by_height(h) for h in heights_to_scan]
+        *[service.get_block_by_height(h) for h in heights_to_scan],
+        return_exceptions=True,
     )
+
+    block_errors = [result for result in block_results if isinstance(result, Exception)]
+    if block_errors and len(block_errors) == len(block_results):
+        raise_backend_http_error(block_errors[0])
 
     for i, block in enumerate(block_results):
         if len(recent_txs) >= max_txs:
             break
+
+        if isinstance(block, Exception):
+            continue
 
         if block and "tx" in block:
             block_time = block.get("time")

@@ -155,9 +155,9 @@ async def address_detail(
             title=f"Address - {chain.display_name}",
             address=address,
             address_info=address_summary,
-            address_data=address_summary, # Both keys used in template?
+            address_data=address_summary,
             balances=balances,
-            assets=balances, # Alias
+            assets=balances,
             permissions=permissions,
             transactions=transactions,
             transactions_count=transactions_count,

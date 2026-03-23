@@ -46,8 +46,7 @@ async def get_chain_summary(chain_config: Any, client: Any = None) -> Dict[str, 
         results = await asyncio.gather(
             service.call("listassets"),
             service.call("liststreams"),
-            # listaddresses with count=False might be slow on huge chains, beware
-            # Actually "*" means all, False means verbose=False
+            # listaddresses("*", False) returns the address list without verbose details.
             service.call("listaddresses", ["*", False]),
             return_exceptions=True,
         )

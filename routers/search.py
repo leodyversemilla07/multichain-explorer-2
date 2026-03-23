@@ -14,6 +14,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     CommonContextDep,
     get_query_params,
+    raise_backend_http_error,
 )
 from services.search_service import search_all_entities
 
@@ -32,11 +33,12 @@ async def search(
     """
     Search the blockchain.
     """
-    # Prefer Form param, fallback to query param from request (legacy support)
     query = search_value
-    
-    # If using search_all logic
-    results = await search_all_entities(chain, service, query, include_stream_keys=True)
+
+    try:
+        results = await search_all_entities(chain, service, query, include_stream_keys=True)
+    except Exception as exc:
+        raise_backend_http_error(exc)
     
     # Check if single result for redirect
     if results["total"] == 1:
@@ -70,7 +72,10 @@ async def search_get(
     """
     query = query_params.get("q", "")
 
-    results = await search_all_entities(chain, service, query, include_stream_keys=True)
+    try:
+        results = await search_all_entities(chain, service, query, include_stream_keys=True)
+    except Exception as exc:
+        raise_backend_http_error(exc)
     
     # Check if single result for redirect
     if results["total"] == 1:
@@ -99,21 +104,22 @@ async def search_suggest(
     """
     Auto-suggest search results for dropdown.
     """
-    query = query_params.get("term", "") # 'term' is often used by jQuery UI Autocomplete, or 'q'
+    query = query_params.get("term", "")
     if not query:
         query = query_params.get("q", "")
 
     limit = 5
-    
-    # Reuse search_all but limit results
-    # We might want a lighter version but search_all is what we have.
-    search_results = await search_all_entities(
-        chain,
-        service,
-        query,
-        limit=limit,
-        include_stream_keys=True,
-    )
+
+    try:
+        search_results = await search_all_entities(
+            chain,
+            service,
+            query,
+            limit=limit,
+            include_stream_keys=True,
+        )
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
     suggestions = []
     for result in search_results["results"][:limit]:
