@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -322,3 +323,227 @@ def mock_rpc_calls(mock_chain):
         mock_client.post.side_effect = mock_post
         
         yield mock_chain
+
+
+@pytest.fixture
+def app_mock_chain():
+    """Mock chain config used by FastAPI router and API tests."""
+    chain = Mock()
+    chain.name = "test-chain"
+    chain.path_name = "test-chain"
+    chain.display_name = "Test Chain"
+    chain.multichain_url = "http://localhost:8570"
+    chain.multichain_headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Basic dGVzdDp0ZXN0",
+    }
+    chain.config = {
+        "name": "test-chain",
+        "path-name": "test-chain",
+        "display-name": "Test Chain",
+        "multichain-url": chain.multichain_url,
+        "multichain-headers": chain.multichain_headers,
+    }
+    return chain
+
+
+@pytest.fixture
+def app_mock_blockchain_service():
+    """Mock blockchain service used by FastAPI router and API tests."""
+    service = Mock()
+
+    block = {
+        "hash": "blockhash_new",
+        "height": 999,
+        "time": 1700000000,
+        "tx": ["tx1"],
+        "nTx": 1,
+        "size": 100,
+        "version": 1,
+        "confirmations": 1,
+        "merkleroot": "root",
+        "miner": "1ABC123",
+    }
+    tx = {
+        "txid": "tx1",
+        "version": 1,
+        "locktime": 0,
+        "vin": [],
+        "vout": [],
+        "confirmations": 1,
+        "time": 1700000000,
+        "size": 250,
+        "hex": "010000...",
+        "blockhash": "blockhash_new",
+        "blockheight": 999,
+    }
+
+    service.get_blockchain_info = AsyncMock(
+        return_value={
+            "blocks": 1000,
+            "headers": 1000,
+            "bestblockhash": "abc123",
+            "difficulty": 1.0,
+            "chainwork": "0000",
+        }
+    )
+    service.list_blocks = AsyncMock(
+        return_value=[
+            block,
+            {
+                **block,
+                "hash": "blockhash_old",
+                "height": 998,
+                "time": 1690000000,
+                "tx": ["tx2", "tx3"],
+                "nTx": 2,
+                "confirmations": 2,
+            },
+        ]
+    )
+    service.get_block_by_height = AsyncMock(return_value=block)
+    service.get_block_by_hash = AsyncMock(return_value=block)
+    service.get_block_hash = AsyncMock(return_value="blockhash_new")
+    service.get_block = AsyncMock(return_value=block)
+    service.get_transaction = AsyncMock(return_value=tx)
+
+    async def mock_call(method, params=None):
+        if method == "validateaddress":
+            address = params[0] if params else ""
+            return {"address": address, "isvalid": True, "ismine": False}
+        if method == "listaddresses":
+            return []
+        if method == "listpermissions":
+            return []
+        if method == "listaddresstransactions":
+            return []
+        if method == "listassets":
+            if params and params[0] != "*":
+                return [{"name": "asset1", "assetref": "1-2-3", "multiple": 1, "units": 0.1, "open": True, "issues": []}]
+            return [
+                {"name": "asset1", "assetref": "1-2-3", "multiple": 1, "units": 0.1, "open": True, "issues": []},
+                {"name": "assetA", "assetref": "2-3-4", "multiple": 1, "units": 1.0, "open": False, "issues": []},
+            ]
+        if method == "listassetholders":
+            return []
+        if method == "listassettransactions":
+            return [{"txid": "tx1"}]
+        if method == "liststreams":
+            if params and params[0] != "*":
+                stream_name = params[0]
+                return [{"name": stream_name, "streamref": "5-6-7", "createtxid": "tx_str", "items": 10}]
+            return [{"name": "stream1", "streamref": "5-6-7", "createtxid": "tx_str", "items": 10}]
+        if method == "liststreamitems":
+            return [
+                {"publishers": ["pub1"], "key": "key1", "data": "hexdata", "confirmations": 1, "blocktime": 1000, "txid": "tx_item"}
+            ]
+        if method in {
+            "liststreamkeys",
+            "liststreampublishers",
+            "liststreamkeyitems",
+            "liststreampublisheritems",
+            "explorerlistaddressstreams",
+        }:
+            return []
+        return []
+
+    service.call = AsyncMock(side_effect=mock_call)
+    service.get_address_info = AsyncMock(
+        return_value={
+            "address": "addr1",
+            "ismine": False,
+            "iswatchonly": False,
+            "isscript": False,
+            "isvalid": True,
+        }
+    )
+    service.get_address_balances = AsyncMock(
+        return_value=[{"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}]
+    )
+    service.get_address_permissions = AsyncMock(return_value=["connect", "send", "receive"])
+    service.get_address_transactions = AsyncMock(return_value=[{"txid": "tx1", "balance": {}, "addresses": ["addr1"]}])
+    service.get_address_summary = AsyncMock(
+        return_value={
+            "address": "addr1",
+            "ismine": False,
+            "iswatchonly": False,
+            "isscript": False,
+            "isvalid": True,
+            "balances": [{"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}],
+            "permissions": ["connect", "send", "receive"],
+        }
+    )
+
+    return service
+
+
+@pytest.fixture
+def app_test_state(app_mock_chain):
+    """Application state used by FastAPI router and API tests."""
+    from app_state import ApplicationState
+
+    state = ApplicationState()
+    state.chains = [app_mock_chain]
+    state.settings = {
+        "main": {"base": "/"},
+        "test-chain": {"name": "test-chain"},
+    }
+    return state
+
+
+@pytest.fixture
+def api_test_client(app_mock_chain, app_mock_blockchain_service, app_test_state):
+    """Shared JSON API client with dependency overrides applied."""
+    from main import create_app
+    from routers.dependencies import get_blockchain_service
+
+    app = create_app()
+    app.state.config = app_test_state
+    app.dependency_overrides[get_blockchain_service] = lambda: app_mock_blockchain_service
+
+    yield TestClient(app, raise_server_exceptions=True)
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def html_test_app(app_mock_chain, app_test_state):
+    """Shared FastAPI app for HTML router tests with patched lifespan dependencies."""
+    from main import create_app
+
+    mock_http_client = Mock()
+    mock_http_client.aclose = AsyncMock()
+    mock_cache_provider = Mock()
+    mock_cache_provider.close = AsyncMock()
+
+    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
+         patch("main.app_state.init_from_env", return_value=True), \
+         patch("main.app_state.get_state", return_value=app_test_state), \
+         patch("main.create_cache_provider", return_value=mock_cache_provider):
+        app = create_app()
+
+    app.state.config = app_test_state
+    return app
+
+
+@pytest.fixture
+def html_test_client(html_test_app, app_mock_blockchain_service):
+    """Shared HTML client with patched lifespan infrastructure and DI overrides."""
+    from routers.dependencies import get_blockchain_service
+
+    mock_http_client = Mock()
+    mock_http_client.aclose = AsyncMock()
+    mock_cache_provider = Mock()
+    mock_cache_provider.close = AsyncMock()
+    state = html_test_app.state.config
+
+    html_test_app.dependency_overrides[get_blockchain_service] = lambda: app_mock_blockchain_service
+    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
+         patch("main.app_state.init_from_env", return_value=True), \
+         patch("main.app_state.get_state", return_value=state), \
+         patch("main.create_cache_provider", return_value=mock_cache_provider):
+        with TestClient(html_test_app, raise_server_exceptions=False) as client:
+            html_test_app.state.config = state
+            yield client
+
+    html_test_app.dependency_overrides.clear()

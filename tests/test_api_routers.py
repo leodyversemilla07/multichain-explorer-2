@@ -3,197 +3,23 @@ Tests for API routers (JSON endpoints).
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock
 from exceptions import ChainConnectionError, RPCError
 
 @pytest.fixture
-def mock_chain():
-    """Create a mock chain object."""
-    chain = Mock()
-    chain.name = "test-chain"
-    chain.config = {
-        "name": "test-chain",
-        "path-name": "test-chain",
-        "display-name": "Test Chain",
-        "multichain-url": "http://localhost:8570",
-        "multichain-headers": {
-            "Content-Type": "application/json",
-            "Authorization": "Basic dGVzdDp0ZXN0",
-        },
-    }
-    return chain
+def mock_chain(app_mock_chain):
+    """Alias the shared app chain fixture for API router tests."""
+    return app_mock_chain
 
 @pytest.fixture
-def mock_blockchain_service():
-    """Create a mock blockchain service with AsyncMock methods."""
-    service = Mock()
-    
-    # Common methods
-    service.get_blockchain_info = AsyncMock(return_value={
-        "blocks": 1000,
-    })
-    
-    # list_blocks
-    service.list_blocks = AsyncMock(return_value=[
-        {
-            "hash": "blockhash_new",
-            "height": 999,
-            "time": 1700000000,
-            "tx": ["tx1"],
-            "nTx": 1,
-            "size": 100,
-            "version": 1,
-            "confirmations": 1,
-            "merkleroot": "root",
-        },
-        {
-            "hash": "blockhash_old",
-            "height": 998,
-            "time": 1690000000,
-            "tx": ["tx2", "tx3"],
-            "nTx": 2,
-            "size": 200,
-            "version": 1,
-            "confirmations": 2,
-            "merkleroot": "root",
-        }
-    ])
-    
-    # Block details
-    service.get_block_by_height = AsyncMock(return_value={
-        "hash": "blockhash_new",
-        "height": 999,
-        "time": 1700000000,
-        "tx": ["tx1"],
-        "nTx": 1,
-        "size": 100,
-        "version": 1,
-        "confirmations": 1,
-        "merkleroot": "root",
-    })
-    service.get_block_hash = AsyncMock(return_value="blockhash_new")
-    service.get_block = AsyncMock(return_value={
-        "hash": "blockhash_new",
-        "height": 999,
-        "time": 1700000000,
-        "tx": ["tx1"],
-        "nTx": 1,
-        "size": 100,
-        "version": 1,
-        "confirmations": 1,
-        "merkleroot": "root",
-    })
-    service.get_block_by_hash = AsyncMock(return_value={
-        "hash": "blockhash_new",
-        "height": 999,
-        "time": 1700000000,
-        "tx": ["tx1"],
-        "nTx": 1,
-        "size": 100,
-        "version": 1,
-        "confirmations": 1,
-        "merkleroot": "root",
-    })
-    
-    # Transaction details
-    tx_defaults = {
-        "txid": "tx1",
-        "version": 1,
-        "locktime": 0,
-        "vin": [],
-        "vout": [],
-        "confirmations": 1,
-        "time": 1700000000,
-        "size": 250,
-        "hex": "010000...",
-        "blockhash": "blockhash_new",
-        "blockheight": 999,
-    }
-    service.get_transaction = AsyncMock(return_value=tx_defaults)
-    
-    # Address Calls
-    async def mock_call(method, params=None):
-        if method == "validateaddress":
-            return {"isvalid": True, "address": params[0], "ismine": False}
-        if method == "listassets":
-            # For query or list
-            if params and params[0] != "*":
-                # Detail
-                return [{"name": "asset1", "assetref": "1-2-3", "multiple": 1, "units": 0.1, "open": True}]
-            else:
-                # List
-                return [
-                    {"name": "asset1", "assetref": "1-2-3", "multiple": 1, "units": 0.1, "open": True},
-                    {"name": "assetA", "assetref": "2-3-4", "multiple": 1, "units": 1.0, "open": False},
-                ]
-        if method == "liststreams":
-            if params and params[0] != "*":
-                # Detail
-                return [{"name": "stream1", "streamref": "5-6-7", "createtxid": "tx_str", "items": 10}]
-            else:
-                return [{"name": "stream1", "streamref": "5-6-7", "createtxid": "tx_str", "items": 10}]
-        if method == "liststreamitems":
-            return [
-                {"publishers": ["pub1"], "key": "key1", "data": "hexdata", "confirmations": 1, "blocktime": 1000, "txid": "tx_item"}
-            ]
-        return None
-
-    service.call = AsyncMock(side_effect=mock_call)
-    
-    service.get_address_info = AsyncMock(return_value={
-        "address": "addr1",
-        "ismine": False,
-        "iswatchonly": False,
-        "isscript": False,
-        "isvalid": True
-    })
-    service.get_address_permissions = AsyncMock(return_value=["connect", "send", "receive"])
-    service.get_address_balances = AsyncMock(return_value=[
-        {"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}
-    ])
-    service.get_address_transactions = AsyncMock(return_value=[
-        {"txid": "tx1", "balance": {}, "addresses": ["addr1"]}
-    ])
-    
-    service.get_address_summary = AsyncMock(return_value={
-        "address": "addr1",
-        "ismine": False,
-        "iswatchonly": False,
-        "isscript": False,
-        "isvalid": True,
-        "balances": [
-             {"asset": "asset1", "assetref": "1-2-3", "qty": 100.0, "raw": 10000000000}
-        ],
-        "permissions": ["connect", "send", "receive"]
-    })
-
-    return service
+def mock_blockchain_service(app_mock_blockchain_service):
+    """Alias the shared app blockchain service fixture for API router tests."""
+    return app_mock_blockchain_service
 
 @pytest.fixture
-def api_client(mock_chain, mock_blockchain_service):
-    """Create test client with mocked services."""
-    from main import create_app
-    from app_state import ApplicationState
-    
-    # Setup app state
-    app = create_app()
-    state = ApplicationState()
-    state.chains = [mock_chain]
-    state.settings = {
-        "main": {"base": "/"},
-        "test-chain": {"name": "test-chain"},
-    }
-    app.state.config = state
-
-    from routers.dependencies import get_blockchain_service
-    
-    app.dependency_overrides[get_blockchain_service] = lambda: mock_blockchain_service
-    
-    yield TestClient(app, raise_server_exceptions=True)
-    
-    # Cleanup
-    app.dependency_overrides = {}
+def api_client(api_test_client):
+    """Alias the shared API client fixture for API router tests."""
+    return api_test_client
 
 
 class TestApiBlocksRouter:
@@ -343,17 +169,12 @@ class TestApiAssetsRouter:
         
     def test_api_list_asset_transactions(self, api_client):
         """Test GET /api/v1/{chain}/assets/{asset_ref}/transactions."""
-        # This mocks listassettransactions via service.call
-        # and then get_transaction for details
-        with patch.object(AsyncMock, 'return_value', [{"txid": "tx1"}]): 
-             # Mock specifically for the call inside (too complex to patch side_effect perfectly here efficiently)
-             # Rely on side_effect logic in fixture: listassettransactions isn't mapped there yet?
-             # Let's add it to side_effect in fixture if missed.
-             pass
-             
         response = api_client.get("/api/v1/test-chain/assets/asset1/transactions")
-        # Assert 200. If internal call returns None, it returns [].
         assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["txid"] == "tx1"
 
 
 class TestApiStreamsRouter:

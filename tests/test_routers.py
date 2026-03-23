@@ -17,113 +17,15 @@ from routers.dependencies import get_blockchain_service
 
 
 @pytest.fixture
-def mock_chain():
-    """Create a mock chain object."""
-    chain = Mock()
-    chain.name = "test-chain"
-    chain.path_name = "test-chain"
-    chain.display_name = "Test Chain"
-    chain.multichain_url = "http://localhost:8570"
-    chain.multichain_headers = {
-        "Content-Type": "application/json",
-        "Authorization": "Basic dGVzdDp0ZXN0",
-    }
-    chain.config = {
-        "name": "test-chain",
-        "path-name": "test-chain",
-        "display-name": "Test Chain",
-        "multichain-url": "http://localhost:8570",
-        "multichain-headers": chain.multichain_headers,
-    }
-    return chain
+def mock_chain(app_mock_chain):
+    """Alias the shared app chain fixture for HTML router tests."""
+    return app_mock_chain
 
 
 @pytest.fixture
-def mock_blockchain_service():
-    """Create a mock blockchain service with AsyncMock methods."""
-    service = Mock()
-    
-    # Use AsyncMock for async methods
-    service.get_blockchain_info = AsyncMock(return_value={
-        "blocks": 1000,
-        "headers": 1000,
-        "bestblockhash": "abc123",
-        "difficulty": 1.0,
-        "chainwork": "0000",
-    })
-    
-    service.get_block_by_height = AsyncMock(return_value={
-        "hash": "blockhash123",
-        "height": 100,
-        "time": 1700000000,
-        "tx": ["tx1", "tx2"],
-        "miner": "1ABC123",
-    })
-    
-    service.get_block_by_hash = AsyncMock(return_value={
-        "hash": "blockhash123",
-        "height": 100,
-        "time": 1700000000,
-        "tx": ["tx1", "tx2"],
-    })
-    
-    service.get_transaction = AsyncMock(return_value={
-        "txid": "tx123",
-        "confirmations": 10,
-        "time": 1700000000,
-        "vin": [],
-        "vout": [],
-    })
-    
-    async def mock_call(method, params=None):
-        if method == "validateaddress":
-            address = params[0] if params else ""
-            return {"address": address, "isvalid": True, "ismine": False}
-        if method == "listaddresses":
-            return []
-        if method == "listpermissions":
-            return []
-        if method == "listaddresstransactions":
-            return []
-        if method == "listassets":
-            if params and params[0] != "*":
-                return [{"name": params[0], "assetref": "1-2-3", "issues": []}]
-            return []
-        if method == "listassetholders":
-            return []
-        if method == "listassettransactions":
-            return []
-        if method == "liststreams":
-            if params and params[0] != "*":
-                return [{"name": params[0], "streamref": "5-6-7", "items": 0}]
-            return []
-        if method in {
-            "liststreamitems",
-            "liststreamkeys",
-            "liststreampublishers",
-            "liststreamkeyitems",
-            "liststreampublisheritems",
-            "explorerlistaddressstreams",
-        }:
-            return []
-        return []
-
-    service.call = AsyncMock(side_effect=mock_call)
-    
-    service.get_address_info = AsyncMock(return_value={"address": "1ABC", "isvalid": True})
-    service.get_address_balances = AsyncMock(return_value=[])
-    service.get_address_permissions = AsyncMock(return_value=[])
-    service.get_address_transactions = AsyncMock(return_value=[])
-    service.list_blocks = AsyncMock(return_value=[])
-    
-    service.get_address_summary = AsyncMock(return_value={
-        "address": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-        "isvalid": True,
-        "balances": [],
-        "permissions": []
-    })
-    
-    return service
+def mock_blockchain_service(app_mock_blockchain_service):
+    """Alias the shared app blockchain service fixture for HTML router tests."""
+    return app_mock_blockchain_service
     
     
 class TestAddressesRouter:
@@ -305,75 +207,15 @@ class TestAddressesDetailRouter:
 
 
 @pytest.fixture
-def app_with_mocks(mock_chain):
-    """Create FastAPI app with mocked dependencies.
-
-    Patches lifespan startup dependencies (Redis, env-init, HTTP client) so TestClient
-    can enter the lifespan context manager without real infrastructure.
-    """
-    from main import create_app
-    from app_state import ApplicationState
-
-    # Build the state we want before lifespan runs
-    state = ApplicationState()
-    state.chains = [mock_chain]
-    state.settings = {
-        "main": {"base": "/"},
-        "test-chain": {"name": "test-chain"},
-    }
-
-    # Patch the three things lifespan touches that need real infrastructure:
-    # 1. httpx.AsyncClient — lifespan creates and later closes it
-    mock_http_client = MagicMock()
-    mock_http_client.aclose = AsyncMock()
-
-    # 2. init_from_env — would try to read .env and build real ChainConfigs
-    # 3. create_cache_provider — would try to connect to Redis
-    mock_cache_provider = MagicMock()
-    mock_cache_provider.close = AsyncMock()
-
-    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
-         patch("main.app_state.init_from_env", return_value=True), \
-         patch("main.app_state.get_state", return_value=state), \
-         patch("main.create_cache_provider", return_value=mock_cache_provider):
-        app = create_app()
-
-    # Ensure app.state.config is our controlled state (lifespan may overwrite it)
-    app.state.config = state
-
-    return app
+def app_with_mocks(html_test_app):
+    """Alias the shared HTML test app fixture for router tests."""
+    return html_test_app
 
 
 @pytest.fixture
-def client(app_with_mocks, mock_blockchain_service):
-    """Create test client with mocked services.
-
-    Uses app.dependency_overrides instead of patch() — the FastAPI-recommended
-    way to swap dependencies in tests (see fastapi-agents skill > testing domain).
-    """
-    # Patch lifespan infrastructure at test-client startup too
-    mock_http_client = MagicMock()
-    mock_http_client.aclose = AsyncMock()
-    mock_cache_provider = MagicMock()
-    mock_cache_provider.close = AsyncMock()
-
-    from app_state import ApplicationState
-    state = app_with_mocks.state.config
-
-    # Override the blockchain service dependency at the FastAPI DI level
-    app_with_mocks.dependency_overrides[get_blockchain_service] = (
-        lambda: mock_blockchain_service
-    )
-    with patch("main.httpx.AsyncClient", return_value=mock_http_client), \
-         patch("main.app_state.init_from_env", return_value=True), \
-         patch("main.app_state.get_state", return_value=state), \
-         patch("main.create_cache_provider", return_value=mock_cache_provider):
-        with TestClient(app_with_mocks, raise_server_exceptions=False) as c:
-            # After lifespan, re-assert our controlled state
-            app_with_mocks.state.config = state
-            yield c
-    # Always clear overrides after the test to prevent state leaking
-    app_with_mocks.dependency_overrides.clear()
+def client(html_test_client):
+    """Alias the shared HTML test client fixture for router tests."""
+    return html_test_client
 
 
 class TestChainsRouter:
