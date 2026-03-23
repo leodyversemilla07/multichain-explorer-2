@@ -501,6 +501,27 @@ def app_mock_blockchain_service():
         streams = await service.call("liststreams", [stream_ref, True])
         return streams[0] if streams else None
 
+    async def mock_get_all_assets():
+        return await service.call("listassets", ["*", True])
+
+    async def mock_get_asset_holders(asset_ref):
+        return await service.call("listassetholders", [asset_ref])
+
+    async def mock_get_all_streams():
+        return await service.call("liststreams", ["*", True])
+
+    async def mock_get_all_addresses():
+        return await service.call("listaddresses", ["*", False])
+
+    async def mock_get_recent_blocks(start_height, count=10):
+        return await service.list_blocks(start_height, count)
+
+    async def mock_get_mining_info():
+        return await service.call("getmininginfo")
+
+    async def mock_get_network_hashrate():
+        return await service.call("getnetworkhashps")
+
     async def mock_count_rpc_list_results(method, *leading_params, fetch_limit=100000):
         results = await service.call(
             method,
@@ -522,14 +543,106 @@ def app_mock_blockchain_service():
         )
         return len(results) if results else 0
 
+    async def mock_count_asset_transactions(asset_ref, fetch_limit=100000):
+        return await mock_count_rpc_list_results(
+            "listassettransactions",
+            asset_ref,
+            fetch_limit=fetch_limit,
+        )
+
+    async def mock_count_stream_items(stream_ref, fetch_limit=100000):
+        return await mock_count_rpc_list_results(
+            "liststreamitems",
+            stream_ref,
+            fetch_limit=fetch_limit,
+        )
+
+    async def mock_count_stream_key_items(stream_ref, key, fetch_limit=100000):
+        return await mock_count_rpc_list_results(
+            "liststreamkeyitems",
+            stream_ref,
+            key,
+            fetch_limit=fetch_limit,
+        )
+
+    async def mock_count_stream_publisher_items(
+        stream_ref, publisher, fetch_limit=100000
+    ):
+        return await mock_count_rpc_list_results(
+            "liststreampublisheritems",
+            stream_ref,
+            publisher,
+            fetch_limit=fetch_limit,
+        )
+
+    async def mock_get_all_stream_keys(stream_ref, fetch_limit=1000):
+        return await service.call(
+            "liststreamkeys",
+            [stream_ref, "*", False, fetch_limit, 0],
+        )
+
+    async def mock_get_all_stream_publishers(stream_ref, fetch_limit=1000):
+        return await service.call(
+            "liststreampublishers",
+            [stream_ref, "*", False, fetch_limit, 0],
+        )
+
+    async def mock_get_asset_holder_transactions(asset_ref, address, fetch_limit=1000):
+        transactions = await service.call(
+            "listaddresstransactions",
+            [address, fetch_limit, 0, True],
+        )
+        if not transactions:
+            return []
+
+        def output_matches_asset(output):
+            if output.get("assetref") == asset_ref or output.get("asset") == asset_ref:
+                return True
+            for asset in output.get("assets", []) or []:
+                if (
+                    asset.get("assetref") == asset_ref
+                    or asset.get("name") == asset_ref
+                    or asset.get("asset") == asset_ref
+                ):
+                    return True
+            return False
+
+        return [
+            tx
+            for tx in transactions
+            if any(output_matches_asset(output) for output in tx.get("vout", []))
+        ]
+
     service.call = AsyncMock(side_effect=mock_call)
     service.get_asset = AsyncMock(side_effect=mock_get_asset)
     service.get_stream = AsyncMock(side_effect=mock_get_stream)
+    service.get_all_assets = AsyncMock(side_effect=mock_get_all_assets)
+    service.get_asset_holders = AsyncMock(side_effect=mock_get_asset_holders)
+    service.get_all_streams = AsyncMock(side_effect=mock_get_all_streams)
+    service.get_all_addresses = AsyncMock(side_effect=mock_get_all_addresses)
+    service.get_recent_blocks = AsyncMock(side_effect=mock_get_recent_blocks)
+    service.get_mining_info = AsyncMock(side_effect=mock_get_mining_info)
+    service.get_network_hashrate = AsyncMock(side_effect=mock_get_network_hashrate)
     service.count_rpc_list_results = AsyncMock(side_effect=mock_count_rpc_list_results)
     service.count_address_transactions = AsyncMock(
         side_effect=mock_count_address_transactions
     )
     service.count_address_streams = AsyncMock(side_effect=mock_count_address_streams)
+    service.count_asset_transactions = AsyncMock(
+        side_effect=mock_count_asset_transactions
+    )
+    service.count_stream_items = AsyncMock(side_effect=mock_count_stream_items)
+    service.count_stream_key_items = AsyncMock(side_effect=mock_count_stream_key_items)
+    service.count_stream_publisher_items = AsyncMock(
+        side_effect=mock_count_stream_publisher_items
+    )
+    service.get_all_stream_keys = AsyncMock(side_effect=mock_get_all_stream_keys)
+    service.get_all_stream_publishers = AsyncMock(
+        side_effect=mock_get_all_stream_publishers
+    )
+    service.get_asset_holder_transactions = AsyncMock(
+        side_effect=mock_get_asset_holder_transactions
+    )
     service.get_address_info = AsyncMock(
         return_value={
             "address": "addr1",

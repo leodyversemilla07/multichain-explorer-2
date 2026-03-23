@@ -44,10 +44,9 @@ async def get_chain_summary(chain_config: Any, client: Any = None) -> Dict[str, 
         # Get additional stats - best effort
         # We can run these concurrently
         results = await asyncio.gather(
-            service.call("listassets"),
-            service.call("liststreams"),
-            # listaddresses("*", False) returns the address list without verbose details.
-            service.call("listaddresses", ["*", False]),
+            service.get_all_assets(),
+            service.get_all_streams(),
+            service.get_all_addresses(),
             return_exceptions=True,
         )
 
@@ -166,7 +165,7 @@ async def chain_home(
         recent_count = min(10, info.get("blocks", 0))
         start_height = max(0, latest_height - recent_count + 1)
         try:
-            recent_blocks = await service.list_blocks(start_height, recent_count)
+            recent_blocks = await service.get_recent_blocks(start_height, recent_count)
             recent_blocks.sort(key=lambda block: block.get("height", 0), reverse=True)
         except Exception as exc:
             logger.warning("Error fetching recent blocks for %s: %s", chain.name, exc)
@@ -175,7 +174,7 @@ async def chain_home(
     # Get mining info and network stats
     mining_info = {}
     try:
-        mining_info = await service.call("getmininginfo")
+        mining_info = await service.get_mining_info()
     except Exception as exc:
         logger.warning("Error fetching mining info for %s: %s", chain.name, exc)
 
@@ -183,7 +182,7 @@ async def chain_home(
     networkhashps = None
     try:
         # Note: getnetworkhashps returns a number directly
-        hashrate = await service.call("getnetworkhashps")
+        hashrate = await service.get_network_hashrate()
         if hashrate:
             # Format as hash/s with appropriate unit
             if hashrate >= 1_000_000_000_000:

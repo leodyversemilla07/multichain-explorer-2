@@ -63,10 +63,7 @@ async def _count_asset_transactions(
     service: BlockchainServiceDep, asset_name: str
 ) -> int:
     """Count asset transactions using the shared bounded list-count fallback."""
-    return await service.count_rpc_list_results(
-        "listassettransactions",
-        asset_name,
-    )
+    return await service.count_asset_transactions(asset_name)
 
 
 @router.get(
@@ -88,9 +85,7 @@ async def list_assets(
     List all assets on the blockchain.
     """
     try:
-        assets = await service.call("listassets", ["*", True])
-        if not assets:
-            assets = []
+        assets = await service.get_all_assets()
     except Exception as exc:
         raise_backend_http_error(exc)
 
@@ -176,9 +171,7 @@ async def asset_holders(
     await _get_asset_or_raise(service, asset_name)
 
     try:
-        holders = await service.call("listassetholders", [asset_name])
-        if not holders:
-            holders = []
+        holders = await service.get_asset_holders(asset_name)
     except Exception as exc:
         raise_backend_http_error(exc)
 
@@ -402,35 +395,9 @@ async def holder_transactions(
     await _get_asset_or_raise(service, asset_name)
     await _validate_address(service, address)
 
-    def output_matches_asset(output: Dict[str, Any]) -> bool:
-        """Match either legacy flat asset fields or nested MultiChain asset entries."""
-        if output.get("assetref") == asset_name or output.get("asset") == asset_name:
-            return True
-
-        for asset in output.get("assets", []) or []:
-            if (
-                asset.get("assetref") == asset_name
-                or asset.get("name") == asset_name
-                or asset.get("asset") == asset_name
-            ):
-                return True
-        return False
-
     # Get transactions
     try:
-        # Note: inefficient to fetch all address transactions to filter by asset.
-        all_txs = await service.call(
-            "listaddresstransactions", [address, 1000, 0, True]
-        )
-        if not all_txs:
-            all_txs = []
-        # Filter transactions for this specific asset
-        # Match both nested assets arrays and legacy flattened output fields.
-        transactions = [
-            tx
-            for tx in all_txs
-            if any(output_matches_asset(item) for item in tx.get("vout", []))
-        ]
+        transactions = await service.get_asset_holder_transactions(asset_name, address)
     except Exception as exc:
         raise_backend_http_error(exc)
 

@@ -10,6 +10,7 @@ Replaces the legacy http.server implementation with a production-grade ASGI serv
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -157,6 +158,33 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+
+    @app.middleware("http")
+    async def log_request_timing(request: Request, call_next):
+        """Emit lightweight route timing logs for the main request path."""
+        start_time = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            logger.exception(
+                "route_timing method=%s path=%s duration_ms=%.2f status=error",
+                request.method,
+                request.url.path,
+                duration_ms,
+            )
+            raise
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        log_fn = logger.warning if duration_ms > 500 else logger.debug
+        log_fn(
+            "route_timing method=%s path=%s duration_ms=%.2f status_code=%s",
+            request.method,
+            request.url.path,
+            duration_ms,
+            response.status_code,
+        )
+        return response
 
     # Mount static files
     if STATIC_DIR.exists():

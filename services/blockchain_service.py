@@ -8,6 +8,7 @@ retry logic, and connection management.
 import asyncio
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
 import httpx
 
@@ -16,6 +17,10 @@ from exceptions import ChainConnectionError, RPCError, is_rpc_not_found_error
 from services.cache_service import cached
 
 logger = logging.getLogger(__name__)
+
+LIST_CACHE_TTL_SECONDS = 10
+COUNT_CACHE_TTL_SECONDS = 5
+SUMMARY_CACHE_TTL_SECONDS = 15
 
 
 class BlockchainService:
@@ -110,6 +115,7 @@ class BlockchainService:
             "method": method,
             "params": params,
         }
+        start_time = time.perf_counter()
 
         try:
             response = await self._post_with_retry(payload)
@@ -140,20 +146,52 @@ class BlockchainService:
                     error_code=error_code,
                 )
 
-            return data.get("result")
+            result = data.get("result")
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            log_fn = logger.warning if duration_ms > 500 else logger.debug
+            log_fn(
+                "rpc_call chain=%s method=%s duration_ms=%.2f status=ok",
+                self.chain_name,
+                method,
+                duration_ms,
+            )
+            return result
 
         except httpx.HTTPError as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
             logger.error(f"Connection error to {self.chain_name}: {e}")
+            logger.warning(
+                "rpc_call chain=%s method=%s duration_ms=%.2f status=connection_error",
+                self.chain_name,
+                method,
+                duration_ms,
+            )
             raise ChainConnectionError(
                 chain_name=self.chain_name,
                 details={"error": str(e), "rpc_url": self.rpc_url},
             )
         except json.JSONDecodeError as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
             logger.error(f"Invalid JSON response from {self.chain_name}: {e}")
+            logger.warning(
+                "rpc_call chain=%s method=%s duration_ms=%.2f status=invalid_json",
+                self.chain_name,
+                method,
+                duration_ms,
+            )
             raise RPCError(
                 method=method,
                 error_message=f"Invalid JSON response: {e}",
             )
+        except RPCError:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            logger.warning(
+                "rpc_call chain=%s method=%s duration_ms=%.2f status=rpc_error",
+                self.chain_name,
+                method,
+                duration_ms,
+            )
+            raise
 
     @cached(ttl=30, key_prefix="info")
     async def get_info(self) -> Dict[str, Any]:
@@ -163,6 +201,17 @@ class BlockchainService:
     async def get_blockchain_info(self) -> Dict[str, Any]:
         """Alias for get_info() for backward compatibility."""
         return await self.get_info()
+
+    @cached(ttl=SUMMARY_CACHE_TTL_SECONDS, key_prefix="mining-info")
+    async def get_mining_info(self) -> Dict[str, Any]:
+        """Return mining info with a short TTL for dashboard views."""
+        info = await self.call("getmininginfo")
+        return info or {}
+
+    @cached(ttl=SUMMARY_CACHE_TTL_SECONDS, key_prefix="network-hashrate")
+    async def get_network_hashrate(self) -> Any:
+        """Return network hashrate with a short TTL for dashboard views."""
+        return await self.call("getnetworkhashps")
 
     @cached(ttl=3600, key_prefix="block")
     async def get_block(self, block_hash_or_height: Any) -> Dict[str, Any]:
@@ -187,10 +236,26 @@ class BlockchainService:
             "listblocks", [f"{start_height}-{start_height + count - 1}"]
         )
 
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="recent-blocks")
+    async def get_recent_blocks(
+        self,
+        start_height: int,
+        count: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Return a short-lived cached recent block slice for dashboard views."""
+        blocks = await self.list_blocks(start_height, count)
+        return blocks or []
+
     async def list_addresses(self, addresses: Optional[List[str]] = None) -> List[Any]:
         """List address information."""
         params = [addresses] if addresses else []
         return await self.call("listaddresses", params)
+
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="addresses-all")
+    async def get_all_addresses(self) -> List[Any]:
+        """Return the full address list for short-lived summary caching."""
+        addresses = await self.call("listaddresses", ["*", False])
+        return addresses or []
 
     async def get_address_balances(self, address: str) -> List[Dict[str, Any]]:
         """Get address asset balances."""
@@ -203,12 +268,24 @@ class BlockchainService:
         params = [] if asset_name is None else [asset_name, verbose]
         return await self.call("listassets", params)
 
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="assets-all")
+    async def get_all_assets(self) -> List[Dict[str, Any]]:
+        """Return the full asset list for short-lived list-page caching."""
+        assets = await self.call("listassets", ["*", True])
+        return assets or []
+
     async def list_streams(
         self, stream_name: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List streams."""
         params = [] if stream_name is None else [stream_name]
         return await self.call("liststreams", params)
+
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="streams-all")
+    async def get_all_streams(self) -> List[Dict[str, Any]]:
+        """Return the full stream list for short-lived list-page caching."""
+        streams = await self.call("liststreams", ["*", True])
+        return streams or []
 
     async def list_stream_items(
         self,
@@ -313,6 +390,23 @@ class BlockchainService:
             raise
         return streams[0] if streams else None
 
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="asset-holders")
+    async def get_asset_holders(self, asset_ref: str) -> List[Dict[str, Any]]:
+        """Return the full holder list for a given asset with a short TTL."""
+        holders = await self.call("listassetholders", [asset_ref])
+        return holders or []
+
+    @cached(ttl=COUNT_CACHE_TTL_SECONDS, key_prefix="rpc-list-count")
+    async def _count_rpc_list_results_cached(
+        self,
+        method: str,
+        *leading_params: Any,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Cached bounded-count fallback for RPC list endpoints."""
+        results = await self.call(method, [*leading_params, False, fetch_limit, 0])
+        return len(results) if results else 0
+
     async def count_rpc_list_results(
         self,
         method: str,
@@ -326,7 +420,23 @@ class BlockchainService:
         that do not expose a dedicated count RPC. Centralizing it makes the cost
         visible and keeps the route layer consistent.
         """
-        results = await self.call(method, [*leading_params, False, fetch_limit, 0])
+        return await self._count_rpc_list_results_cached(
+            method,
+            *leading_params,
+            fetch_limit=fetch_limit,
+        )
+
+    @cached(ttl=COUNT_CACHE_TTL_SECONDS, key_prefix="address-tx-count")
+    async def _count_address_transactions_cached(
+        self,
+        address: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Cached count helper for address transactions."""
+        results = await self.call(
+            "listaddresstransactions",
+            [address, fetch_limit, 0, False],
+        )
         return len(results) if results else 0
 
     async def count_address_transactions(
@@ -335,9 +445,21 @@ class BlockchainService:
         fetch_limit: int = 100000,
     ) -> int:
         """Count address transactions using the MultiChain parameter order."""
+        return await self._count_address_transactions_cached(
+            address,
+            fetch_limit=fetch_limit,
+        )
+
+    @cached(ttl=COUNT_CACHE_TTL_SECONDS, key_prefix="address-stream-count")
+    async def _count_address_streams_cached(
+        self,
+        address: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Cached count helper for address-associated streams."""
         results = await self.call(
-            "listaddresstransactions",
-            [address, fetch_limit, 0, False],
+            "explorerlistaddressstreams",
+            [address, True, fetch_limit, 0],
         )
         return len(results) if results else 0
 
@@ -347,11 +469,131 @@ class BlockchainService:
         fetch_limit: int = 100000,
     ) -> int:
         """Count address-associated streams using the explorer RPC parameter order."""
-        results = await self.call(
-            "explorerlistaddressstreams",
-            [address, True, fetch_limit, 0],
+        return await self._count_address_streams_cached(
+            address,
+            fetch_limit=fetch_limit,
         )
-        return len(results) if results else 0
+
+    async def count_asset_transactions(
+        self,
+        asset_ref: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Count transactions involving a specific asset."""
+        return await self.count_rpc_list_results(
+            "listassettransactions",
+            asset_ref,
+            fetch_limit=fetch_limit,
+        )
+
+    async def count_stream_items(
+        self,
+        stream_ref: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Count items published to a stream."""
+        return await self.count_rpc_list_results(
+            "liststreamitems",
+            stream_ref,
+            fetch_limit=fetch_limit,
+        )
+
+    async def count_stream_key_items(
+        self,
+        stream_ref: str,
+        key: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Count items for a specific stream key."""
+        return await self.count_rpc_list_results(
+            "liststreamkeyitems",
+            stream_ref,
+            key,
+            fetch_limit=fetch_limit,
+        )
+
+    async def count_stream_publisher_items(
+        self,
+        stream_ref: str,
+        publisher: str,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Count items published by a specific stream publisher."""
+        return await self.count_rpc_list_results(
+            "liststreampublisheritems",
+            stream_ref,
+            publisher,
+            fetch_limit=fetch_limit,
+        )
+
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="stream-keys")
+    async def get_all_stream_keys(
+        self,
+        stream_ref: str,
+        fetch_limit: int = 1000,
+    ) -> List[Dict[str, Any]]:
+        """Return stream keys via the shared bounded full-list fallback."""
+        keys = await self.call(
+            "liststreamkeys", [stream_ref, "*", False, fetch_limit, 0]
+        )
+        return keys or []
+
+    @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="stream-publishers")
+    async def get_all_stream_publishers(
+        self,
+        stream_ref: str,
+        fetch_limit: int = 1000,
+    ) -> List[Dict[str, Any]]:
+        """Return stream publishers via the shared bounded full-list fallback."""
+        publishers = await self.call(
+            "liststreampublishers",
+            [stream_ref, "*", False, fetch_limit, 0],
+        )
+        return publishers or []
+
+    @staticmethod
+    def _output_matches_asset(output: Dict[str, Any], asset_ref: str) -> bool:
+        """Match legacy flat asset fields and nested MultiChain asset entries."""
+        if output.get("assetref") == asset_ref or output.get("asset") == asset_ref:
+            return True
+
+        for asset in output.get("assets", []) or []:
+            if (
+                asset.get("assetref") == asset_ref
+                or asset.get("name") == asset_ref
+                or asset.get("asset") == asset_ref
+            ):
+                return True
+        return False
+
+    @cached(ttl=SUMMARY_CACHE_TTL_SECONDS, key_prefix="asset-holder-txs")
+    async def get_asset_holder_transactions(
+        self,
+        asset_ref: str,
+        address: str,
+        fetch_limit: int = 1000,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return address transactions filtered down to those that affect one asset.
+
+        MultiChain does not expose a direct paginated holder+asset query, so this
+        remains a bounded full-fetch fallback, centralized and cached here.
+        """
+        transactions = await self.call(
+            "listaddresstransactions",
+            [address, fetch_limit, 0, True],
+        )
+        if not transactions:
+            return []
+
+        return [
+            tx
+            for tx in transactions
+            if any(
+                self._output_matches_asset(output, asset_ref)
+                for output in tx.get("vout", [])
+            )
+        ]
 
     async def get_address_summary(self, address: str) -> Dict[str, Any]:
         """

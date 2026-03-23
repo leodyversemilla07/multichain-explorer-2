@@ -15,7 +15,6 @@ Handles:
 - Publisher items
 """
 
-import asyncio
 import logging
 from typing import Dict, Any
 
@@ -61,10 +60,17 @@ async def _count_stream_results(
     *leading_params: Any,
 ) -> int:
     """Count paginated stream-related results using the shared fallback."""
-    return await service.count_rpc_list_results(
-        method,
-        *leading_params,
-    )
+    if method == "liststreamitems" and len(leading_params) == 1:
+        return await service.count_stream_items(leading_params[0])
+    if method == "liststreamkeyitems" and len(leading_params) == 2:
+        return await service.count_stream_key_items(
+            leading_params[0], leading_params[1]
+        )
+    if method == "liststreampublisheritems" and len(leading_params) == 2:
+        return await service.count_stream_publisher_items(
+            leading_params[0], leading_params[1]
+        )
+    return await service.count_rpc_list_results(method, *leading_params)
 
 
 @router.get(
@@ -86,33 +92,7 @@ async def list_streams(
     List all streams on the blockchain.
     """
     try:
-        streams = await service.call("liststreams", ["*", True])
-        if not streams:
-            streams = []
-        else:
-            # Ensure each stream has proper item counts using parallel fetching
-            async def enrich_stream_info(stream):
-                # Get item count for each stream if not present
-                if "items" not in stream or not isinstance(
-                    stream.get("items"), (int, float)
-                ):
-                    try:
-                        stream["items"] = await _count_stream_results(
-                            service,
-                            "liststreamitems",
-                            stream["name"],
-                        )
-                    except Exception:
-                        stream["items"] = 0
-
-                if "confirmed" not in stream or not isinstance(
-                    stream.get("confirmed"), (int, float)
-                ):
-                    stream["confirmed"] = stream.get("items", 0)
-
-            # Parallel execution
-            await asyncio.gather(*[enrich_stream_info(s) for s in streams])
-
+        streams = await service.get_all_streams()
     except Exception as exc:
         logger.error("Error fetching streams", exc_info=exc)
         raise_backend_http_error(exc)
@@ -126,9 +106,24 @@ async def list_streams(
         items_per_page=count,
     )
 
-    paginated_streams = streams[
-        page_info["start"] : page_info["start"] + page_info["count"]
+    paginated_streams = [
+        dict(stream)
+        for stream in streams[
+            page_info["start"] : page_info["start"] + page_info["count"]
+        ]
     ]
+
+    for stream in paginated_streams:
+        if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
+            try:
+                stream["items"] = await service.count_stream_items(stream["name"])
+            except Exception:
+                stream["items"] = 0
+
+        if "confirmed" not in stream or not isinstance(
+            stream.get("confirmed"), (int, float)
+        ):
+            stream["confirmed"] = stream.get("items", 0)
 
     pagination_context = pagination.build_context(
         page_info,
@@ -168,16 +163,12 @@ async def stream_detail(
     Show stream details.
     """
     try:
-        stream = await _get_stream_or_raise(service, stream_name)
+        stream = dict(await _get_stream_or_raise(service, stream_name))
 
         # Fix items count if it's not a number
         if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
             try:
-                stream["items"] = await _count_stream_results(
-                    service,
-                    "liststreamitems",
-                    stream_name,
-                )
+                stream["items"] = await service.count_stream_items(stream_name)
             except Exception:
                 stream["items"] = 0
 
@@ -303,9 +294,7 @@ async def stream_keys(
     await _get_stream_or_raise(service, stream_name)
 
     try:
-        keys = await service.call("liststreamkeys", [stream_name, "*", False, 1000, 0])
-        if not keys:
-            keys = []
+        keys = await service.get_all_stream_keys(stream_name)
     except Exception as exc:
         logger.error("Error fetching stream keys", exc_info=exc)
         raise_backend_http_error(exc)
@@ -365,11 +354,7 @@ async def stream_publishers(
     await _get_stream_or_raise(service, stream_name)
 
     try:
-        publishers = await service.call(
-            "liststreampublishers", [stream_name, "*", False, 1000, 0]
-        )
-        if not publishers:
-            publishers = []
+        publishers = await service.get_all_stream_publishers(stream_name)
     except Exception as exc:
         logger.error("Error fetching stream publishers", exc_info=exc)
         raise_backend_http_error(exc)

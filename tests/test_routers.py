@@ -135,6 +135,26 @@ class TestStreamsRouter:
         assert "/test-chain/stream/stream1/keys" in response.text
         assert "/test-chain/stream/stream1/publishers" in response.text
 
+    def test_streams_list_only_enriches_visible_page(
+        self, html_test_client, app_mock_blockchain_service
+    ):
+        """Test stream count backfills only run for the current paginated slice."""
+        app_mock_blockchain_service.get_all_streams = AsyncMock(
+            return_value=[
+                {"name": "stream1", "streamref": "1-1-1"},
+                {"name": "stream2", "streamref": "1-1-2"},
+                {"name": "stream3", "streamref": "1-1-3"},
+            ]
+        )
+        app_mock_blockchain_service.count_stream_items = AsyncMock(return_value=7)
+
+        response = html_test_client.get("/test-chain/streams?page=2&count=1")
+
+        assert response.status_code == 200
+        app_mock_blockchain_service.count_stream_items.assert_awaited_once_with(
+            "stream2"
+        )
+
 
 class TestPermissionsRouter:
     """Test permissions router endpoints (HTML)."""
@@ -273,15 +293,49 @@ class TestChainsRouter:
             "chainwork": "0000",
             "description": "Test chain description",
         }
-        app_mock_blockchain_service.list_blocks.return_value = [
-            {"height": 1, "hash": "hash1", "time": 1700000000, "tx": ["tx1"]},
-            {"height": 0, "hash": "hash0", "time": 1699990000, "tx": ["tx0"]},
-        ]
+        app_mock_blockchain_service.get_recent_blocks = AsyncMock(
+            return_value=[
+                {"height": 1, "hash": "hash1", "time": 1700000000, "tx": ["tx1"]},
+                {"height": 0, "hash": "hash0", "time": 1699990000, "tx": ["tx0"]},
+            ]
+        )
+        app_mock_blockchain_service.get_mining_info = AsyncMock(return_value={})
+        app_mock_blockchain_service.get_network_hashrate = AsyncMock(return_value=None)
 
         response = html_test_client.get("/test-chain")
         assert response.status_code == 200
         assert "/test-chain/blocks" in response.text
         assert "/test-chain/block/1" in response.text
+
+    def test_chain_home_uses_cached_dashboard_helpers(
+        self, html_test_client, app_mock_blockchain_service
+    ):
+        """Test chain dashboard uses shared cached helper methods for hot reads."""
+        app_mock_blockchain_service.get_blockchain_info.return_value = {
+            "blocks": 2,
+            "headers": 2,
+            "bestblockhash": "abc123",
+            "difficulty": 1.0,
+            "chainwork": "0000",
+        }
+        app_mock_blockchain_service.get_recent_blocks = AsyncMock(
+            return_value=[{"height": 1, "hash": "hash1", "time": 1700000000, "tx": []}]
+        )
+        app_mock_blockchain_service.get_mining_info = AsyncMock(return_value={})
+        app_mock_blockchain_service.get_network_hashrate = AsyncMock(return_value=None)
+        app_mock_blockchain_service.list_blocks = AsyncMock(
+            side_effect=AssertionError("should not call uncached recent block fetch")
+        )
+        app_mock_blockchain_service.call = AsyncMock(
+            side_effect=AssertionError("should not call raw dashboard RPCs")
+        )
+
+        response = html_test_client.get("/test-chain")
+
+        assert response.status_code == 200
+        app_mock_blockchain_service.get_recent_blocks.assert_awaited_once_with(0, 2)
+        app_mock_blockchain_service.get_mining_info.assert_awaited_once()
+        app_mock_blockchain_service.get_network_hashrate.assert_awaited_once()
 
     def test_chain_parameters_returns_503_on_connection_error(
         self, html_test_client, app_mock_blockchain_service

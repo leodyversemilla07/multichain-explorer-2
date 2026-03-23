@@ -13,6 +13,11 @@ import pytest
 from config import ChainConfig
 from exceptions import ChainConnectionError, RPCError
 from services import BlockchainService, FormattingService, PaginationService
+from services.cache_service import (
+    CacheService,
+    MemoryCacheProvider,
+    _replace_global_cache,
+)
 from services.search_service import search_all_entities
 
 
@@ -38,6 +43,13 @@ class TestBlockchainService:
     def service(self, chain_config):
         """Create blockchain service instance."""
         return BlockchainService(chain_config)
+
+    @pytest.fixture(autouse=True)
+    async def reset_global_cache(self):
+        """Ensure cached service methods always run against an async memory cache."""
+        _replace_global_cache(CacheService(MemoryCacheProvider()))
+        yield
+        _replace_global_cache(CacheService(MemoryCacheProvider()))
 
     def test_service_initialization(self, service, chain_config):
         """Test service initializes correctly."""
@@ -232,6 +244,82 @@ class TestBlockchainService:
             "listassettransactions",
             ["asset1", False, 100000, 0],
         )
+
+    async def test_get_all_assets_is_cached(self, service):
+        """Test shared asset list helper caches the expensive full-list fetch."""
+        await service.get_all_assets.cache_clear()
+        service.call = AsyncMock(return_value=[{"name": "asset1"}])
+
+        first = await service.get_all_assets()
+        second = await service.get_all_assets()
+
+        assert first == second == [{"name": "asset1"}]
+        service.call.assert_awaited_once_with("listassets", ["*", True])
+
+    async def test_count_stream_items_is_cached(self, service):
+        """Test stream item counts reuse the shared cached bounded-count helper."""
+        await service._count_rpc_list_results_cached.cache_clear()
+        service.call = AsyncMock(return_value=[{"txid": "tx1"}])
+
+        first = await service.count_stream_items("stream1")
+        second = await service.count_stream_items("stream1")
+
+        assert first == second == 1
+        service.call.assert_awaited_once_with(
+            "liststreamitems",
+            ["stream1", False, 100000, 0],
+        )
+
+    async def test_get_asset_holder_transactions_filters_nested_assets(self, service):
+        """Test holder transaction filtering keeps nested asset outputs only once."""
+        await service.get_asset_holder_transactions.cache_clear()
+        service.call = AsyncMock(
+            return_value=[
+                {
+                    "txid": "tx1",
+                    "vout": [{"assets": [{"name": "asset1"}]}],
+                },
+                {
+                    "txid": "tx2",
+                    "vout": [{"assets": [{"name": "asset2"}]}],
+                },
+            ]
+        )
+
+        first = await service.get_asset_holder_transactions("asset1", "addr1")
+        second = await service.get_asset_holder_transactions("asset1", "addr1")
+
+        assert (
+            first
+            == second
+            == [{"txid": "tx1", "vout": [{"assets": [{"name": "asset1"}]}]}]
+        )
+        service.call.assert_awaited_once_with(
+            "listaddresstransactions",
+            ["addr1", 1000, 0, True],
+        )
+
+    async def test_get_recent_blocks_is_cached(self, service):
+        """Test dashboard recent-block slices reuse the short-lived cache."""
+        await service.get_recent_blocks.cache_clear()
+        service.call = AsyncMock(return_value=[{"height": 99}])
+
+        first = await service.get_recent_blocks(90, 10)
+        second = await service.get_recent_blocks(90, 10)
+
+        assert first == second == [{"height": 99}]
+        service.call.assert_awaited_once_with("listblocks", ["90-99"])
+
+    async def test_get_all_addresses_is_cached(self, service):
+        """Test homepage address summaries reuse the shared cached full-list helper."""
+        await service.get_all_addresses.cache_clear()
+        service.call = AsyncMock(return_value=[{"address": "addr1"}])
+
+        first = await service.get_all_addresses()
+        second = await service.get_all_addresses()
+
+        assert first == second == [{"address": "addr1"}]
+        service.call.assert_awaited_once_with("listaddresses", ["*", False])
 
 
 @pytest.mark.asyncio

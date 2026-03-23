@@ -186,8 +186,18 @@ def cached(ttl: int = 60, key_prefix: str = "") -> Callable:
             cache = get_cache()
             result = await cache.get(cache_key)
             if result is not None:
+                logger.debug(
+                    "Cache hit for %s (prefix=%s)",
+                    func.__name__,
+                    key_prefix or "default",
+                )
                 return result
 
+            logger.debug(
+                "Cache miss for %s (prefix=%s)",
+                func.__name__,
+                key_prefix or "default",
+            )
             result = await func(*args, **kwargs)
             await cache.set(cache_key, result, ttl)
             return result

@@ -52,11 +52,11 @@ async def list_streams(
     List streams in the blockchain (JSON).
     """
     try:
-        streams = await service.call("liststreams", ["*", True])
+        streams = await service.get_all_streams()
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    streams.sort(key=lambda x: x.get("name", ""))
+    streams = sorted(streams, key=lambda x: x.get("name", ""))
     page, count = get_page_count(query_params)
 
     page_info = pagination.get_pagination_info(

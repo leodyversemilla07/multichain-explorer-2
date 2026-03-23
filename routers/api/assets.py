@@ -55,15 +55,13 @@ async def list_assets(
     """
     List assets in the blockchain (JSON).
     """
-    # Fetch all assets
-    # listassets returns list of dicts.
     try:
-        assets = await service.call("listassets", ["*", True])
+        assets = await service.get_all_assets()
     except Exception as exc:
         raise_backend_http_error(exc)
 
     # Sort by name
-    assets.sort(key=lambda x: x.get("name", ""))
+    assets = sorted(assets, key=lambda x: x.get("name", ""))
 
     # Pagination
     page, count = get_page_count(query_params)

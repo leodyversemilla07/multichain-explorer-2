@@ -181,6 +181,31 @@ class TestApiAssetsRouter:
         assert len(data) == 1
         assert data[0]["name"] == "assetA"
 
+    def test_api_list_assets_uses_shared_cached_list_helper(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test assets API uses the shared full-list helper instead of a raw list RPC."""
+        app_mock_blockchain_service.get_all_assets = AsyncMock(
+            return_value=[
+                {
+                    "name": "asset1",
+                    "assetref": "1-2-3",
+                    "multiple": 1,
+                    "units": 0.1,
+                    "open": True,
+                    "issues": [],
+                }
+            ]
+        )
+        app_mock_blockchain_service.call = AsyncMock(
+            side_effect=AssertionError("should not call listassets directly")
+        )
+
+        response = api_test_client.get("/api/v1/test-chain/assets")
+
+        assert response.status_code == 200
+        assert response.json()[0]["name"] == "asset1"
+
     def test_api_get_asset(self, api_test_client):
         """Test GET /api/v1/{chain}/assets/{asset_ref}."""
         response = api_test_client.get("/api/v1/test-chain/assets/asset1")
@@ -238,12 +263,35 @@ class TestApiStreamsRouter:
         self, api_test_client, app_mock_blockchain_service
     ):
         """Test streams list endpoint surfaces backend connection failures."""
-        app_mock_blockchain_service.call = AsyncMock(
+        app_mock_blockchain_service.get_all_streams = AsyncMock(
             side_effect=ChainConnectionError("test-chain")
         )
 
         response = api_test_client.get("/api/v1/test-chain/streams")
         assert response.status_code == 503
+
+    def test_api_list_streams_uses_shared_cached_list_helper(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test streams API uses the shared full-list helper instead of a raw list RPC."""
+        app_mock_blockchain_service.get_all_streams = AsyncMock(
+            return_value=[
+                {
+                    "name": "stream1",
+                    "streamref": "5-6-7",
+                    "createtxid": "tx_str",
+                    "items": 10,
+                },
+            ]
+        )
+        app_mock_blockchain_service.call = AsyncMock(
+            side_effect=AssertionError("should not call liststreams directly")
+        )
+
+        response = api_test_client.get("/api/v1/test-chain/streams")
+
+        assert response.status_code == 200
+        assert response.json()[0]["name"] == "stream1"
 
     def test_api_get_stream(self, api_test_client):
         """Test GET /api/v1/{chain}/streams/{stream_ref}."""
