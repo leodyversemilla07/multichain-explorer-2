@@ -1,33 +1,21 @@
-"""
-Tests for FastAPI routers - endpoint integration tests.
-
-Uses app.dependency_overrides (FastAPI-recommended pattern) instead of
-unittest.mock.patch for service injection — ensures FastAPI's DI system
-actually swaps the dependency rather than patching at the module reference level.
-"""
+"""Tests for FastAPI HTML routers."""
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
-from fastapi import FastAPI
-
-import app_state
 from exceptions import ChainConnectionError, RPCError
 from routers.dependencies import get_blockchain_service
-
-
 @pytest.fixture
-def mock_chain(app_mock_chain):
-    """Alias the shared app chain fixture for HTML router tests."""
-    return app_mock_chain
+def simple_client():
+    """Create a lightweight client for system/OpenAPI tests."""
+    from main import create_app
+
+    app = create_app()
+    with patch("main.app_state.init_from_env", return_value=False):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client
 
 
-@pytest.fixture
-def mock_blockchain_service(app_mock_blockchain_service):
-    """Alias the shared app blockchain service fixture for HTML router tests."""
-    return app_mock_blockchain_service
-    
-    
 class TestAddressesRouter:
     """Test addresses router endpoints (HTML)."""
     
@@ -37,7 +25,7 @@ class TestAddressesRouter:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_list_addresses_renders_shared_pagination(self, client, mock_blockchain_service):
+    def test_list_addresses_renders_shared_pagination(self, client, app_mock_blockchain_service):
         """Test addresses page uses the shared page-based pagination component."""
         addresses = [
             {"address": f"addr{i}", "ismine": i % 2 == 0}
@@ -49,7 +37,7 @@ class TestAddressesRouter:
                 return addresses
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=list_addresses_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=list_addresses_call)
 
         response = client.get("/test-chain/addresses?page=2&count=2")
         assert response.status_code == 200
@@ -83,7 +71,7 @@ class TestStreamsRouter:
         assert "/test-chain/stream/stream1/publishers" in response.text
         assert "/test-chain/streams" in response.text
 
-    def test_stream_detail_renders_recent_items_preview(self, client, mock_blockchain_service):
+    def test_stream_detail_renders_recent_items_preview(self, client, app_mock_blockchain_service):
         """Test stream detail includes the recent items preview when available."""
         async def stream_detail_call(method, params=None):
             if method == "liststreams":
@@ -92,14 +80,14 @@ class TestStreamsRouter:
                 return [{"publishers": ["publisher1"], "key": "key1", "txid": "tx1", "data": "payload"}]
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=stream_detail_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=stream_detail_call)
 
         response = client.get("/test-chain/stream/stream1")
         assert response.status_code == 200
         assert "key1" in response.text
         assert "/test-chain/tx/tx1" in response.text
 
-    def test_streams_list_uses_canonical_links(self, client, mock_blockchain_service):
+    def test_streams_list_uses_canonical_links(self, client, app_mock_blockchain_service):
         """Test streams list page links use the canonical chain path."""
         async def stream_list_call(method, params=None):
             if method == "liststreams":
@@ -114,7 +102,7 @@ class TestStreamsRouter:
                 ]
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=stream_list_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=stream_list_call)
 
         response = client.get("/test-chain/streams")
         assert response.status_code == 200
@@ -127,7 +115,7 @@ class TestStreamsRouter:
 class TestPermissionsRouter:
     """Test permissions router endpoints (HTML)."""
 
-    def test_permissions_page_renders_paginated_permissions(self, client, mock_blockchain_service):
+    def test_permissions_page_renders_paginated_permissions(self, client, app_mock_blockchain_service):
         """Test main permissions page renders table rows and pagination state."""
         permissions = [
             {"address": f"addr{i}", "type": "admin", "startblock": i, "endblock": i + 10}
@@ -139,7 +127,7 @@ class TestPermissionsRouter:
                 return permissions
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=permissions_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=permissions_call)
 
         response = client.get("/test-chain/permissions?page=2&count=2")
         assert response.status_code == 200
@@ -147,7 +135,7 @@ class TestPermissionsRouter:
         assert "Addresses with Permissions" in response.text
         assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
 
-    def test_global_permissions_page_renders(self, client, mock_blockchain_service):
+    def test_global_permissions_page_renders(self, client, app_mock_blockchain_service):
         """Test global permissions page uses its dedicated template successfully."""
         permissions = [
             {"address": "addr1", "type": "admin", "startblock": 0, "endblock": None},
@@ -160,7 +148,7 @@ class TestPermissionsRouter:
                 return permissions
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=global_permissions_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=global_permissions_call)
 
         response = client.get("/test-chain/permissions/global")
         assert response.status_code == 200
@@ -179,7 +167,7 @@ class TestAddressesDetailRouter:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_address_streams_renders_shared_pagination(self, client, mock_blockchain_service):
+    def test_address_streams_renders_shared_pagination(self, client, app_mock_blockchain_service):
         """Test address streams page uses the shared page-based pagination component."""
         streams = [
             {"name": f"stream{i}", "items": i}
@@ -194,7 +182,7 @@ class TestAddressesDetailRouter:
                 return streams[start : start + count]
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=address_streams_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=address_streams_call)
 
         response = client.get(
             "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/streams?page=2&count=2"
@@ -204,13 +192,6 @@ class TestAddressesDetailRouter:
         assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
         assert "/test-chain/stream/stream2" in response.text
         assert "/test-chain/stream/stream3" in response.text
-
-
-@pytest.fixture
-def app_with_mocks(html_test_app):
-    """Alias the shared HTML test app fixture for router tests."""
-    return html_test_app
-
 
 @pytest.fixture
 def client(html_test_client):
@@ -231,9 +212,9 @@ class TestChainsRouter:
         response = client.get("/")
         assert "text/html" in response.headers.get("content-type", "")
 
-    def test_chain_home_renders_recent_blocks_links(self, client, mock_blockchain_service):
+    def test_chain_home_renders_recent_blocks_links(self, client, app_mock_blockchain_service):
         """Test chain dashboard includes recent block navigation when blocks are available."""
-        mock_blockchain_service.get_blockchain_info.return_value = {
+        app_mock_blockchain_service.get_blockchain_info.return_value = {
             "blocks": 2,
             "headers": 2,
             "bestblockhash": "abc123",
@@ -241,7 +222,7 @@ class TestChainsRouter:
             "chainwork": "0000",
             "description": "Test chain description",
         }
-        mock_blockchain_service.list_blocks.return_value = [
+        app_mock_blockchain_service.list_blocks.return_value = [
             {"height": 1, "hash": "hash1", "time": 1700000000, "tx": ["tx1"]},
             {"height": 0, "hash": "hash0", "time": 1699990000, "tx": ["tx0"]},
         ]
@@ -251,17 +232,17 @@ class TestChainsRouter:
         assert "/test-chain/blocks" in response.text
         assert "/test-chain/block/1" in response.text
 
-    def test_chain_parameters_returns_503_on_connection_error(self, client, mock_blockchain_service):
+    def test_chain_parameters_returns_503_on_connection_error(self, client, app_mock_blockchain_service):
         """Test chain parameters page surfaces backend connection failures."""
-        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("RPC unavailable"))
+        app_mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("RPC unavailable"))
 
         response = client.get("/test-chain/parameters")
         assert response.status_code == 503
         assert "RPC unavailable" in response.text
 
-    def test_peers_returns_503_on_connection_error(self, client, mock_blockchain_service):
+    def test_peers_returns_503_on_connection_error(self, client, app_mock_blockchain_service):
         """Test peers page surfaces backend connection failures."""
-        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("RPC unavailable"))
+        app_mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("RPC unavailable"))
 
         response = client.get("/test-chain/peers")
         assert response.status_code == 503
@@ -277,9 +258,9 @@ class TestBlocksRouter:
         assert response.status_code == 302
         assert "/blocks" in response.headers.get("location", "")
 
-    def test_block_detail_uses_canonical_navigation_links(self, client, mock_blockchain_service):
+    def test_block_detail_uses_canonical_navigation_links(self, client, app_mock_blockchain_service):
         """Test block detail navigation links use the canonical chain path."""
-        mock_blockchain_service.get_block_by_height.return_value = {
+        app_mock_blockchain_service.get_block_by_height.return_value = {
             "hash": "blockhash123",
             "height": 100,
             "time": 1700000000,
@@ -294,18 +275,18 @@ class TestBlocksRouter:
         assert "/test-chain/block/99" in response.text
         assert "/test-chain/block/101" in response.text
 
-    def test_block_detail_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+    def test_block_detail_returns_503_for_connection_errors(self, client, app_mock_blockchain_service):
         """Test block detail surfaces backend connection failures."""
-        mock_blockchain_service.get_block_by_height = AsyncMock(
+        app_mock_blockchain_service.get_block_by_height = AsyncMock(
             side_effect=ChainConnectionError("test-chain")
         )
 
         response = client.get("/test-chain/block/100")
         assert response.status_code == 503
 
-    def test_block_transactions_returns_502_for_rpc_errors(self, client, mock_blockchain_service):
+    def test_block_transactions_returns_502_for_rpc_errors(self, client, app_mock_blockchain_service):
         """Test block transactions surface backend RPC failures."""
-        mock_blockchain_service.get_block_by_height = AsyncMock(
+        app_mock_blockchain_service.get_block_by_height = AsyncMock(
             side_effect=RPCError("getblockhash", "boom")
         )
 
@@ -316,9 +297,9 @@ class TestBlocksRouter:
 class TestSearchRouter:
     """Test search router endpoints."""
 
-    def test_search_suggest_returns_json(self, client, mock_blockchain_service):
+    def test_search_suggest_returns_json(self, client, app_mock_blockchain_service):
         """Test search suggest endpoint returns JSON."""
-        mock_blockchain_service.call.return_value = {"results": [], "total": 0}
+        app_mock_blockchain_service.call.return_value = {"results": [], "total": 0}
         # Note: search algo calls specific getters which are already mocked
         
         response = client.get("/test-chain/search/suggest?q=test")
@@ -326,9 +307,9 @@ class TestSearchRouter:
         data = response.json()
         assert "suggestions" in data
 
-    def test_search_suggest_returns_503_on_backend_failure(self, client, mock_blockchain_service):
+    def test_search_suggest_returns_503_on_backend_failure(self, client, app_mock_blockchain_service):
         """Test HTML search suggest surfaces backend failures from shared search."""
-        mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
+        app_mock_blockchain_service.call = AsyncMock(side_effect=ChainConnectionError("test-chain"))
 
         response = client.get("/test-chain/search/suggest?q=asset1")
         assert response.status_code == 503
@@ -336,20 +317,6 @@ class TestSearchRouter:
 
 class TestSystemRoutes:
     """Test system routes (health, api info)."""
-
-    @pytest.fixture
-    def simple_client(self):
-        """Create simple test client without chain mocks.
-
-        Uses context manager so lifespan startup/shutdown events run.
-        Skill ref: fastapi-agents > testing > Testing Lifespan with TestClient
-        """
-        from main import create_app
-
-        app = create_app()
-        with patch("main.app_state.init_from_env", return_value=False):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                yield client
 
     def test_health_endpoint(self, simple_client):
         """Test health endpoint works."""
@@ -393,9 +360,9 @@ class TestChainNotFoundHandling:
 class TestPaginationInRoutes:
     """Test pagination parameters in routes."""
 
-    def test_blocks_accepts_page_param(self, client, mock_blockchain_service):
+    def test_blocks_accepts_page_param(self, client, app_mock_blockchain_service):
         """Test blocks endpoint accepts page parameter."""
-        mock_blockchain_service.list_blocks.return_value = [
+        app_mock_blockchain_service.list_blocks.return_value = [
             {
                 "height": 980,
                 "hash": "a" * 64,
@@ -410,9 +377,9 @@ class TestPaginationInRoutes:
         assert '/test-chain/blocks?page=1' in response.text
         assert '/test-chain/blocks?page=3' in response.text
 
-    def test_blocks_accepts_count_param(self, client, mock_blockchain_service):
+    def test_blocks_accepts_count_param(self, client, app_mock_blockchain_service):
         """Test blocks endpoint accepts count parameter."""
-        mock_blockchain_service.list_blocks.return_value = [
+        app_mock_blockchain_service.list_blocks.return_value = [
             {
                 "height": 999,
                 "hash": "b" * 64,
@@ -425,17 +392,17 @@ class TestPaginationInRoutes:
         assert response.status_code == 200
         assert 'Page <span class="font-medium">1</span> of <span class="font-medium">20</span>' in response.text
 
-    def test_transactions_returns_503_when_all_recent_block_fetches_fail(self, client, mock_blockchain_service):
+    def test_transactions_returns_503_when_all_recent_block_fetches_fail(self, client, app_mock_blockchain_service):
         """Test recent transactions page surfaces total backend block failures."""
-        mock_blockchain_service.get_blockchain_info.return_value = {"blocks": 5}
-        mock_blockchain_service.get_block_by_height = AsyncMock(
+        app_mock_blockchain_service.get_blockchain_info.return_value = {"blocks": 5}
+        app_mock_blockchain_service.get_block_by_height = AsyncMock(
             side_effect=ChainConnectionError("test-chain")
         )
 
         response = client.get("/test-chain/transactions")
         assert response.status_code == 503
 
-    def test_asset_transactions_uses_full_total_for_pagination(self, client, mock_blockchain_service):
+    def test_asset_transactions_uses_full_total_for_pagination(self, client, app_mock_blockchain_service):
         """Test asset transaction pages use the real total, not a one-item probe."""
         transactions = [
             {"txid": f"tx{i}", "type": "transfer", "qty": i, "blockheight": i, "time": 1700000000 + i}
@@ -450,7 +417,7 @@ class TestPaginationInRoutes:
                 return transactions[start : start + count]
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=asset_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=asset_call)
 
         response = client.get("/test-chain/asset/asset1/transactions?page=2&count=2")
         assert response.status_code == 200
@@ -458,7 +425,7 @@ class TestPaginationInRoutes:
         assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
         assert "/test-chain/asset/asset1/transactions?page=3" in response.text
 
-    def test_stream_items_uses_full_total_for_pagination(self, client, mock_blockchain_service):
+    def test_stream_items_uses_full_total_for_pagination(self, client, app_mock_blockchain_service):
         """Test stream item pages use the real total, not a one-item probe."""
         items = [
             {
@@ -480,7 +447,7 @@ class TestPaginationInRoutes:
                 return items[start : start + count]
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=stream_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=stream_call)
 
         response = client.get("/test-chain/stream/stream1/items?page=2&count=2")
         assert response.status_code == 200
@@ -488,7 +455,7 @@ class TestPaginationInRoutes:
         assert "Page <span class=\"font-medium\">2</span> of <span class=\"font-medium\">3</span>" in response.text
         assert "/test-chain/stream/stream1/items?page=3" in response.text
 
-    def test_address_transactions_supports_legacy_start_links(self, client, mock_blockchain_service):
+    def test_address_transactions_supports_legacy_start_links(self, client, app_mock_blockchain_service):
         """Test address transactions still work with legacy start/count pagination links."""
         transactions = [
             {
@@ -509,7 +476,7 @@ class TestPaginationInRoutes:
                 return transactions[start : start + count]
             return []
 
-        mock_blockchain_service.call = AsyncMock(side_effect=address_call)
+        app_mock_blockchain_service.call = AsyncMock(side_effect=address_call)
 
         response = client.get(
             "/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/transactions?start=2&count=2"
@@ -535,20 +502,6 @@ class TestLegacyRoutes:
 class TestRouterTags:
     """Test that routers have proper tags for OpenAPI."""
 
-    @pytest.fixture
-    def simple_client(self):
-        """Create simple test client.
-
-        Uses context manager so lifespan startup/shutdown events run.
-        Skill ref: fastapi-agents > testing > Testing Lifespan with TestClient
-        """
-        from main import create_app
-
-        app = create_app()
-        with patch("main.app_state.init_from_env", return_value=False):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                yield client
-
     def test_openapi_has_tags(self, simple_client):
         """Test OpenAPI schema has tags defined."""
         response = simple_client.get("/openapi.json")
@@ -568,20 +521,6 @@ class TestRouterTags:
 
 class TestResponseModels:
     """Test that endpoints return proper response models."""
-
-    @pytest.fixture
-    def simple_client(self):
-        """Create simple test client.
-
-        Uses context manager so lifespan startup/shutdown events run.
-        Skill ref: fastapi-agents > testing > Testing Lifespan with TestClient
-        """
-        from main import create_app
-
-        app = create_app()
-        with patch("main.app_state.init_from_env", return_value=False):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                yield client
 
     def test_health_response_model(self, simple_client):
         """Test health endpoint matches HealthResponse model."""
@@ -610,15 +549,15 @@ class TestErrorHandling:
     """Test error handling in routes."""
 
     @pytest.fixture
-    def client_with_error_service(self, mock_chain):
-        """Create client with a service that raises errors — uses dependency_overrides."""
+    def client_with_error_service(self, app_mock_chain):
+        """Create client with a service that raises errors."""
         from main import create_app
         from app_state import ApplicationState
 
         app = create_app()
 
         state = ApplicationState()
-        state.chains = [mock_chain]
+        state.chains = [app_mock_chain]
         state.settings = {
             "main": {"base": "/"},
             "test-chain": {"name": "test-chain"},
@@ -628,10 +567,8 @@ class TestErrorHandling:
         error_service = Mock()
         error_service.get_blockchain_info = AsyncMock(side_effect=Exception("RPC Error"))
 
-        # Use dependency_overrides — the FastAPI-idiomatic approach
         app.dependency_overrides[get_blockchain_service] = lambda: error_service
 
-        # Patch lifespan dependencies so startup does not replace our in-test state
         mock_http_client = MagicMock()
         mock_http_client.aclose = AsyncMock()
         mock_cache_provider = MagicMock()
@@ -653,16 +590,16 @@ class TestErrorHandling:
         # Should return some response (error page or 500)
         assert response.status_code in [200, 500]
 
-    def test_raw_transaction_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+    def test_raw_transaction_returns_503_for_connection_errors(self, client, app_mock_blockchain_service):
         """Test raw transaction endpoint preserves chain connection failures."""
-        mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
+        app_mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
 
         response = client.get("/test-chain/tx/" + ("a" * 64) + "/raw")
         assert response.status_code == 503
 
-    def test_raw_transaction_returns_502_for_rpc_errors(self, client, mock_blockchain_service):
+    def test_raw_transaction_returns_502_for_rpc_errors(self, client, app_mock_blockchain_service):
         """Test raw transaction endpoint returns 502 for non-not-found RPC errors."""
-        mock_blockchain_service.call.side_effect = RPCError(
+        app_mock_blockchain_service.call.side_effect = RPCError(
             method="getrawtransaction",
             error_message="backend exploded",
             error_code=-1,
@@ -671,16 +608,16 @@ class TestErrorHandling:
         response = client.get("/test-chain/tx/" + ("b" * 64) + "/raw")
         assert response.status_code == 502
 
-    def test_address_detail_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+    def test_address_detail_returns_503_for_connection_errors(self, client, app_mock_blockchain_service):
         """Test address detail preserves backend connection failures."""
-        mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
+        app_mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
 
         response = client.get("/test-chain/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
         assert response.status_code == 503
 
-    def test_asset_detail_returns_502_for_rpc_errors(self, client, mock_blockchain_service):
+    def test_asset_detail_returns_502_for_rpc_errors(self, client, app_mock_blockchain_service):
         """Test asset detail returns 502 for backend RPC failures."""
-        mock_blockchain_service.call.side_effect = RPCError(
+        app_mock_blockchain_service.call.side_effect = RPCError(
             method="listassets",
             error_message="backend exploded",
             error_code=-1,
@@ -689,21 +626,21 @@ class TestErrorHandling:
         response = client.get("/test-chain/asset/asset1")
         assert response.status_code == 502
 
-    def test_stream_detail_returns_404_for_missing_streams(self, client, mock_blockchain_service):
+    def test_stream_detail_returns_404_for_missing_streams(self, client, app_mock_blockchain_service):
         """Test stream detail returns 404 when the stream does not exist."""
         async def missing_stream_call(method, params=None):
             if method == "liststreams":
                 return []
             return []
 
-        mock_blockchain_service.call.side_effect = missing_stream_call
+        app_mock_blockchain_service.call.side_effect = missing_stream_call
 
         response = client.get("/test-chain/stream/stream1")
         assert response.status_code == 404
 
-    def test_permissions_page_returns_503_for_connection_errors(self, client, mock_blockchain_service):
+    def test_permissions_page_returns_503_for_connection_errors(self, client, app_mock_blockchain_service):
         """Test permissions page preserves backend connection failures."""
-        mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
+        app_mock_blockchain_service.call.side_effect = ChainConnectionError("test-chain")
 
         response = client.get("/test-chain/permissions")
         assert response.status_code == 503
