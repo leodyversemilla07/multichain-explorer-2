@@ -70,7 +70,10 @@ class TestChainConfig:
     def test_chain_config_backward_compatibility(self):
         """Test that chain config creates legacy config dict"""
         chain = ChainConfig(
-            name="test", display_name="Test Chain", path_name="test-chain", ini_name="chain1"
+            name="test",
+            display_name="Test Chain",
+            path_name="test-chain",
+            ini_name="chain1",
         )
 
         assert "name" in chain.config
@@ -129,7 +132,9 @@ class TestConfigSmoke:
 
     def test_all_config_classes_instantiate(self):
         """Test that all config classes can be instantiated"""
-        chain = ChainConfig(name="test", display_name="Test", path_name="test", ini_name="test")
+        chain = ChainConfig(
+            name="test", display_name="Test", path_name="test", ini_name="test"
+        )
         server = ServerConfig()
 
         assert all([chain, server])

@@ -33,7 +33,9 @@ from routers.dependencies import (
 router = APIRouter(tags=["Assets"])
 
 
-async def _get_asset_or_raise(service: BlockchainServiceDep, asset_name: str) -> Dict[str, Any]:
+async def _get_asset_or_raise(
+    service: BlockchainServiceDep, asset_name: str
+) -> Dict[str, Any]:
     """Load an asset and raise a typed HTTP error when it is unavailable."""
     try:
         asset = await service.get_asset(asset_name)
@@ -57,7 +59,9 @@ async def _validate_address(service: BlockchainServiceDep, address: str) -> None
         raise HTTPException(status_code=404, detail=f"Address {address} not found")
 
 
-async def _count_asset_transactions(service: BlockchainServiceDep, asset_name: str) -> int:
+async def _count_asset_transactions(
+    service: BlockchainServiceDep, asset_name: str
+) -> int:
     """Count asset transactions using the shared bounded list-count fallback."""
     return await service.count_rpc_list_results(
         "listassettransactions",
@@ -65,8 +69,12 @@ async def _count_asset_transactions(service: BlockchainServiceDep, asset_name: s
     )
 
 
-@router.get("/{chain_name}/assets", response_class=HTMLResponse, name="assets",
-            summary="List assets")
+@router.get(
+    "/{chain_name}/assets",
+    response_class=HTMLResponse,
+    name="assets",
+    summary="List assets",
+)
 async def list_assets(
     request: Request,
     chain: ChainDep,
@@ -95,9 +103,13 @@ async def list_assets(
         items_per_page=count,
     )
 
-    paginated_assets = assets[page_info["start"] : page_info["start"] + page_info["count"]]
+    paginated_assets = assets[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
-    pagination_context = pagination.build_context(page_info, f"/{chain.path_name}/assets")
+    pagination_context = pagination.build_context(
+        page_info, f"/{chain.path_name}/assets"
+    )
 
     return templates.TemplateResponse(
         name="pages/assets.html",
@@ -105,20 +117,26 @@ async def list_assets(
             title=f"Assets - {chain.display_name}",
             assets=paginated_assets,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}", response_class=HTMLResponse, name="asset",
-            summary="Asset details")
+@router.get(
+    "/{chain_name}/asset/{asset_name}",
+    response_class=HTMLResponse,
+    name="asset",
+    summary="Asset details",
+)
 async def asset_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
+    asset_name: str = Path(
+        ..., min_length=1, max_length=32, description="Asset name or reference"
+    ),
 ):
     """
     Show asset details.
@@ -134,8 +152,12 @@ async def asset_detail(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/holders", response_class=HTMLResponse, name="asset_holders",
-            summary="Asset holders")
+@router.get(
+    "/{chain_name}/asset/{asset_name}/holders",
+    response_class=HTMLResponse,
+    name="asset_holders",
+    summary="Asset holders",
+)
 async def asset_holders(
     request: Request,
     chain: ChainDep,
@@ -143,7 +165,9 @@ async def asset_holders(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
+    asset_name: str = Path(
+        ..., min_length=1, max_length=32, description="Asset name or reference"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -167,7 +191,9 @@ async def asset_holders(
         items_per_page=count,
     )
 
-    paginated_holders = holders[page_info["start"] : page_info["start"] + page_info["count"]]
+    paginated_holders = holders[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -183,13 +209,17 @@ async def asset_holders(
             asset_name=asset_name,
             holders=paginated_holders,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/transactions", response_class=HTMLResponse, name="asset_transactions",
-            summary="Asset transaction history")
+@router.get(
+    "/{chain_name}/asset/{asset_name}/transactions",
+    response_class=HTMLResponse,
+    name="asset_transactions",
+    summary="Asset transaction history",
+)
 async def asset_transactions(
     request: Request,
     chain: ChainDep,
@@ -197,7 +227,9 @@ async def asset_transactions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
+    asset_name: str = Path(
+        ..., min_length=1, max_length=32, description="Asset name or reference"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -244,13 +276,17 @@ async def asset_transactions(
             asset_name=asset_name,
             transactions=transactions,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/issues", response_class=HTMLResponse, name="asset_issues",
-            summary="Asset issuances")
+@router.get(
+    "/{chain_name}/asset/{asset_name}/issues",
+    response_class=HTMLResponse,
+    name="asset_issues",
+    summary="Asset issuances",
+)
 async def asset_issues(
     request: Request,
     chain: ChainDep,
@@ -258,7 +294,9 @@ async def asset_issues(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
+    asset_name: str = Path(
+        ..., min_length=1, max_length=32, description="Asset name or reference"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -276,7 +314,9 @@ async def asset_issues(
         items_per_page=count,
     )
 
-    paginated_issues = issues[page_info["start"] : page_info["start"] + page_info["count"]]
+    paginated_issues = issues[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -292,20 +332,26 @@ async def asset_issues(
             asset_name=asset_name,
             issues=paginated_issues,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/permissions", response_class=HTMLResponse, name="asset_permissions",
-            summary="Asset permissions")
+@router.get(
+    "/{chain_name}/asset/{asset_name}/permissions",
+    response_class=HTMLResponse,
+    name="asset_permissions",
+    summary="Asset permissions",
+)
 async def asset_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
+    asset_name: str = Path(
+        ..., min_length=1, max_length=32, description="Asset name or reference"
+    ),
 ):
     """
     Show asset permissions.
@@ -329,9 +375,12 @@ async def asset_permissions(
     )
 
 
-@router.get("/{chain_name}/asset/{asset_name}/holder/{address}/transactions",
-            response_class=HTMLResponse, name="holder_transactions",
-            summary="Holder transaction history")
+@router.get(
+    "/{chain_name}/asset/{asset_name}/holder/{address}/transactions",
+    response_class=HTMLResponse,
+    name="holder_transactions",
+    summary="Holder transaction history",
+)
 async def holder_transactions(
     request: Request,
     chain: ChainDep,
@@ -339,8 +388,12 @@ async def holder_transactions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    asset_name: str = Path(..., min_length=1, max_length=32, description="Asset name or reference"),
-    address: str = Path(..., min_length=26, max_length=52, description="Holder address"),
+    asset_name: str = Path(
+        ..., min_length=1, max_length=32, description="Asset name or reference"
+    ),
+    address: str = Path(
+        ..., min_length=26, max_length=52, description="Holder address"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -366,7 +419,9 @@ async def holder_transactions(
     # Get transactions
     try:
         # Note: inefficient to fetch all address transactions to filter by asset.
-        all_txs = await service.call("listaddresstransactions", [address, 1000, 0, True])
+        all_txs = await service.call(
+            "listaddresstransactions", [address, 1000, 0, True]
+        )
         if not all_txs:
             all_txs = []
         # Filter transactions for this specific asset
@@ -388,7 +443,9 @@ async def holder_transactions(
         items_per_page=count,
     )
 
-    paginated_txs = transactions[page_info["start"] : page_info["start"] + page_info["count"]]
+    paginated_txs = transactions[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -405,13 +462,18 @@ async def holder_transactions(
             address=address,
             transactions=paginated_txs,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}/assets", response_class=HTMLResponse, name="legacy_assets", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/assets",
+    response_class=HTMLResponse,
+    name="legacy_assets",
+    include_in_schema=False,
+)
 async def legacy_list_assets(
     request: Request,
     chain: ChainDep,
@@ -422,10 +484,17 @@ async def legacy_list_assets(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy assets list route."""
-    return await list_assets(request, chain, service, pagination, templates, context, query_params)
+    return await list_assets(
+        request, chain, service, pagination, templates, context, query_params
+    )
 
 
-@router.get("/chain/{chain_name}/asset/{asset_name}", response_class=HTMLResponse, name="legacy_asset", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/asset/{asset_name}",
+    response_class=HTMLResponse,
+    name="legacy_asset",
+    include_in_schema=False,
+)
 async def legacy_asset_detail(
     request: Request,
     chain: ChainDep,

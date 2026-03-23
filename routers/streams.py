@@ -38,12 +38,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Streams"])
 
 
-async def _get_stream_or_raise(service: BlockchainServiceDep, stream_name: str) -> Dict[str, Any]:
+async def _get_stream_or_raise(
+    service: BlockchainServiceDep, stream_name: str
+) -> Dict[str, Any]:
     """Load a stream and raise a typed HTTP error when it is unavailable."""
     try:
         stream = await service.get_stream(stream_name)
     except Exception as exc:
-        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_name} not found")
+        raise_backend_http_error(
+            exc, not_found_detail=f"Stream {stream_name} not found"
+        )
 
     if not stream:
         raise HTTPException(status_code=404, detail=f"Stream {stream_name} not found")
@@ -63,8 +67,12 @@ async def _count_stream_results(
     )
 
 
-@router.get("/{chain_name}/streams", response_class=HTMLResponse, name="streams",
-            summary="List streams")
+@router.get(
+    "/{chain_name}/streams",
+    response_class=HTMLResponse,
+    name="streams",
+    summary="List streams",
+)
 async def list_streams(
     request: Request,
     chain: ChainDep,
@@ -85,7 +93,9 @@ async def list_streams(
             # Ensure each stream has proper item counts using parallel fetching
             async def enrich_stream_info(stream):
                 # Get item count for each stream if not present
-                if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
+                if "items" not in stream or not isinstance(
+                    stream.get("items"), (int, float)
+                ):
                     try:
                         stream["items"] = await _count_stream_results(
                             service,
@@ -116,7 +126,9 @@ async def list_streams(
         items_per_page=count,
     )
 
-    paginated_streams = streams[page_info["start"] : page_info["start"] + page_info["count"]]
+    paginated_streams = streams[
+        page_info["start"] : page_info["start"] + page_info["count"]
+    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -133,13 +145,17 @@ async def list_streams(
             streams=paginated_streams,
             pagination=page_info,
             show_pagination=show_pagination,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}", response_class=HTMLResponse, name="stream",
-            summary="Stream details")
+@router.get(
+    "/{chain_name}/stream/{stream_name}",
+    response_class=HTMLResponse,
+    name="stream",
+    summary="Stream details",
+)
 async def stream_detail(
     request: Request,
     chain: ChainDep,
@@ -165,15 +181,21 @@ async def stream_detail(
             except Exception:
                 stream["items"] = 0
 
-        if "confirmed" not in stream or not isinstance(stream.get("confirmed"), (int, float)):
+        if "confirmed" not in stream or not isinstance(
+            stream.get("confirmed"), (int, float)
+        ):
             stream["confirmed"] = stream.get("items", 0)
 
     except Exception as exc:
         logger.error("Error fetching stream %s", stream_name, exc_info=exc)
-        raise_backend_http_error(exc, not_found_detail=f"Stream {stream_name} not found")
+        raise_backend_http_error(
+            exc, not_found_detail=f"Stream {stream_name} not found"
+        )
 
     try:
-        stream_items_preview = await service.call("liststreamitems", [stream_name, True, 10, 0])
+        stream_items_preview = await service.call(
+            "liststreamitems", [stream_name, True, 10, 0]
+        )
     except Exception:
         stream_items_preview = []
 
@@ -189,8 +211,12 @@ async def stream_detail(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/items", response_class=HTMLResponse, name="stream_items",
-            summary="Stream items")
+@router.get(
+    "/{chain_name}/stream/{stream_name}/items",
+    response_class=HTMLResponse,
+    name="stream_items",
+    summary="Stream items",
+)
 async def stream_items(
     request: Request,
     chain: ChainDep,
@@ -250,13 +276,17 @@ async def stream_items(
             stream_name=stream_name,
             items=items,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/keys", response_class=HTMLResponse, name="stream_keys",
-            summary="Stream keys")
+@router.get(
+    "/{chain_name}/stream/{stream_name}/keys",
+    response_class=HTMLResponse,
+    name="stream_keys",
+    summary="Stream keys",
+)
 async def stream_keys(
     request: Request,
     chain: ChainDep,
@@ -308,13 +338,17 @@ async def stream_keys(
             keys=paginated_keys,
             pagination=page_info,
             show_pagination=show_pagination,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/publishers", response_class=HTMLResponse, name="stream_publishers",
-            summary="Stream publishers")
+@router.get(
+    "/{chain_name}/stream/{stream_name}/publishers",
+    response_class=HTMLResponse,
+    name="stream_publishers",
+    summary="Stream publishers",
+)
 async def stream_publishers(
     request: Request,
     chain: ChainDep,
@@ -331,7 +365,9 @@ async def stream_publishers(
     await _get_stream_or_raise(service, stream_name)
 
     try:
-        publishers = await service.call("liststreampublishers", [stream_name, "*", False, 1000, 0])
+        publishers = await service.call(
+            "liststreampublishers", [stream_name, "*", False, 1000, 0]
+        )
         if not publishers:
             publishers = []
     except Exception as exc:
@@ -368,13 +404,17 @@ async def stream_publishers(
             publishers=paginated_publishers,
             pagination=page_info,
             show_pagination=show_pagination,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/permissions", response_class=HTMLResponse, name="stream_permissions",
-            summary="Stream permissions")
+@router.get(
+    "/{chain_name}/stream/{stream_name}/permissions",
+    response_class=HTMLResponse,
+    name="stream_permissions",
+    summary="Stream permissions",
+)
 async def stream_permissions(
     request: Request,
     chain: ChainDep,
@@ -406,8 +446,12 @@ async def stream_permissions(
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/key/{key}", response_class=HTMLResponse, name="key_items",
-            summary="Items by stream key")
+@router.get(
+    "/{chain_name}/stream/{stream_name}/key/{key}",
+    response_class=HTMLResponse,
+    name="key_items",
+    summary="Items by stream key",
+)
 async def key_items(
     request: Request,
     chain: ChainDep,
@@ -470,13 +514,17 @@ async def key_items(
             key=key,
             items=items,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/stream/{stream_name}/publisher/{publisher}", response_class=HTMLResponse, name="publisher_items",
-            summary="Items by stream publisher")
+@router.get(
+    "/{chain_name}/stream/{stream_name}/publisher/{publisher}",
+    response_class=HTMLResponse,
+    name="publisher_items",
+    summary="Items by stream publisher",
+)
 async def publisher_items(
     request: Request,
     chain: ChainDep,
@@ -485,7 +533,9 @@ async def publisher_items(
     templates: TemplatesDep,
     context: CommonContextDep,
     stream_name: str = Path(..., min_length=1, description="Stream name"),
-    publisher: str = Path(..., min_length=26, max_length=52, description="Publisher address"),
+    publisher: str = Path(
+        ..., min_length=26, max_length=52, description="Publisher address"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -539,13 +589,18 @@ async def publisher_items(
             publisher=publisher,
             items=items,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}/streams", response_class=HTMLResponse, name="legacy_streams", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/streams",
+    response_class=HTMLResponse,
+    name="legacy_streams",
+    include_in_schema=False,
+)
 async def legacy_list_streams(
     request: Request,
     chain: ChainDep,
@@ -556,10 +611,17 @@ async def legacy_list_streams(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy streams list route."""
-    return await list_streams(request, chain, service, pagination, templates, context, query_params)
+    return await list_streams(
+        request, chain, service, pagination, templates, context, query_params
+    )
 
 
-@router.get("/chain/{chain_name}/stream/{stream_name}", response_class=HTMLResponse, name="legacy_stream", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/stream/{stream_name}",
+    response_class=HTMLResponse,
+    name="legacy_stream",
+    include_in_schema=False,
+)
 async def legacy_stream_detail(
     request: Request,
     chain: ChainDep,

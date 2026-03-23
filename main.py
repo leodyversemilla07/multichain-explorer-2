@@ -510,7 +510,8 @@ if __name__ == "__main__":
             reload = True
             i += 1
         elif args[i] in ("-h", "--help"):
-            print(f"""
+            print(
+                f"""
 MultiChain Explorer 2 - FastAPI Server
 
 Usage: python main.py [options]
@@ -534,7 +535,8 @@ Examples:
   
 Alternative (recommended):
   uvicorn main:app --host 0.0.0.0 --port 8080 --reload
-""")
+"""
+            )
             sys.exit(0)
         else:
             print(f"Unknown argument: {args[i]}")

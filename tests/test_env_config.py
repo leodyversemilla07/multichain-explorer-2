@@ -6,7 +6,6 @@ import os
 from unittest.mock import patch
 
 
-
 class TestSettings:
     """Test Settings class."""
 

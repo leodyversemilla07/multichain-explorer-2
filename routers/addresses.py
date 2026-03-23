@@ -33,7 +33,9 @@ from routers.dependencies import (
 router = APIRouter(tags=["Addresses"])
 
 
-async def _validate_address(service: BlockchainServiceDep, address: str) -> Dict[str, Any]:
+async def _validate_address(
+    service: BlockchainServiceDep, address: str
+) -> Dict[str, Any]:
     """Validate an address before rendering dependent pages."""
     try:
         address_info = await service.call("validateaddress", [address])
@@ -58,7 +60,7 @@ async def list_addresses(
 ):
     """
     List addresses with balances.
-    
+
     Displays addresses that have activity on the blockchain.
     """
     # Get total address count
@@ -95,19 +97,23 @@ async def list_addresses(
             title=f"Addresses - {chain.display_name}",
             addresses=paginated_addresses,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/address/{address}", response_class=HTMLResponse, name="address")
+@router.get(
+    "/{chain_name}/address/{address}", response_class=HTMLResponse, name="address"
+)
 async def address_detail(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
+    address: str = Path(
+        ..., min_length=26, max_length=52, description="Blockchain address"
+    ),
 ):
     """
     Show address details.
@@ -164,7 +170,11 @@ async def address_detail(
     )
 
 
-@router.get("/{chain_name}/address/{address}/transactions", response_class=HTMLResponse, name="address_transactions")
+@router.get(
+    "/{chain_name}/address/{address}/transactions",
+    response_class=HTMLResponse,
+    name="address_transactions",
+)
 async def address_transactions(
     request: Request,
     chain: ChainDep,
@@ -172,7 +182,9 @@ async def address_transactions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
+    address: str = Path(
+        ..., min_length=26, max_length=52, description="Blockchain address"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -222,19 +234,25 @@ async def address_transactions(
             address=address,
             transactions=transactions,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/address/{address}/assets", response_class=HTMLResponse, name="address_assets")
+@router.get(
+    "/{chain_name}/address/{address}/assets",
+    response_class=HTMLResponse,
+    name="address_assets",
+)
 async def address_assets(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
+    address: str = Path(
+        ..., min_length=26, max_length=52, description="Blockchain address"
+    ),
 ):
     """
     List assets held by an address.
@@ -256,7 +274,11 @@ async def address_assets(
     )
 
 
-@router.get("/{chain_name}/address/{address}/streams", response_class=HTMLResponse, name="address_streams")
+@router.get(
+    "/{chain_name}/address/{address}/streams",
+    response_class=HTMLResponse,
+    name="address_streams",
+)
 async def address_streams(
     request: Request,
     chain: ChainDep,
@@ -264,7 +286,9 @@ async def address_streams(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
+    address: str = Path(
+        ..., min_length=26, max_length=52, description="Blockchain address"
+    ),
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """
@@ -312,19 +336,25 @@ async def address_streams(
             address=address,
             streams=streams,
             pagination=page_info,
-            **pagination_context
+            **pagination_context,
         ),
     )
 
 
-@router.get("/{chain_name}/address/{address}/permissions", response_class=HTMLResponse, name="address_permissions")
+@router.get(
+    "/{chain_name}/address/{address}/permissions",
+    response_class=HTMLResponse,
+    name="address_permissions",
+)
 async def address_permissions(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    address: str = Path(..., min_length=26, max_length=52, description="Blockchain address"),
+    address: str = Path(
+        ..., min_length=26, max_length=52, description="Blockchain address"
+    ),
 ):
     """
     List permissions for an address.
@@ -347,7 +377,12 @@ async def address_permissions(
 
 
 # Legacy routes for backward compatibility
-@router.get("/chain/{chain_name}/addresses", response_class=HTMLResponse, name="legacy_addresses", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/addresses",
+    response_class=HTMLResponse,
+    name="legacy_addresses",
+    include_in_schema=False,
+)
 async def legacy_list_addresses(
     request: Request,
     chain: ChainDep,
@@ -358,10 +393,17 @@ async def legacy_list_addresses(
     query_params: Dict[str, str] = Depends(get_query_params),
 ):
     """Legacy addresses list route."""
-    return await list_addresses(request, chain, service, pagination, templates, context, query_params)
+    return await list_addresses(
+        request, chain, service, pagination, templates, context, query_params
+    )
 
 
-@router.get("/chain/{chain_name}/address/{address}", response_class=HTMLResponse, name="legacy_address", include_in_schema=False)
+@router.get(
+    "/chain/{chain_name}/address/{address}",
+    response_class=HTMLResponse,
+    name="legacy_address",
+    include_in_schema=False,
+)
 async def legacy_address_detail(
     request: Request,
     chain: ChainDep,

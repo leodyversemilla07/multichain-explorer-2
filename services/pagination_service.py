@@ -159,7 +159,9 @@ class PaginationService:
         if include_component_fields:
             context.update(
                 {
-                    "total": page_info.total_items if total_items is None else total_items,
+                    "total": page_info.total_items
+                    if total_items is None
+                    else total_items,
                     "total_pages": page_info.total_pages,
                     "page_number": page_info.current_page,
                     "base_path": url_base,
@@ -228,7 +230,9 @@ class PaginationService:
         return paginated_items, pagination_info
 
     @staticmethod
-    def get_page_range(current_page: int, total_pages: int, max_pages: int = 5) -> List[int]:
+    def get_page_range(
+        current_page: int, total_pages: int, max_pages: int = 5
+    ) -> List[int]:
         """
         Get a range of page numbers to display.
 

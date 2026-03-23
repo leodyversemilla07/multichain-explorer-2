@@ -19,7 +19,11 @@ class MCEException(Exception):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert exception to dictionary for JSON responses"""
-        return {"error": self.__class__.__name__, "message": self.message, "details": self.details}
+        return {
+            "error": self.__class__.__name__,
+            "message": self.message,
+            "details": self.details,
+        }
 
 
 class ChainConnectionError(MCEException):
@@ -105,9 +109,15 @@ class StreamNotFoundError(ResourceNotFoundError):
 class RPCError(MCEException):
     """Raised when MultiChain RPC call fails"""
 
-    def __init__(self, method: str, error_message: str, error_code: Optional[int] = None):
+    def __init__(
+        self, method: str, error_message: str, error_code: Optional[int] = None
+    ):
         message = f"RPC error calling {method}: {error_message}"
-        details = {"method": method, "error_message": error_message, "error_code": error_code}
+        details = {
+            "method": method,
+            "error_message": error_message,
+            "error_code": error_code,
+        }
         super().__init__(message, details)
         self.method = method
         self.error_code = error_code
@@ -199,7 +209,9 @@ def format_error_html(exception: Exception, debug: bool = False) -> str:
         return html
 
 
-def log_exception(exception: Exception, context: Optional[Dict[str, Any]] = None) -> None:
+def log_exception(
+    exception: Exception, context: Optional[Dict[str, Any]] = None
+) -> None:
     """Log exception with context information"""
     context = context or {}
 
@@ -231,5 +243,6 @@ def log_exception(exception: Exception, context: Optional[Dict[str, Any]] = None
             )
     else:
         # Unexpected exceptions - always log at error level with traceback
-        logger.error(f"Unexpected exception: {str(exception)}", exc_info=True, extra=context)
-
+        logger.error(
+            f"Unexpected exception: {str(exception)}", exc_info=True, extra=context
+        )
