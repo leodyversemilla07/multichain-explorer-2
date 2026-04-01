@@ -398,57 +398,116 @@ class BlockchainService:
         holders = await self.call("listassetholders", [asset_ref])
         return holders or []
 
+    async def _count_rpc_list_results_paginated(
+        self,
+        method: str,
+        *leading_params: Any,
+        chunk_size: int = 1000,
+        fetch_limit: int = 100000,
+    ) -> int:
+        """Paginated count that fetches chunks until the list ends or limit reached."""
+        total = 0
+        start = 0
+        chunk_size = max(1, min(chunk_size, fetch_limit))
+
+        while total < fetch_limit:
+            batch_limit = min(chunk_size, fetch_limit - total)
+            params = [*leading_params, False, batch_limit, start]
+            batch = await self.call(method, params)
+            if not batch:
+                break
+            batch_len = len(batch)
+            total += batch_len
+            if batch_len < batch_limit:
+                break
+            start += batch_len
+
+        return min(total, fetch_limit)
+
     @cached(ttl=COUNT_CACHE_TTL_SECONDS, key_prefix="rpc-list-count")
     async def _count_rpc_list_results_cached(
         self,
         method: str,
         *leading_params: Any,
+        chunk_size: int = 1000,
         fetch_limit: int = 100000,
     ) -> int:
-        """Cached bounded-count fallback for RPC list endpoints."""
-        results = await self.call(method, [*leading_params, False, fetch_limit, 0])
-        return len(results) if results else 0
+        """Cached count using the chunking helper so lists never load entirely."""
+        return await self._count_rpc_list_results_paginated(
+            method,
+            *leading_params,
+            chunk_size=chunk_size,
+            fetch_limit=fetch_limit,
+        )
 
     async def count_rpc_list_results(
         self,
         method: str,
         *leading_params: Any,
+        chunk_size: int = 1000,
         fetch_limit: int = 100000,
     ) -> int:
         """
-        Count paginated RPC list results via a bounded full fetch.
-
-        This is the current compatibility fallback for MultiChain list endpoints
-        that do not expose a dedicated count RPC. Centralizing it makes the cost
-        visible and keeps the route layer consistent.
+        Count paginated RPC list results via chunked fetches instead of one large pull.
         """
         return await self._count_rpc_list_results_cached(
             method,
             *leading_params,
+            chunk_size=chunk_size,
             fetch_limit=fetch_limit,
         )
+
+    @cached(ttl=COUNT_CACHE_TTL_SECONDS, key_prefix="address-tx-count")
+    async def _chunked_address_count(
+        self,
+        call_method: str,
+        params_builder,
+        fetch_limit: int,
+        chunk_size: int,
+    ) -> int:
+        total = 0
+        start = 0
+        chunk_size = max(1, min(chunk_size, fetch_limit))
+
+        while total < fetch_limit:
+            batch_limit = min(chunk_size, fetch_limit - total)
+            params = params_builder(start, batch_limit)
+            batch = await self.call(call_method, params)
+            if not batch:
+                break
+            batch_len = len(batch)
+            total += batch_len
+            if batch_len < batch_limit:
+                break
+            start += batch_len
+
+        return min(total, fetch_limit)
 
     @cached(ttl=COUNT_CACHE_TTL_SECONDS, key_prefix="address-tx-count")
     async def _count_address_transactions_cached(
         self,
         address: str,
+        chunk_size: int = 1000,
         fetch_limit: int = 100000,
     ) -> int:
-        """Cached count helper for address transactions."""
-        results = await self.call(
+        """Cached count helper for address transactions that pages in chunks."""
+        return await self._chunked_address_count(
             "listaddresstransactions",
-            [address, fetch_limit, 0, False],
+            lambda start, batch_limit: [address, batch_limit, start, False],
+            fetch_limit,
+            chunk_size,
         )
-        return len(results) if results else 0
 
     async def count_address_transactions(
         self,
         address: str,
+        chunk_size: int = 1000,
         fetch_limit: int = 100000,
     ) -> int:
         """Count address transactions using the MultiChain parameter order."""
         return await self._count_address_transactions_cached(
             address,
+            chunk_size=chunk_size,
             fetch_limit=fetch_limit,
         )
 
@@ -456,23 +515,27 @@ class BlockchainService:
     async def _count_address_streams_cached(
         self,
         address: str,
+        chunk_size: int = 1000,
         fetch_limit: int = 100000,
     ) -> int:
-        """Cached count helper for address-associated streams."""
-        results = await self.call(
+        """Cached count helper for address-associated streams that pages results."""
+        return await self._chunked_address_count(
             "explorerlistaddressstreams",
-            [address, True, fetch_limit, 0],
+            lambda start, batch_limit: [address, True, batch_limit, start],
+            fetch_limit,
+            chunk_size,
         )
-        return len(results) if results else 0
 
     async def count_address_streams(
         self,
         address: str,
+        chunk_size: int = 1000,
         fetch_limit: int = 100000,
     ) -> int:
         """Count address-associated streams using the explorer RPC parameter order."""
         return await self._count_address_streams_cached(
             address,
+            chunk_size=chunk_size,
             fetch_limit=fetch_limit,
         )
 
