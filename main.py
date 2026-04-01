@@ -68,22 +68,48 @@ BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
+def _create_shared_http_client() -> httpx.AsyncClient:
+    """Build the shared HTTP client used for chain RPC requests."""
+    return httpx.AsyncClient(timeout=30.0)
 
-def _patch_template_response(templates: Jinja2Templates) -> None:
-    """Support both old and new Starlette TemplateResponse calling styles."""
-    if getattr(templates, "_mce_template_response_patched", False):
+
+def _initialise_cache_provider(app: FastAPI) -> None:
+    """Initialise the configured cache provider and attach it to app state."""
+    settings = get_settings()
+    cache_provider = create_cache_provider(
+        backend=settings.cache_backend,
+        redis_url=settings.redis_url,
+    )
+    _replace_global_cache(CacheService(cache_provider))
+    app.state.cache_provider = cache_provider
+    logger.info("Cache backend initialised: %s", settings.cache_backend)
+
+
+def _load_runtime_config(app: FastAPI) -> None:
+    """Load chain configuration into app state when available."""
+    logger.info("Loading configuration from .env")
+    if not app_state.init_from_env():
+        logger.warning("Could not load configuration from .env - using defaults")
         return
 
-    original_template_response = templates.TemplateResponse
+    logger.info("Configuration loaded successfully")
+    state = app_state.get_state()
+    app.state.config = state
+    for chain in state.chains:
+        logger.info("Chain configured: %s", chain.name)
 
-    def compat_template_response(*args, **kwargs):
-        if not args and "context" in kwargs:
-            context = kwargs["context"] or {}
-            kwargs.setdefault("request", context.get("request"))
-        return original_template_response(*args, **kwargs)
 
-    templates.TemplateResponse = compat_template_response
-    templates._mce_template_response_patched = True
+async def _close_runtime_resources(app: FastAPI) -> None:
+    """Close shared application resources on shutdown."""
+    http_client = getattr(app.state, "http_client", None)
+    if http_client is not None:
+        await http_client.aclose()
+        logger.info("Shared HTTP client closed")
+
+    cache_provider = getattr(app.state, "cache_provider", None)
+    if hasattr(cache_provider, "close"):
+        await cache_provider.close()
+        logger.info("Cache provider closed")
 
 
 @asynccontextmanager
@@ -98,70 +124,44 @@ async def lifespan(app: FastAPI):
 
     # Create a shared HTTP client for all blockchain RPC calls
     # This enables connection pooling (one client reused across requests)
-    app.state.http_client = httpx.AsyncClient(timeout=30.0)
+    app.state.http_client = _create_shared_http_client()
     logger.info("Shared HTTP client created")
 
-    # Select and initialise cache provider from env config
-    settings = get_settings()
-    cache_provider = create_cache_provider(
-        backend=settings.cache_backend,
-        redis_url=settings.redis_url,
-    )
-    _replace_global_cache(CacheService(cache_provider))
-    app.state.cache_provider = cache_provider
-    logger.info(f"Cache backend initialised: {settings.cache_backend}")
+    _initialise_cache_provider(app)
+    _load_runtime_config(app)
 
-    # Initialize from .env
-    logger.info("Loading configuration from .env")
-    if app_state.init_from_env():
-        logger.info("Configuration loaded successfully")
-        state = app_state.get_state()
-        app.state.config = state
-        chains = state.chains
-        if chains:
-            for chain in chains:
-                logger.info(f"Chain configured: {chain.name}")
-    else:
-        logger.warning("Could not load configuration from .env - using defaults")
-
-    logger.info(f"Templates directory: {TEMPLATES_DIR}")
-    logger.info(f"Static directory: {STATIC_DIR}")
+    logger.info("Templates directory: %s", TEMPLATES_DIR)
+    logger.info("Static directory: %s", STATIC_DIR)
 
     yield
 
     # Shutdown
     logger.info("Shutting down MultiChain Explorer 2")
-    await app.state.http_client.aclose()
-    logger.info("Shared HTTP client closed")
-    # Close Redis connection pool if applicable
-    if hasattr(app.state.cache_provider, "close"):
-        await app.state.cache_provider.close()
-        logger.info("Cache provider closed")
+    await _close_runtime_resources(app)
 
 
-def create_app() -> FastAPI:
-    """
-    Create and configure the FastAPI application.
+def _configure_templates(app: FastAPI) -> Jinja2Templates:
+    """Create templates, attach them to app state, and register filters."""
+    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    app.state.templates = templates
+    _register_template_filters(templates)
+    return templates
 
-    Returns:
-        Configured FastAPI application instance
-    """
-    # Get version from app_state
-    version = app_state.VERSION
 
-    app = FastAPI(
-        title="MultiChain Explorer 2",
-        description="A modern, web-based explorer for MultiChain blockchains",
-        version=version,
-        lifespan=lifespan,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
-    )
+def _mount_static_files(app: FastAPI) -> None:
+    """Mount the static files directory when it exists."""
+    if STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+        logger.info("Mounted static files from %s", STATIC_DIR)
+    else:
+        logger.warning("Static directory not found: %s", STATIC_DIR)
+
+
+def _register_request_timing_middleware(app: FastAPI) -> None:
+    """Add lightweight request timing logs around the main request path."""
 
     @app.middleware("http")
     async def log_request_timing(request: Request, call_next):
-        """Emit lightweight route timing logs for the main request path."""
         start_time = time.perf_counter()
         try:
             response = await call_next(request)
@@ -186,59 +186,37 @@ def create_app() -> FastAPI:
         )
         return response
 
-    # Mount static files
-    if STATIC_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-        logger.info(f"Mounted static files from {STATIC_DIR}")
-    else:
-        logger.warning(f"Static directory not found: {STATIC_DIR}")
 
-    # Setup Jinja2 templates
-    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-    _patch_template_response(templates)
-
-    # Store templates in app state for access in routes
-    app.state.templates = templates
-
-    # Register custom template filters
-    _register_template_filters(templates)
-
-    # Register exception handlers
-    _register_exception_handlers(app, templates)
-
-    # Rate limiting — attach limiter to app state and add middleware + 429 handler
+def _register_middleware(app: FastAPI) -> None:
+    """Register request middleware in the required outer-to-inner order."""
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     logger.info("Rate limiting enabled (60 req/min per IP by default)")
 
-    # TrustedHostMiddleware — rejects requests with unexpected Host headers.
-    # Must be registered before CORSMiddleware so it's between rate limiting and CORS.
-    # Skill ref: fastapi-agents > middleware > TrustedHostMiddleware
     settings = get_settings()
     trusted_hosts = settings.trusted_hosts_list
-    if trusted_hosts != ["*"]:  # skip in dev (wildcard = allow all)
+    if trusted_hosts != ["*"]:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
-        logger.info(f"TrustedHostMiddleware enabled for: {trusted_hosts}")
+        logger.info("TrustedHostMiddleware enabled for: %s", trusted_hosts)
     else:
         logger.info(
             "TrustedHostMiddleware: wildcard mode (all hosts allowed – set TRUSTED_HOSTS in production)"
         )
 
-    # CORS — must be added LAST (outermost) so OPTIONS preflight requests are
-    # answered before rate limiting or other middleware runs.
-    # Skill ref: fastapi-agents > middleware > CORSMiddleware
     cors_origins = settings.cors_origins_list
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_credentials=cors_origins != ["*"],  # never combine wildcard + credentials
+        allow_credentials=cors_origins != ["*"],
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
-    logger.info(f"CORS enabled for origins: {cors_origins}")
+    logger.info("CORS enabled for origins: %s", cors_origins)
 
-    # Register system routes FIRST to avoid being masked by catch-all routes
+
+def _register_system_routes(app: FastAPI) -> None:
+    """Register system and health routes before feature routers."""
     system_router = APIRouter(tags=["System"])
 
     @system_router.get("/favicon.ico", include_in_schema=False)
@@ -261,7 +239,6 @@ def create_app() -> FastAPI:
         http_client = getattr(request.app.state, "http_client", None)
         chains = getattr(state, "chains", []) if state is not None else []
 
-        # Only run chain connectivity checks when lifespan has initialized shared app state.
         if chains and http_client is not None:
             checks = await asyncio.gather(
                 *[
@@ -293,9 +270,11 @@ def create_app() -> FastAPI:
         }
 
     app.include_router(system_router)
-    app.include_router(api_router)
 
-    # Include functional routers
+
+def _include_feature_routers(app: FastAPI) -> None:
+    """Include API and HTML feature routers on the application."""
+    app.include_router(api_router)
     app.include_router(chains_router.router)
     app.include_router(blocks_router.router)
     app.include_router(transactions_router.router)
@@ -304,6 +283,35 @@ def create_app() -> FastAPI:
     app.include_router(streams_router.router)
     app.include_router(search_router.router)
     app.include_router(permissions_router.router)
+
+
+def create_app() -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+
+    Returns:
+        Configured FastAPI application instance
+    """
+    # Get version from app_state
+    version = app_state.VERSION
+
+    app = FastAPI(
+        title="MultiChain Explorer 2",
+        description="A modern, web-based explorer for MultiChain blockchains",
+        version=version,
+        lifespan=lifespan,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+    )
+
+    _register_request_timing_middleware(app)
+    _mount_static_files(app)
+    templates = _configure_templates(app)
+    _register_exception_handlers(app, templates)
+    _register_middleware(app)
+    _register_system_routes(app)
+    _include_feature_routers(app)
 
     logger.info("FastAPI application configured successfully")
 

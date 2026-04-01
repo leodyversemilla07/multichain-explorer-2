@@ -14,6 +14,14 @@
             <h1 class="text-3xl font-bold text-gray-900">Recent Transactions</h1>
             <span class="text-sm text-gray-600">{{ pagination.total|default(0) }} total</span>
         </div>
+        {% if transaction_window %}
+        <p class="mt-2 text-sm text-gray-500">
+            This page shows a recent window from the latest {{ transaction_window.scanned_block_count }} blocks.
+            {% if transaction_window.is_capped %}
+            Results are capped at {{ transaction_window.max_transactions }} transactions for predictable latency.
+            {% endif %}
+        </p>
+        {% endif %}
     </div>
 
     <!-- Transactions List -->

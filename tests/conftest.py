@@ -522,6 +522,50 @@ def app_mock_blockchain_service():
     async def mock_get_network_hashrate():
         return await service.call("getnetworkhashps")
 
+    async def mock_get_recent_transaction_summaries(
+        page=1,
+        count=20,
+        *,
+        block_window=50,
+        max_transactions=200,
+    ):
+        block_count = (await service.get_blockchain_info()).get("blocks", 0)
+        latest_height = max(block_count - 1, -1)
+        transactions = []
+
+        for height in range(latest_height, max(latest_height - block_window, -1), -1):
+            block = await service.get_block_by_height(height)
+            if not block:
+                continue
+            block_height = block.get("height", height)
+            confirmations = block_count - block_height
+            for txid in block.get("tx", []):
+                if len(transactions) >= max_transactions:
+                    break
+                transactions.append(
+                    {
+                        "txid": txid,
+                        "blockheight": block_height,
+                        "confirmations": confirmations,
+                        "time": block.get("time"),
+                    }
+                )
+            if len(transactions) >= max_transactions:
+                break
+
+        start = max((page - 1) * count, 0)
+        end = start + count
+        return {
+            "transactions": transactions[start:end],
+            "total": len(transactions),
+            "latest_height": latest_height,
+            "scanned_block_count": min(block_count, block_window),
+            "page": page,
+            "count": count,
+            "is_capped": len(transactions) >= max_transactions,
+            "max_transactions": max_transactions,
+        }
+
     async def mock_count_rpc_list_results(method, *leading_params, fetch_limit=100000):
         results = await service.call(
             method,
@@ -621,6 +665,9 @@ def app_mock_blockchain_service():
     service.get_all_streams = AsyncMock(side_effect=mock_get_all_streams)
     service.get_all_addresses = AsyncMock(side_effect=mock_get_all_addresses)
     service.get_recent_blocks = AsyncMock(side_effect=mock_get_recent_blocks)
+    service.get_recent_transaction_summaries = AsyncMock(
+        side_effect=mock_get_recent_transaction_summaries
+    )
     service.get_mining_info = AsyncMock(side_effect=mock_get_mining_info)
     service.get_network_hashrate = AsyncMock(side_effect=mock_get_network_hashrate)
     service.count_rpc_list_results = AsyncMock(side_effect=mock_count_rpc_list_results)

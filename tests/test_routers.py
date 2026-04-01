@@ -416,6 +416,77 @@ class TestBlocksRouter:
 class TestSearchRouter:
     """Test search router endpoints."""
 
+    def test_search_results_render_shared_search_payload(
+        self, html_test_client, app_mock_blockchain_service
+    ):
+        """Test the HTML search page renders the shared search result contract."""
+        txid = "a" * 64
+        app_mock_blockchain_service.get_block_by_hash = AsyncMock(
+            return_value={
+                "hash": txid,
+                "height": 999,
+                "time": 1700000000,
+                "tx": [txid],
+                "miner": "1ABC123",
+            }
+        )
+        app_mock_blockchain_service.get_transaction = AsyncMock(
+            return_value={
+                "txid": txid,
+                "confirmations": 7,
+                "time": 1700000000,
+                "vin": [{"txid": "prev", "vout": 0}],
+                "vout": [{"n": 0, "value": 1.0, "scriptPubKey": {}}],
+            }
+        )
+
+        async def search_call(method, params=None):
+            if method == "validateaddress":
+                return {"isvalid": False}
+            if method in {"listassets", "liststreams"}:
+                return []
+            return []
+
+        app_mock_blockchain_service.call = AsyncMock(side_effect=search_call)
+
+        response = html_test_client.get(f"/test-chain/search?q={txid}")
+
+        assert response.status_code == 200
+        assert f"Block #{999}" in response.text
+        assert txid in response.text
+        assert "Confirmations: 7" in response.text
+        assert "/test-chain/tx/" + txid in response.text
+
+    def test_search_redirect_includes_base_url_prefix(
+        self, html_test_client, app_mock_blockchain_service
+    ):
+        """Test single-result search redirects preserve the configured base URL."""
+        html_test_client.app.state.config.settings["main"]["base"] = "/explorer"
+
+        async def search_call(method, params=None):
+            if method == "validateaddress":
+                return {"isvalid": False}
+            if method == "listassets":
+                return [
+                    {
+                        "name": "asset1",
+                        "assetref": "1-2-3",
+                        "units": 1.0,
+                    }
+                ]
+            if method == "liststreams":
+                return []
+            return []
+
+        app_mock_blockchain_service.call = AsyncMock(side_effect=search_call)
+
+        response = html_test_client.get(
+            "/test-chain/search?q=asset1", follow_redirects=False
+        )
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "/explorer/test-chain/asset/asset1"
+
     def test_search_suggest_returns_json(
         self, html_test_client, app_mock_blockchain_service
     ):
@@ -536,6 +607,36 @@ class TestPaginationInRoutes:
 
         response = html_test_client.get("/test-chain/transactions")
         assert response.status_code == 503
+
+    def test_transactions_page_describes_recent_window(
+        self, html_test_client, app_mock_blockchain_service
+    ):
+        """Test recent transactions page explains its bounded scan window."""
+        app_mock_blockchain_service.get_recent_transaction_summaries = AsyncMock(
+            return_value={
+                "transactions": [
+                    {
+                        "txid": "tx1",
+                        "blockheight": 999,
+                        "confirmations": 1,
+                        "time": 1700000000,
+                    }
+                ],
+                "total": 1,
+                "latest_height": 999,
+                "scanned_block_count": 50,
+                "page": 1,
+                "count": 20,
+                "is_capped": True,
+                "max_transactions": 200,
+            }
+        )
+
+        response = html_test_client.get("/test-chain/transactions")
+
+        assert response.status_code == 200
+        assert "latest 50 blocks" in response.text
+        assert "capped at 200 transactions" in response.text
 
     def test_asset_transactions_uses_full_total_for_pagination(
         self, html_test_client, app_mock_blockchain_service
@@ -661,6 +762,29 @@ class TestLegacyRoutes:
         """Test legacy /chain/{name} route exists."""
         response = html_test_client.get("/chain/test-chain", follow_redirects=False)
         assert response.status_code in [200, 302, 307, 500]
+
+
+class TestTemplateLinkGeneration:
+    """Test templates generate canonical route links."""
+
+    def test_stream_publishers_uses_chain_path_in_links(
+        self, html_test_client, app_mock_blockchain_service
+    ):
+        """Test publisher links use the canonical chain slug instead of the display name."""
+        publisher_address = "1" + ("A" * 25)
+        app_mock_blockchain_service.get_all_stream_publishers = AsyncMock(
+            return_value=[{"publisher": publisher_address, "items": 2}]
+        )
+
+        response = html_test_client.get("/test-chain/stream/stream1/publishers")
+
+        assert response.status_code == 200
+        assert f"/test-chain/address/{publisher_address}" in response.text
+        assert (
+            f"/test-chain/stream/stream1/publisher/{publisher_address}"
+            in response.text
+        )
+        assert "/Test Chain/" not in response.text
 
 
 class TestRouterTags:

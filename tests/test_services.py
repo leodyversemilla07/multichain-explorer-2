@@ -233,6 +233,39 @@ class TestBlockchainService:
         with pytest.raises(ChainConnectionError):
             await service.get_stream("stream1")
 
+    async def test_get_recent_transaction_summaries_returns_recent_window(self, service):
+        """Test recent transaction summaries are derived from the newest blocks."""
+        service.get_blockchain_info = AsyncMock(return_value={"blocks": 3})
+        service.get_block_by_height = AsyncMock(
+            side_effect=[
+                {"height": 2, "time": 300, "tx": ["tx3", "tx2"]},
+                {"height": 1, "time": 200, "tx": ["tx1"]},
+                {"height": 0, "time": 100, "tx": []},
+            ]
+        )
+
+        result = await service.get_recent_transaction_summaries(page=1, count=2)
+
+        assert result["transactions"] == [
+            {"txid": "tx3", "blockheight": 2, "confirmations": 1, "time": 300},
+            {"txid": "tx2", "blockheight": 2, "confirmations": 1, "time": 300},
+        ]
+        assert result["total"] == 3
+        assert result["scanned_block_count"] == 3
+        assert result["is_capped"] is False
+
+    async def test_get_recent_transaction_summaries_raises_when_all_blocks_fail(
+        self, service
+    ):
+        """Test total block fetch failure surfaces the backend error."""
+        service.get_blockchain_info = AsyncMock(return_value={"blocks": 2})
+        service.get_block_by_height = AsyncMock(
+            side_effect=ChainConnectionError("test-chain")
+        )
+
+        with pytest.raises(ChainConnectionError):
+            await service.get_recent_transaction_summaries(page=1, count=5)
+
     async def test_count_rpc_list_results_uses_shared_bounded_fetch(self, service):
         """Test shared RPC count fallback uses the expected bounded parameters."""
         service.call = AsyncMock(return_value=[{"txid": "tx1"}, {"txid": "tx2"}])
@@ -370,6 +403,32 @@ class TestSearchService:
             await search_all_entities(
                 chain, search_service_mock, "asset1", include_stream_keys=False
             )
+
+    async def test_search_all_entities_applies_base_url_prefix(
+        self, chain, search_service_mock
+    ):
+        """Test canonical search result URLs respect reverse-proxy base prefixes."""
+        search_service_mock.call = AsyncMock(
+            side_effect=lambda method, params=None: [
+                {
+                    "name": "asset1",
+                    "assetref": "1-2-3",
+                    "units": 1.0,
+                }
+            ]
+            if method == "listassets"
+            else []
+        )
+
+        result = await search_all_entities(
+            chain,
+            search_service_mock,
+            "asset1",
+            include_stream_keys=False,
+            base_url="/explorer",
+        )
+
+        assert result["results"][0]["url"] == "/explorer/test-chain/asset/asset1"
 
 
 class TestPaginationService:

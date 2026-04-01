@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 LIST_CACHE_TTL_SECONDS = 10
 COUNT_CACHE_TTL_SECONDS = 5
 SUMMARY_CACHE_TTL_SECONDS = 15
+RECENT_TRANSACTIONS_BLOCK_WINDOW = 50
+RECENT_TRANSACTIONS_MAX_ITEMS = 200
 
 
 class BlockchainService:
@@ -525,6 +527,84 @@ class BlockchainService:
             publisher,
             fetch_limit=fetch_limit,
         )
+
+    async def get_recent_transaction_summaries(
+        self,
+        page: int = 1,
+        count: int = 20,
+        *,
+        block_window: int = RECENT_TRANSACTIONS_BLOCK_WINDOW,
+        max_transactions: int = RECENT_TRANSACTIONS_MAX_ITEMS,
+    ) -> Dict[str, Any]:
+        """
+        Return a recent transaction window derived from the newest blocks only.
+
+        This endpoint is intentionally not a full-chain transaction index. It
+        scans a bounded window of recent blocks and returns enough transactions
+        to satisfy the requested page, capped by ``max_transactions``.
+        """
+        info = await self.get_blockchain_info()
+        latest_block_count = max(info.get("blocks", 0), 0)
+        if latest_block_count == 0:
+            return {
+                "transactions": [],
+                "total": 0,
+                "latest_height": -1,
+                "scanned_block_count": 0,
+                "page": 1,
+                "count": count,
+                "is_capped": False,
+                "max_transactions": max_transactions,
+            }
+
+        latest_height = latest_block_count - 1
+        needed = min((page * count) + 1, max_transactions)
+        scan_end = max(latest_height - block_window, -1)
+        heights_to_scan = list(range(latest_height, scan_end, -1))
+
+        block_results = await asyncio.gather(
+            *[self.get_block_by_height(height) for height in heights_to_scan],
+            return_exceptions=True,
+        )
+
+        block_errors = [result for result in block_results if isinstance(result, Exception)]
+        if block_errors and len(block_errors) == len(block_results):
+            raise block_errors[0]
+
+        recent_transactions: List[Dict[str, Any]] = []
+        for requested_height, block in zip(heights_to_scan, block_results):
+            if len(recent_transactions) >= needed:
+                break
+            if isinstance(block, Exception) or not block:
+                continue
+
+            block_height = block.get("height", requested_height)
+            confirmations = latest_block_count - block_height
+            for txid in block.get("tx", []):
+                if len(recent_transactions) >= needed:
+                    break
+                recent_transactions.append(
+                    {
+                        "txid": txid,
+                        "blockheight": block_height,
+                        "confirmations": confirmations,
+                        "time": block.get("time"),
+                    }
+                )
+
+        page_start = max((page - 1) * count, 0)
+        page_end = page_start + count
+
+        return {
+            "transactions": recent_transactions[page_start:page_end],
+            "total": len(recent_transactions),
+            "latest_height": latest_height,
+            "scanned_block_count": len(heights_to_scan),
+            "page": max(page, 1),
+            "count": count,
+            "is_capped": len(recent_transactions) >= max_transactions,
+            "max_transactions": max_transactions,
+        }
 
     @cached(ttl=LIST_CACHE_TTL_SECONDS, key_prefix="stream-keys")
     async def get_all_stream_keys(
