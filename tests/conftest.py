@@ -3,11 +3,23 @@ MultiChain Explorer 2 - Test Suite
 Pytest configuration and fixtures
 """
 
+import asyncio
+import inspect
+import json
 from typing import Any, Dict, Optional
 from unittest.mock import Mock, patch, AsyncMock
 
+import httpx
 import pytest
+from fastapi import HTTPException
+from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient
+from fastapi.routing import APIRoute
+from fastapi.responses import JSONResponse
+from starlette.requests import Request
+from starlette.routing import Match
+
+from exceptions import ChainNotFoundError
 
 
 @pytest.fixture
@@ -746,67 +758,253 @@ def app_test_state(app_mock_chain):
     return state
 
 
+class DirectTestResponse:
+    def __init__(self, status_code: int, headers: Dict[str, str], body: bytes):
+        self.status_code = status_code
+        self.headers = headers
+        self._body = body
+
+    @property
+    def text(self) -> str:
+        return self._body.decode("utf-8")
+
+    def json(self):
+        return json.loads(self.text)
+
+
+class DirectAppClient:
+    def __init__(self, app, blockchain_service=None):
+        from routers.dependencies import CommonContext, PaginationService, _resolve_base_url
+
+        self.app = app
+        self._blockchain_service = blockchain_service
+        self._CommonContext = CommonContext
+        self._PaginationService = PaginationService
+        self._resolve_base_url = _resolve_base_url
+
+    def _build_scope(self, method: str, path: str, query_string: bytes):
+        return {
+            "type": "http",
+            "http_version": "1.1",
+            "method": method,
+            "path": path,
+            "raw_path": path.encode("utf-8"),
+            "query_string": query_string,
+            "headers": [],
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("127.0.0.1", 12345),
+            "root_path": "",
+            "app": self.app,
+        }
+
+    def _match_route(self, scope):
+        for route in self.app.routes:
+            match, child_scope = route.matches(scope)
+            if match == Match.FULL:
+                return route, child_scope
+        raise AssertionError(f"No route matched {scope['path']}")
+
+    def _coerce_param(self, raw_value, annotation):
+        if annotation is int:
+            return int(raw_value)
+        if annotation is float:
+            return float(raw_value)
+        if annotation is bool:
+            return raw_value.lower() in {"1", "true", "yes", "on"}
+        return raw_value
+
+    async def _render_response(self, response, scope):
+        if not hasattr(response, "__call__"):
+            response = JSONResponse(content=jsonable_encoder(response))
+
+        messages = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            messages.append(message)
+
+        await response(scope, receive, send)
+
+        start = next(msg for msg in messages if msg["type"] == "http.response.start")
+        body = b"".join(
+            msg.get("body", b"")
+            for msg in messages
+            if msg["type"] == "http.response.body"
+        )
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in start.get("headers", [])
+        }
+        return DirectTestResponse(start["status"], headers, body)
+
+    async def _handle_exception(self, request: Request, exc: Exception):
+        handler = None
+        for exc_type in type(exc).__mro__:
+            handler = self.app.exception_handlers.get(exc_type)
+            if handler:
+                break
+
+        if handler:
+            response = await handler(request, exc)
+            return await self._render_response(response, request.scope)
+
+        if isinstance(exc, HTTPException):
+            if request.url.path.startswith("/api/"):
+                response = JSONResponse(
+                    status_code=exc.status_code,
+                    content={"detail": exc.detail},
+                )
+            else:
+                response = self.app.state.templates.TemplateResponse(
+                    name="pages/error.html",
+                    context={
+                        "request": request,
+                        "title": "Error",
+                        "status_code": exc.status_code,
+                        "error_title": "Error",
+                        "error_message": str(exc.detail),
+                        "base_url": self._resolve_base_url(self.app.state.config),
+                    },
+                    status_code=exc.status_code,
+                )
+            return await self._render_response(response, request.scope)
+
+        raise exc
+
+    async def _request(self, method: str, url: str, **kwargs):
+        follow_redirects = kwargs.pop("follow_redirects", True)
+        params = kwargs.pop("params", None)
+        if kwargs:
+            raise TypeError(f"Unsupported request kwargs: {sorted(kwargs.keys())}")
+
+        parsed = httpx.URL(url)
+        if params is not None:
+            parsed = parsed.copy_merge_params(params)
+        scope = self._build_scope(method, parsed.path, parsed.query)
+        route, child_scope = self._match_route(scope)
+        path_params = child_scope.get("path_params", {})
+        request = Request({**scope, **child_scope})
+        state = getattr(self.app.state, "config", None)
+        chain_name = path_params.get("chain_name")
+        chain = state.get_chain_by_name(chain_name) if chain_name and state else None
+
+        if chain_name and chain is None:
+            return await self._handle_exception(
+                request,
+                ChainNotFoundError(chain_name),
+            )
+
+        if isinstance(route, APIRoute):
+            signature = inspect.signature(route.endpoint)
+            endpoint_kwargs = {}
+            for name, parameter in signature.parameters.items():
+                if name == "request":
+                    endpoint_kwargs[name] = request
+                elif name == "state":
+                    endpoint_kwargs[name] = state
+                elif name == "chain":
+                    endpoint_kwargs[name] = chain
+                elif name == "service":
+                    endpoint_kwargs[name] = self._blockchain_service
+                elif name == "pagination":
+                    endpoint_kwargs[name] = self._PaginationService()
+                elif name == "templates":
+                    endpoint_kwargs[name] = self.app.state.templates
+                elif name == "context":
+                    endpoint_kwargs[name] = self._CommonContext(
+                        request=request,
+                        chain=chain,
+                        state=state,
+                    )
+                elif name == "query_params":
+                    endpoint_kwargs[name] = dict(request.query_params)
+                elif name == "base_url":
+                    endpoint_kwargs[name] = (
+                        self._resolve_base_url(state) if state else "/"
+                    )
+                elif name in path_params:
+                    endpoint_kwargs[name] = self._coerce_param(
+                        path_params[name], parameter.annotation
+                    )
+                elif name in request.query_params:
+                    endpoint_kwargs[name] = self._coerce_param(
+                        request.query_params[name], parameter.annotation
+                    )
+
+            try:
+                response = await route.endpoint(**endpoint_kwargs)
+            except Exception as exc:
+                return await self._handle_exception(request, exc)
+
+            rendered = await self._render_response(response, request.scope)
+            if follow_redirects and 300 <= rendered.status_code < 400:
+                location = rendered.headers.get("location")
+                if location:
+                    return await self._request(method, location)
+            return rendered
+
+        if hasattr(route, "endpoint"):
+            endpoint = route.endpoint
+            if inspect.iscoroutinefunction(endpoint):
+                response = await endpoint(request)
+            else:
+                response = endpoint(request)
+            rendered = await self._render_response(response, request.scope)
+            if follow_redirects and 300 <= rendered.status_code < 400:
+                location = rendered.headers.get("location")
+                if location:
+                    return await self._request(method, location)
+            return rendered
+
+        raise AssertionError(f"Unsupported route type for {parsed.path}: {type(route)}")
+
+    def request(self, method: str, url: str, **kwargs):
+        return asyncio.run(self._request(method, url, **kwargs))
+
+    def get(self, url: str, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+
+@pytest.fixture
+def direct_client_factory():
+    def _factory(app, blockchain_service=None):
+        return DirectAppClient(app, blockchain_service)
+
+    return _factory
+
+
 @pytest.fixture
 def api_test_client(app_mock_chain, app_mock_blockchain_service, app_test_state):
     """Shared JSON API client with dependency overrides applied."""
     from main import create_app
-    from routers.dependencies import get_blockchain_service
 
     app = create_app()
+    app.user_middleware = []
+    app.middleware_stack = app.build_middleware_stack()
     app.state.config = app_test_state
-    app.dependency_overrides[get_blockchain_service] = (
-        lambda: app_mock_blockchain_service
-    )
-
-    yield TestClient(app, raise_server_exceptions=True)
-
-    app.dependency_overrides.clear()
+    yield DirectAppClient(app, app_mock_blockchain_service)
 
 
 @pytest.fixture
 def html_test_app(app_mock_chain, app_test_state):
-    """Shared FastAPI app for HTML router tests with patched lifespan dependencies."""
+    """Shared FastAPI app for HTML router tests without lifespan startup."""
     from main import create_app
 
-    mock_http_client = Mock()
-    mock_http_client.aclose = AsyncMock()
-    mock_cache_provider = Mock()
-    mock_cache_provider.close = AsyncMock()
-
-    with (
-        patch("main.httpx.AsyncClient", return_value=mock_http_client),
-        patch("main.app_state.init_from_env", return_value=True),
-        patch("main.app_state.get_state", return_value=app_test_state),
-        patch("main.create_cache_provider", return_value=mock_cache_provider),
-    ):
-        app = create_app()
-
+    app = create_app()
+    app.user_middleware = []
+    app.middleware_stack = app.build_middleware_stack()
     app.state.config = app_test_state
+    app.state.http_client = Mock()
+    app.state.http_client.aclose = AsyncMock()
+    app.state.cache_provider = Mock()
+    app.state.cache_provider.close = AsyncMock()
     return app
 
 
 @pytest.fixture
 def html_test_client(html_test_app, app_mock_blockchain_service):
-    """Shared HTML client with patched lifespan infrastructure and DI overrides."""
-    from routers.dependencies import get_blockchain_service
-
-    mock_http_client = Mock()
-    mock_http_client.aclose = AsyncMock()
-    mock_cache_provider = Mock()
-    mock_cache_provider.close = AsyncMock()
-    state = html_test_app.state.config
-
-    html_test_app.dependency_overrides[get_blockchain_service] = (
-        lambda: app_mock_blockchain_service
-    )
-    with (
-        patch("main.httpx.AsyncClient", return_value=mock_http_client),
-        patch("main.app_state.init_from_env", return_value=True),
-        patch("main.app_state.get_state", return_value=state),
-        patch("main.create_cache_provider", return_value=mock_cache_provider),
-    ):
-        with TestClient(html_test_app, raise_server_exceptions=False) as client:
-            html_test_app.state.config = state
-            yield client
-
-    html_test_app.dependency_overrides.clear()
+    """Shared HTML client using direct route invocation instead of ASGI transport."""
+    yield DirectAppClient(html_test_app, app_mock_blockchain_service)

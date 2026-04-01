@@ -2,20 +2,19 @@
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from fastapi.testclient import TestClient
 from exceptions import ChainConnectionError, RPCError
 from routers.dependencies import get_blockchain_service
 
 
 @pytest.fixture
-def simple_client():
+def simple_client(direct_client_factory):
     """Create a lightweight client for system/OpenAPI tests."""
     from main import create_app
 
     app = create_app()
-    with patch("main.app_state.init_from_env", return_value=False):
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
+    app.user_middleware = []
+    app.middleware_stack = app.build_middleware_stack()
+    yield direct_client_factory(app)
 
 
 class TestAddressesRouter:
@@ -532,18 +531,20 @@ class TestChainNotFoundHandling:
     """Test handling of nonexistent chains."""
 
     @pytest.fixture
-    def client_no_chains(self):
+    def client_no_chains(self, direct_client_factory):
         """Create client with no chains configured."""
         from main import create_app
         from app_state import ApplicationState
 
         app = create_app()
+        app.user_middleware = []
+        app.middleware_stack = app.build_middleware_stack()
 
         state = ApplicationState()
         state.chains = []
         app.state.config = state
 
-        return TestClient(app, raise_server_exceptions=False)
+        return direct_client_factory(app)
 
     def test_nonexistent_chain_returns_404(self, client_no_chains):
         """Test accessing nonexistent chain returns 404."""
@@ -833,12 +834,14 @@ class TestErrorHandling:
     """Test error handling in routes."""
 
     @pytest.fixture
-    def client_with_error_service(self, app_mock_chain):
+    def client_with_error_service(self, app_mock_chain, direct_client_factory):
         """Create client with a service that raises errors."""
         from main import create_app
         from app_state import ApplicationState
 
         app = create_app()
+        app.user_middleware = []
+        app.middleware_stack = app.build_middleware_stack()
 
         state = ApplicationState()
         state.chains = [app_mock_chain]
@@ -852,24 +855,7 @@ class TestErrorHandling:
         error_service.get_blockchain_info = AsyncMock(
             side_effect=Exception("RPC Error")
         )
-
-        app.dependency_overrides[get_blockchain_service] = lambda: error_service
-
-        mock_http_client = MagicMock()
-        mock_http_client.aclose = AsyncMock()
-        mock_cache_provider = MagicMock()
-        mock_cache_provider.close = AsyncMock()
-
-        with (
-            patch("main.httpx.AsyncClient", return_value=mock_http_client),
-            patch("main.app_state.init_from_env", return_value=True),
-            patch("main.app_state.get_state", return_value=state),
-            patch("main.create_cache_provider", return_value=mock_cache_provider),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                app.state.config = state
-                yield client
-        app.dependency_overrides.clear()
+        yield direct_client_factory(app, error_service)
 
     def test_service_error_handled(self, client_with_error_service):
         """Test that service errors are handled gracefully."""
