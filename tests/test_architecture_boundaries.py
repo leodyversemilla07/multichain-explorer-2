@@ -15,7 +15,7 @@ ACTIVE_RUNTIME_PATHS = [
     REPO_ROOT / "services",
 ]
 
-COMPATIBILITY_ONLY_MODULES = {"multichain", "performance"}
+COMPATIBILITY_ONLY_MODULES = {"compat", "multichain", "performance"}
 
 
 def _iter_python_files():

@@ -387,8 +387,9 @@ multichain-explorer-2/
 ├── env_config.py            # Environment-backed settings loader
 ├── validators.py            # Input validation helpers
 ├── exceptions.py            # Error handling
-├── multichain.py            # Compatibility-only legacy RPC client
-├── performance.py           # Compatibility-only utility surface
+├── compat/                  # Compatibility-only implementations
+├── multichain.py            # Compatibility shim for legacy RPC client
+├── performance.py           # Compatibility shim for legacy utility surface
 ├── utils.py                 # Utility functions
 ├── ACTIVE_ARCHITECTURE.md   # Current active runtime path
 ├── COMPATIBILITY_BOUNDARY.md # Compatibility policy and boundaries

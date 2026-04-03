@@ -11,9 +11,11 @@ This repository still carries a compatibility surface, but it is not the primary
 ## Compatibility-Only Modules
 
 - `multichain.py`
-  - legacy synchronous MultiChain RPC wrapper
+  - compatibility shim for `compat/legacy_multichain.py`
 - `performance.py`
-  - legacy performance/cache utility surface retained for compatibility and tests
+  - compatibility shim for `compat/legacy_performance.py`
+
+Implementation code for compatibility-only modules now lives under `compat/`.
 
 These modules are kept for compatibility and regression coverage. New runtime behavior should not depend on them.
 

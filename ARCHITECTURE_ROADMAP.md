@@ -25,7 +25,7 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 - **Framework:** FastAPI + Uvicorn (async ASGI) ⚡
 - **Entry Point:** `main.py` (single entry point)
 - **Legacy Entry Points Removed:** `http_server.py`, `routing.py`, `app.py`, `cfg.py`
-- **Compatibility-Only Modules Still Present:** `multichain.py`, `performance.py`
+- **Compatibility-Only Shims Still Present:** `multichain.py`, `performance.py` (implementations isolated under `compat/`)
 
 **Current Status:**
 - ✅ All core functionality complete

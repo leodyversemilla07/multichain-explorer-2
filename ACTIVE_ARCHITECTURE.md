@@ -47,9 +47,9 @@ These are compatibility inputs, not the preferred internal architecture.
 These modules still exist in the repository but are not part of the primary FastAPI request path:
 
 - `multichain.py`
-  - legacy synchronous RPC wrapper
+  - compatibility shim for the legacy synchronous RPC wrapper implementation in `compat/legacy_multichain.py`
 - `performance.py`
-  - legacy/cache utility surface retained for compatibility and tests
+  - compatibility shim for the legacy utility surface in `compat/legacy_performance.py`
 
 Changes to the active runtime path should not add new dependencies on these modules.
 
