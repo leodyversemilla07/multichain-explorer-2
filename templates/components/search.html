@@ -278,8 +278,17 @@ function searchComponent() {
             this.isLoading = true;
 
             try {
-                const chainPath = window.location.pathname.split('/')[1] || '';
-                const response = await fetch(`/${chainPath}/search/suggest?q=${encodeURIComponent(this.query)}`);
+                const baseHref = document.querySelector('base')?.getAttribute('href') || '/';
+                const normalizedBase = baseHref === '/' ? '' : `/${baseHref.replace(/^\/+|\/+$/g, '')}`;
+                const relativePath = window.location.pathname.startsWith(normalizedBase)
+                    ? window.location.pathname.slice(normalizedBase.length)
+                    : window.location.pathname;
+                const chainPath = relativePath.split('/').filter(Boolean)[0] || '';
+                const searchPath = [normalizedBase, chainPath, 'search', 'suggest']
+                    .filter(Boolean)
+                    .join('/');
+                const searchUrl = `${searchPath.startsWith('/') ? searchPath : `/${searchPath}`}?q=${encodeURIComponent(this.query)}`;
+                const response = await fetch(searchUrl);
                 const data = await response.json();
 
                 if (data.suggestions) {

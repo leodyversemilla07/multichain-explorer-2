@@ -57,12 +57,12 @@
                     <!-- Result Details -->
                     {% if result.type == 'block' %}
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                        Block #{{ result.height }}
+                        {{ result.label }}
                     </h3>
-                    <p class="text-sm text-gray-600 font-mono mb-2">{{ result.hash }}</p>
+                    <p class="text-sm text-gray-600 font-mono mb-2">{{ result.meta.hash }}</p>
                     <div class="text-sm text-gray-500">
-                        <span>Time: {{ result.time|format_timestamp }}</span> •
-                        <span>Transactions: {{ result.tx_count }}</span>
+                        <span>Time: {{ result.meta.time|format_timestamp }}</span> •
+                        <span>Transactions: {{ result.meta.txcount }}</span>
                     </div>
                     <a href="{{ result.url }}"
                        class="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
@@ -70,13 +70,14 @@
                     </a>
 
                     {% elif result.type == 'transaction' %}
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Transaction</h3>
-                    <p class="text-sm text-gray-600 font-mono mb-2">{{ result.txid }}</p>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.label }}</h3>
+                    <p class="text-sm text-gray-600 font-mono mb-2">{{ result.meta.txid }}</p>
                     <div class="text-sm text-gray-500">
-                        {% if result.confirmations %}
-                        <span>Confirmations: {{ result.confirmations }}</span> •
+                        {% if result.meta.confirmations %}
+                        <span>Confirmations: {{ result.meta.confirmations }}</span> •
                         {% endif %}
-                        <span>Block: {{ result.blockheight if result.blockheight else 'Unconfirmed' }}</span>
+                        <span>Inputs: {{ result.meta.vincount }}</span> •
+                        <span>Outputs: {{ result.meta.voutcount }}</span>
                     </div>
                     <a href="{{ result.url }}"
                        class="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
@@ -85,12 +86,12 @@
 
                     {% elif result.type == 'address' %}
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">Address</h3>
-                    <p class="text-sm text-gray-600 font-mono mb-2">{{ result.address }}</p>
+                    <p class="text-sm text-gray-600 font-mono mb-2">{{ result.meta.address }}</p>
                     <div class="text-sm text-gray-500">
-                        {% if result.balance %}
-                        <span>Balance: {{ result.balance|format_amount }}</span> •
+                        {% if result.meta.balance %}
+                        <span>Balance: {{ result.meta.balance|format_amount }}</span> •
                         {% endif %}
-                        <span>Transactions: {{ result.tx_count|default('Unknown') }}</span>
+                        <span>{{ 'Wallet Address' if result.meta.ismine else 'Address' }}</span>
                     </div>
                     <a href="{{ result.url }}"
                        class="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
@@ -98,11 +99,13 @@
                     </a>
 
                     {% elif result.type == 'asset' %}
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.name }}</h3>
-                    <p class="text-sm text-gray-600 mb-2">{{ result.assetref }}</p>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.label }}</h3>
+                    <p class="text-sm text-gray-600 mb-2">{{ result.meta.assetref }}</p>
                     <div class="text-sm text-gray-500">
-                        <span>Total Quantity: {{ result.qty|default('0') }}</span> •
-                        <span>{{ result.open|ternary('Open', 'Closed') }}</span>
+                        <span>Units: {{ result.meta.units|format_amount }}</span>
+                        {% if result.meta.issuer %}
+                        • <span>Issuer: {{ result.meta.issuer }}</span>
+                        {% endif %}
                     </div>
                     <a href="{{ result.url }}"
                        class="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
@@ -110,20 +113,30 @@
                     </a>
 
                     {% elif result.type == 'stream' %}
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.name }}</h3>
-                    <p class="text-sm text-gray-600 mb-2">{{ result.streamref }}</p>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.label }}</h3>
+                    <p class="text-sm text-gray-600 mb-2">{{ result.meta.createtxid }}</p>
                     <div class="text-sm text-gray-500">
-                        <span>Items: {{ result['items']|default(0) }}</span> •
-                        <span>{{ result.subscribed|ternary('Subscribed', 'Not Subscribed') }}</span>
+                        <span>Items: {{ result.meta.items|default(0) }}</span>
                     </div>
                     <a href="{{ result.url }}"
                        class="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
                         View Stream →
                     </a>
 
+                    {% elif result.type == 'stream_key' %}
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.label }}</h3>
+                    <p class="text-sm text-gray-600 mb-2">Stream: {{ result.meta.stream }}</p>
+                    <div class="text-sm text-gray-500">
+                        <span>Items: {{ result.meta.items|default(0) }}</span>
+                    </div>
+                    <a href="{{ result.url }}"
+                       class="inline-block mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        View Stream Key →
+                    </a>
+
                     {% else %}
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.title|default('Unknown') }}</h3>
-                    <p class="text-sm text-gray-600 mb-2">{{ result.description|default('No description') }}</p>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ result.label|default('Unknown') }}</h3>
+                    <p class="text-sm text-gray-600 mb-2">{{ result.id|default('No description') }}</p>
                     {% endif %}
                 </div>
             </div>

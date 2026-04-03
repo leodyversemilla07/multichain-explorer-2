@@ -13,7 +13,8 @@ from routers.dependencies import (
     TemplatesDep,
     BlockchainServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_base_url_dep,
+    get_query_params_dep,
     raise_backend_http_error,
 )
 from services.search_service import search_all_entities
@@ -27,6 +28,7 @@ async def _run_search(
     query: str,
     *,
     limit: Optional[int] = None,
+    base_url: str = "",
 ) -> dict:
     """Execute shared search and preserve backend HTTP semantics."""
     try:
@@ -36,6 +38,7 @@ async def _run_search(
             query,
             limit=limit,
             include_stream_keys=True,
+            base_url=base_url,
         )
     except Exception as exc:
         raise_backend_http_error(exc)
@@ -55,7 +58,7 @@ async def search(
     """
     query = search_value
 
-    results = await _run_search(chain, service, query)
+    results = await _run_search(chain, service, query, base_url=context.base_url)
 
     # Check if single result for redirect
     if results["total"] == 1:
@@ -86,14 +89,14 @@ async def search_get(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     Search the blockchain (GET method).
     """
     query = query_params.get("q", "")
 
-    results = await _run_search(chain, service, query)
+    results = await _run_search(chain, service, query, base_url=context.base_url)
 
     # Check if single result for redirect
     if results["total"] == 1:
@@ -122,7 +125,8 @@ async def search_suggest(
     request: Request,
     chain: ChainDep,
     service: BlockchainServiceDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
+    base_url: str = Depends(get_base_url_dep),
 ):
     """
     Auto-suggest search results for dropdown.
@@ -133,7 +137,9 @@ async def search_suggest(
 
     limit = 5
 
-    search_results = await _run_search(chain, service, query, limit=limit)
+    search_results = await _run_search(
+        chain, service, query, limit=limit, base_url=base_url
+    )
 
     suggestions = []
     for result in search_results["results"][:limit]:

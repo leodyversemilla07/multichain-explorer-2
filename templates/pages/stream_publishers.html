@@ -40,11 +40,11 @@
                 {% for publisher in publishers %}
                 <tr>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-800">
-                        <a href="{{ url_for('address', chain_name=chain_name, address=publisher.publisher) }}" class="text-indigo-600 hover:text-indigo-900">{{ publisher.publisher }}</a>
+                        <a href="{{ base_url }}{{ chain_path }}/address/{{ publisher.publisher }}" class="text-indigo-600 hover:text-indigo-900">{{ publisher.publisher }}</a>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ publisher.items }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <a href="{{ url_for('publisher_items', chain_name=chain_name, stream_name=stream_name, publisher=publisher.publisher) }}" class="text-indigo-600 hover:text-indigo-900">View Items</a>
+                        <a href="{{ base_url }}{{ chain_path }}/stream/{{ stream_name }}/publisher/{{ publisher.publisher }}" class="text-indigo-600 hover:text-indigo-900">View Items</a>
                     </td>
                 </tr>
                 {% endfor %}

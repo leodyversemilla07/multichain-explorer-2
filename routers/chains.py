@@ -25,7 +25,7 @@ from routers.dependencies import (
     TemplatesDep,
     BlockchainServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_query_params_dep,
     raise_backend_http_error,
 )
 from services.blockchain_service import BlockchainService
@@ -149,7 +149,7 @@ async def chain_home(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     Chain homepage/dashboard.
@@ -228,7 +228,7 @@ async def chain_dashboard(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     Chain dashboard (alias for chain_home).
@@ -383,7 +383,7 @@ async def legacy_chain_home(
     service: BlockchainServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy chain home route."""
     return await chain_home(request, chain, service, templates, context, query_params)

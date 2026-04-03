@@ -21,15 +21,31 @@ def _get_chain_path(chain: Any) -> str:
     return config_path if isinstance(config_path, str) else ""
 
 
-def _get_result_url(chain: Any, result_type: str, result_id: str) -> str:
+def _normalise_base_url(base_url: str) -> str:
+    """Normalise an optional base URL prefix for reverse-proxy deployments."""
+    if not base_url or base_url == "/":
+        return ""
+    return "/" + base_url.strip("/")
+
+
+def _build_url(base_url: str, path: str) -> str:
+    """Build a canonical application URL with an optional base prefix."""
+    prefix = _normalise_base_url(base_url)
+    normalised_path = path if path.startswith("/") else f"/{path}"
+    return f"{prefix}{normalised_path}" if prefix else normalised_path
+
+
+def _get_result_url(
+    chain: Any, result_type: str, result_id: str, base_url: str = ""
+) -> str:
     """Generate a canonical URL for a search result."""
     chain_path = _get_chain_path(chain)
     url_map = {
-        "block": f"/{chain_path}/block/{result_id}",
-        "transaction": f"/{chain_path}/tx/{result_id}",
-        "address": f"/{chain_path}/address/{result_id}",
-        "asset": f"/{chain_path}/asset/{result_id}",
-        "stream": f"/{chain_path}/stream/{result_id}",
+        "block": _build_url(base_url, f"/{chain_path}/block/{result_id}"),
+        "transaction": _build_url(base_url, f"/{chain_path}/tx/{result_id}"),
+        "address": _build_url(base_url, f"/{chain_path}/address/{result_id}"),
+        "asset": _build_url(base_url, f"/{chain_path}/asset/{result_id}"),
+        "stream": _build_url(base_url, f"/{chain_path}/stream/{result_id}"),
     }
     return url_map.get(result_type, "/")
 
@@ -40,6 +56,7 @@ async def search_all_entities(
     query: str,
     limit: int = 10,
     include_stream_keys: bool = True,
+    base_url: str = "",
 ) -> Dict[str, Any]:
     """
     Search across the supported entity types for a given query.
@@ -78,7 +95,9 @@ async def search_all_entities(
                             "time": block.get("time", 0),
                             "txcount": len(block.get("tx", [])),
                         },
-                        "url": _get_result_url(chain, "block", str(height)),
+                        "url": _get_result_url(
+                            chain, "block", str(height), base_url=base_url
+                        ),
                     }
                 )
         elif len(query) == 64:
@@ -96,7 +115,9 @@ async def search_all_entities(
                             "time": block.get("time", 0),
                             "txcount": len(block.get("tx", [])),
                         },
-                        "url": _get_result_url(chain, "block", block_height),
+                        "url": _get_result_url(
+                            chain, "block", block_height, base_url=base_url
+                        ),
                     }
                 )
         return found
@@ -126,7 +147,9 @@ async def search_all_entities(
                         "vincount": len(tx.get("vin", [])),
                         "voutcount": len(tx.get("vout", [])),
                     },
-                    "url": _get_result_url(chain, "transaction", query),
+                    "url": _get_result_url(
+                        chain, "transaction", query, base_url=base_url
+                    ),
                 }
             )
         return found
@@ -152,7 +175,9 @@ async def search_all_entities(
                         "ismine": addr_info.get("ismine", False),
                         "balance": balance,
                     },
-                    "url": _get_result_url(chain, "address", query),
+                    "url": _get_result_url(
+                        chain, "address", query, base_url=base_url
+                    ),
                 }
             )
         return found
@@ -172,7 +197,9 @@ async def search_all_entities(
                         "issuer": asset.get("issueaddress", ""),
                         "units": asset.get("units", 1),
                     },
-                    "url": _get_result_url(chain, "asset", asset.get("name", "")),
+                    "url": _get_result_url(
+                        chain, "asset", asset.get("name", ""), base_url=base_url
+                    ),
                 }
             )
         return found
@@ -191,7 +218,9 @@ async def search_all_entities(
                         "createtxid": stream.get("createtxid", ""),
                         "items": stream.get("items", 0),
                     },
-                    "url": _get_result_url(chain, "stream", stream.get("name", "")),
+                    "url": _get_result_url(
+                        chain, "stream", stream.get("name", ""), base_url=base_url
+                    ),
                 }
             )
         return found
@@ -224,7 +253,10 @@ async def search_all_entities(
                             "stream": stream_name,
                             "items": key_info.get("items", 0),
                         },
-                        "url": f"/{_get_chain_path(chain)}/stream/{stream_name}/key/{key_name}",
+                        "url": _build_url(
+                            base_url,
+                            f"/{_get_chain_path(chain)}/stream/{stream_name}/key/{key_name}",
+                        ),
                     }
                 )
             return results
