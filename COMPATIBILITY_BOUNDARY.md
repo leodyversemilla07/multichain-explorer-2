@@ -8,17 +8,6 @@ This repository still carries a compatibility surface, but it is not the primary
 - legacy `start`/`count` pagination inputs where API endpoints now prefer `page`/`count`
 - compatibility-oriented config/state dictionaries used by older code paths and regression tests
 
-## Compatibility-Only Modules
-
-- `multichain.py`
-  - compatibility shim for `compat/legacy_multichain.py`
-- `performance.py`
-  - compatibility shim for `compat/legacy_performance.py`
-
-Implementation code for compatibility-only modules now lives under `compat/`.
-
-These modules are kept for compatibility and regression coverage. New runtime behavior should not depend on them.
-
 ## Active Runtime Boundary
 
 The active runtime path is:

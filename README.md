@@ -343,7 +343,6 @@ tests/
 ├── test_dependencies.py        # FastAPI dependency tests
 ├── test_exceptions.py          # Error handling tests
 ├── test_models.py              # Domain model tests
-├── test_multichain.py          # Legacy RPC client tests
 ├── test_utils.py               # Utility tests
 └── test_validators.py          # Input validation tests
 ```
@@ -387,9 +386,6 @@ multichain-explorer-2/
 ├── env_config.py            # Environment-backed settings loader
 ├── validators.py            # Input validation helpers
 ├── exceptions.py            # Error handling
-├── compat/                  # Compatibility-only implementations
-├── multichain.py            # Compatibility shim for legacy RPC client
-├── performance.py           # Compatibility shim for legacy utility surface
 ├── utils.py                 # Utility functions
 ├── ACTIVE_ARCHITECTURE.md   # Current active runtime path
 ├── COMPATIBILITY_BOUNDARY.md # Compatibility policy and boundaries

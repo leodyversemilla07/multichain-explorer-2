@@ -7,7 +7,7 @@
 > Note
 > This roadmap reflects the original migration project and is no longer the authoritative description of the current runtime boundaries.
 > For the current active runtime path, see `ACTIVE_ARCHITECTURE.md`.
-> For compatibility-only modules and supported compatibility inputs, see `COMPATIBILITY_BOUNDARY.md`.
+> For supported compatibility inputs in the current codebase, see `COMPATIBILITY_BOUNDARY.md`.
 
 ---
 
@@ -25,7 +25,7 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 - **Framework:** FastAPI + Uvicorn (async ASGI) ⚡
 - **Entry Point:** `main.py` (single entry point)
 - **Legacy Entry Points Removed:** `http_server.py`, `routing.py`, `app.py`, `cfg.py`
-- **Compatibility-Only Shims Still Present:** `multichain.py`, `performance.py` (implementations isolated under `compat/`)
+- **Compatibility Inputs Still Supported:** legacy `/chain/...` routes and legacy `start`/`count` pagination links
 
 **Current Status:**
 - ✅ All core functionality complete

@@ -42,17 +42,6 @@ The following compatibility behavior is intentionally still supported:
 
 These are compatibility inputs, not the preferred internal architecture.
 
-## Compatibility-Only Modules
-
-These modules still exist in the repository but are not part of the primary FastAPI request path:
-
-- `multichain.py`
-  - compatibility shim for the legacy synchronous RPC wrapper implementation in `compat/legacy_multichain.py`
-- `performance.py`
-  - compatibility shim for the legacy utility surface in `compat/legacy_performance.py`
-
-Changes to the active runtime path should not add new dependencies on these modules.
-
 ## Current Refactor Direction
 
 The active runtime path has been consolidated around shared helpers for:
@@ -71,4 +60,4 @@ Future cleanup should prefer:
 1. keeping `main.py` as the single entrypoint
 2. adding behavior to services or shared dependencies before duplicating logic in routers
 3. preserving compatibility inputs only when they protect existing URLs or clients
-4. isolating or removing compatibility-only modules instead of extending them
+4. continuing to remove compatibility surfaces instead of extending them
