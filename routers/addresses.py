@@ -27,6 +27,7 @@ from routers.dependencies import (
     CommonContextDep,
     get_query_params_dep,
     get_page_count,
+    get_page_info_from_query,
     raise_backend_http_error,
 )
 
@@ -194,25 +195,20 @@ async def address_transactions(
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=total_count,
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, total_count)
 
     transactions = []
     if total_count > 0:
         # Get transactions for this page
         try:
-            transactions = await service.call(
+            transactions = await service.call_windowed_list(
                 "listaddresstransactions",
-                [address, page_info["count"], page_info["start"], True],
+                address,
+                count=page_info["count"],
+                start=page_info["start"],
+                verbose=True,
+                verbose_position="after_window",
             )
-            if not transactions:
-                transactions = []
         except Exception as exc:
             raise_backend_http_error(exc)
 
@@ -298,23 +294,19 @@ async def address_streams(
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    page, count = get_page_count(query_params)
-    page_info = pagination.get_pagination_info(
-        total=total_count,
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, total_count)
     streams = []
 
     if total_count > 0:
         # Get streams for this page
         try:
-            streams = await service.call(
+            streams = await service.call_windowed_list(
                 "explorerlistaddressstreams",
-                [address, True, page_info["count"], page_info["start"]],
+                address,
+                count=page_info["count"],
+                start=page_info["start"],
+                verbose=True,
             )
-            if not streams:
-                streams = []
         except Exception as exc:
             raise_backend_http_error(exc)
 

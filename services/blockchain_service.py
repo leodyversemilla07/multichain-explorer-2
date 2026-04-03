@@ -326,6 +326,33 @@ class BlockchainService:
             "listaddresstransactions", [address, count, skip, verbose]
         )
 
+    async def call_windowed_list(
+        self,
+        method: str,
+        *leading_params: Any,
+        count: int,
+        start: int,
+        verbose: Optional[bool] = None,
+        verbose_position: str = "before_window",
+    ) -> List[Any]:
+        """
+        Call a paginated RPC list method using shared window argument ordering.
+
+        Most MultiChain list RPCs place `verbose` before `count/start`, but
+        `listaddresstransactions` appends it after the window arguments.
+        """
+        params = list(leading_params)
+
+        if verbose is None:
+            params.extend([count, start])
+        elif verbose_position == "after_window":
+            params.extend([count, start, verbose])
+        else:
+            params.extend([verbose, count, start])
+
+        results = await self.call(method, params)
+        return results or []
+
     async def is_healthy(self) -> bool:
         """
         Check if the blockchain connection is healthy.

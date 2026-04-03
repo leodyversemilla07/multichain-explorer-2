@@ -509,6 +509,23 @@ def app_mock_blockchain_service():
         assets = await service.call("listassets", [asset_ref, True])
         return assets[0] if assets else None
 
+    async def mock_call_windowed_list(
+        method,
+        *leading_params,
+        count,
+        start,
+        verbose=None,
+        verbose_position="before_window",
+    ):
+        params = list(leading_params)
+        if verbose is None:
+            params.extend([count, start])
+        elif verbose_position == "after_window":
+            params.extend([count, start, verbose])
+        else:
+            params.extend([verbose, count, start])
+        return await service.call(method, params)
+
     async def mock_get_stream(stream_ref):
         streams = await service.call("liststreams", [stream_ref, True])
         return streams[0] if streams else None
@@ -670,6 +687,7 @@ def app_mock_blockchain_service():
         ]
 
     service.call = AsyncMock(side_effect=mock_call)
+    service.call_windowed_list = AsyncMock(side_effect=mock_call_windowed_list)
     service.get_asset = AsyncMock(side_effect=mock_get_asset)
     service.get_stream = AsyncMock(side_effect=mock_get_stream)
     service.get_all_assets = AsyncMock(side_effect=mock_get_all_assets)

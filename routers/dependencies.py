@@ -22,6 +22,7 @@ from config import ChainConfig
 from exceptions import ChainConnectionError, ChainNotFoundError, RPCError
 from services.blockchain_service import BlockchainService
 from services.pagination_service import PaginationService
+from services.pagination_service import PaginationInfo
 
 
 def get_state(request: Request) -> ApplicationState:
@@ -342,6 +343,26 @@ def get_start_count(
     return (
         safe_int(query_params.get("start", default_start), default_start),
         count,
+    )
+
+
+def get_page_info_from_query(
+    pagination: PaginationService,
+    query_params: Dict[str, str],
+    total: int,
+    default_page: int = 1,
+    default_count: int = 20,
+) -> PaginationInfo:
+    """Build PaginationInfo directly from shared page/count query parsing."""
+    page, count = get_page_count(
+        query_params,
+        default_page=default_page,
+        default_count=default_count,
+    )
+    return pagination.get_pagination_info(
+        total=total,
+        page=page,
+        items_per_page=count,
     )
 
 

@@ -27,6 +27,7 @@ from routers.dependencies import (
     CommonContextDep,
     get_query_params_dep,
     get_page_count,
+    get_page_info_from_query,
     raise_backend_http_error,
 )
 
@@ -174,15 +175,11 @@ async def asset_holders(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(holders),
+    paginated_holders, page_info = pagination.paginate(
+        holders,
         page=page,
         items_per_page=count,
     )
-
-    paginated_holders = holders[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -232,21 +229,17 @@ async def asset_transactions(
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=total_count,
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, total_count)
 
     transactions = []
     if total_count > 0:
         try:
-            transactions = await service.call(
+            transactions = await service.call_windowed_list(
                 "listassettransactions",
-                [asset_name, True, page_info["count"], page_info["start"]],
+                asset_name,
+                count=page_info["count"],
+                start=page_info["start"],
+                verbose=True,
             )
         except Exception as exc:
             raise_backend_http_error(exc)
@@ -294,14 +287,7 @@ async def asset_issues(
     asset = await _get_asset_or_raise(service, asset_name)
     issues = asset.get("issues", [])
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=len(issues),
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, len(issues))
 
     paginated_issues = issues[
         page_info["start"] : page_info["start"] + page_info["count"]

@@ -275,7 +275,38 @@ class TestBlockchainService:
         assert result == 2
         service.call.assert_awaited_with(
             "listassettransactions",
-            ["asset1", False, 100000, 0],
+            ["asset1", False, 1000, 0],
+        )
+
+    async def test_call_windowed_list_supports_both_verbose_orders(self, service):
+        """Test paginated RPC helper supports both MultiChain argument layouts."""
+        service.call = AsyncMock(return_value=[{"txid": "tx1"}])
+
+        result = await service.call_windowed_list(
+            "liststreamitems",
+            "stream1",
+            count=5,
+            start=10,
+            verbose=True,
+        )
+
+        assert result == [{"txid": "tx1"}]
+        service.call.assert_awaited_with(
+            "liststreamitems",
+            ["stream1", True, 5, 10],
+        )
+
+        await service.call_windowed_list(
+            "listaddresstransactions",
+            "addr1",
+            count=5,
+            start=10,
+            verbose=True,
+            verbose_position="after_window",
+        )
+        service.call.assert_awaited_with(
+            "listaddresstransactions",
+            ["addr1", 5, 10, True],
         )
 
     async def test_get_all_assets_is_cached(self, service):
@@ -300,7 +331,7 @@ class TestBlockchainService:
         assert first == second == 1
         service.call.assert_awaited_once_with(
             "liststreamitems",
-            ["stream1", False, 100000, 0],
+            ["stream1", False, 1000, 0],
         )
 
     async def test_get_asset_holder_transactions_filters_nested_assets(self, service):

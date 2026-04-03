@@ -29,6 +29,7 @@ from routers.dependencies import (
     CommonContextDep,
     get_query_params_dep,
     get_page_count,
+    get_page_info_from_query,
     raise_backend_http_error,
 )
 
@@ -227,21 +228,17 @@ async def stream_items(
         logger.error("Error getting stream item count", exc_info=exc)
         raise_backend_http_error(exc)
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=total_count,
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, total_count)
 
     items = []
     if total_count > 0:
         try:
-            items = await service.call(
+            items = await service.call_windowed_list(
                 "liststreamitems",
-                [stream_name, True, page_info["count"], page_info["start"]],
+                stream_name,
+                count=page_info["count"],
+                start=page_info["start"],
+                verbose=True,
             )
         except Exception as exc:
             logger.error("Error fetching stream items", exc_info=exc)
@@ -296,13 +293,11 @@ async def stream_keys(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(keys),
+    paginated_keys, page_info = pagination.paginate(
+        keys,
         page=page,
         items_per_page=count,
     )
-
-    paginated_keys = keys[page_info["start"] : page_info["start"] + page_info["count"]]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -356,15 +351,11 @@ async def stream_publishers(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(publishers),
+    paginated_publishers, page_info = pagination.paginate(
+        publishers,
         page=page,
         items_per_page=count,
     )
-
-    paginated_publishers = publishers[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -458,21 +449,18 @@ async def key_items(
         logger.error("Error getting key item count", exc_info=exc)
         raise_backend_http_error(exc)
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=total_count,
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, total_count)
 
     items = []
     if total_count > 0:
         try:
-            items = await service.call(
+            items = await service.call_windowed_list(
                 "liststreamkeyitems",
-                [stream_name, key, True, page_info["count"], page_info["start"]],
+                stream_name,
+                key,
+                count=page_info["count"],
+                start=page_info["start"],
+                verbose=True,
             )
         except Exception as exc:
             logger.error("Error fetching key items", exc_info=exc)
@@ -533,21 +521,18 @@ async def publisher_items(
         logger.error("Error getting publisher item count", exc_info=exc)
         raise_backend_http_error(exc)
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=total_count,
-        page=page,
-        items_per_page=count,
-    )
+    page_info = get_page_info_from_query(pagination, query_params, total_count)
 
     items = []
     if total_count > 0:
         try:
-            items = await service.call(
+            items = await service.call_windowed_list(
                 "liststreampublisheritems",
-                [stream_name, publisher, True, page_info["count"], page_info["start"]],
+                stream_name,
+                publisher,
+                count=page_info["count"],
+                start=page_info["start"],
+                verbose=True,
             )
         except Exception as exc:
             logger.error("Error fetching publisher items", exc_info=exc)
