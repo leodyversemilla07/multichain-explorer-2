@@ -5,6 +5,7 @@ from typing import Dict, List
 from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import StreamResponse, StreamItemResponse
 
+from routers.api.helpers import map_response_models, paginate_response_models
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
@@ -55,16 +56,15 @@ async def list_streams(
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    streams = sorted(streams, key=lambda x: x.get("name", ""))
     page, count = page_count
-
-    paginated_streams, _ = pagination.paginate(
+    return paginate_response_models(
+        pagination,
+        StreamResponse,
         streams,
         page=page,
-        items_per_page=count,
+        count=count,
+        sort_names=True,
     )
-
-    return [StreamResponse(**s) for s in paginated_streams]
 
 
 @router.get(
@@ -114,8 +114,14 @@ async def list_stream_items(
     await _get_stream_or_raise(service, stream_ref)
 
     try:
-        items = await service.call("liststreamitems", [stream_ref, True, count, start])
+        items = await service.call_windowed_list(
+            "liststreamitems",
+            stream_ref,
+            count=count,
+            start=start,
+            verbose=True,
+        )
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Stream {stream_ref} not found")
 
-    return [StreamItemResponse(**item) for item in (items or [])]
+    return map_response_models(StreamItemResponse, items or [])

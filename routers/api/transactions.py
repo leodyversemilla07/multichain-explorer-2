@@ -7,11 +7,13 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import TransactionResponse
 
+from routers.api.helpers import load_transaction_responses
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
     PaginationServiceDep,
     StartCountDep,
+    get_page_info_from_start_count,
     raise_backend_http_error,
 )
 
@@ -91,30 +93,21 @@ async def list_block_transactions(
 
     # Apply pagination
     start, count = start_count
-
-    page_info = pagination.get_pagination_info(
+    page_info = get_page_info_from_start_count(
+        pagination,
         total=len(tx_ids),
         start=start,
         count=count,
     )
 
-    paginated_tx_ids = tx_ids[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
+    paginated_tx_ids, _ = pagination.paginate(
+        tx_ids,
+        page=page_info["page"],
+        items_per_page=page_info["count"],
+    )
 
-    # Concurrent fetch
-    import asyncio
-
-    tasks = [service.get_transaction(tx_id) for tx_id in paginated_tx_ids]
-
-    transactions = []
-    if tasks:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        errors = [res for res in results if isinstance(res, Exception)]
-        if errors and len(errors) == len(results):
-            raise_backend_http_error(errors[0])
-        for res in results:
-            if isinstance(res, dict):
-                transactions.append(TransactionResponse(**res))
-
-    return transactions
+    return await load_transaction_responses(
+        service,
+        paginated_tx_ids,
+        raise_if_all_fail=True,
+    )

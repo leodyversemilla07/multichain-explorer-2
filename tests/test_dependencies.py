@@ -159,6 +159,28 @@ class TestGetPaginationService:
         assert isinstance(service, PaginationService)
 
 
+class TestPaginationQueryHelpers:
+    """Test shared pagination parsing helpers."""
+
+    def test_get_page_info_from_start_count(self):
+        """Test start/count inputs normalize to a shared PaginationInfo."""
+        from routers.dependencies import get_page_info_from_start_count
+        from services.pagination_service import PaginationService
+
+        pagination = PaginationService()
+
+        page_info = get_page_info_from_start_count(
+            pagination,
+            total=25,
+            start=10,
+            count=5,
+        )
+
+        assert page_info["page"] == 3
+        assert page_info["start"] == 10
+        assert page_info["count"] == 5
+
+
 class TestPaginationParams:
     """Test PaginationParams dependency class."""
 

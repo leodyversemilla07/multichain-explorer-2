@@ -230,6 +230,21 @@ class BlockchainService:
         """Get transaction by ID. Cached for 1 hour (immutable)."""
         return await self.call("getrawtransaction", [txid, 1 if verbose else 0])
 
+    async def get_transactions_by_ids(
+        self,
+        tx_ids: List[str],
+        *,
+        return_exceptions: bool = False,
+    ) -> List[Any]:
+        """Fetch multiple transactions concurrently by txid."""
+        tx_ids = [tx_id for tx_id in tx_ids if tx_id]
+        if not tx_ids:
+            return []
+        return await asyncio.gather(
+            *(self.get_transaction(tx_id) for tx_id in tx_ids),
+            return_exceptions=return_exceptions,
+        )
+
     async def list_blocks(
         self, start_height: int, count: int = 10
     ) -> List[Dict[str, Any]]:
@@ -247,6 +262,26 @@ class BlockchainService:
         """Return a short-lived cached recent block slice for dashboard views."""
         blocks = await self.list_blocks(start_height, count)
         return blocks or []
+
+    async def get_newest_blocks_page(
+        self,
+        total_blocks: int,
+        *,
+        start: int,
+        count: int,
+    ) -> List[Dict[str, Any]]:
+        """Return a newest-first block page for a normalized start/count window."""
+        end_height = total_blocks - 1 - start
+        start_height = max(0, end_height - count + 1)
+        blocks_to_fetch = end_height - start_height + 1
+
+        if blocks_to_fetch <= 0 or start_height > end_height:
+            return []
+
+        blocks = await self.list_blocks(start_height, blocks_to_fetch)
+        blocks = blocks or []
+        blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
+        return blocks
 
     async def list_addresses(self, addresses: Optional[List[str]] = None) -> List[Any]:
         """List address information."""

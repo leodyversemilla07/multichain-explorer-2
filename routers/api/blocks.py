@@ -72,35 +72,16 @@ async def list_blocks(
         items_per_page=count,
     )
 
-    # Calculate block range for newest-first display
-    end_height = total_blocks - 1 - page_info["start"]
-    start_height = max(0, end_height - page_info["count"] + 1)
-    blocks_to_fetch = end_height - start_height + 1
+    try:
+        raw_blocks = await service.get_newest_blocks_page(
+            total_blocks,
+            start=page_info["start"],
+            count=page_info["count"],
+        )
+    except Exception as exc:
+        raise_backend_http_error(exc)
 
-    blocks = []
-    if blocks_to_fetch > 0 and start_height <= end_height:
-        # Batch fetch blocks
-        try:
-            raw_blocks = await service.list_blocks(start_height, blocks_to_fetch)
-        except Exception as exc:
-            raise_backend_http_error(exc)
-        # Sort blocks by height descending (newest first)
-        raw_blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
-
-        # Map to Reponse Model
-        for b in raw_blocks:
-            # Helper to map fields if needed
-            block_data = b.copy()
-            if "tx" in block_data:
-                block_data["transactions"] = block_data.pop("tx")
-            if "nTx" in block_data:
-                block_data["tx_count"] = block_data.pop("nTx")
-            elif "transactions" in block_data:
-                block_data["tx_count"] = len(block_data["transactions"])
-
-            blocks.append(BlockResponse(**block_data))
-
-    return blocks
+    return [BlockResponse.from_rpc_block(block) for block in raw_blocks]
 
 
 @router.get(
@@ -125,13 +106,4 @@ async def get_block(
     """
     block = await _get_block_or_raise(service, identifier)
 
-    # Map fields
-    block_data = block.copy()
-    if "tx" in block_data:
-        block_data["transactions"] = block_data.pop("tx")
-    if "nTx" in block_data:
-        block_data["tx_count"] = block_data.pop("nTx")
-    elif "transactions" in block_data:
-        block_data["tx_count"] = len(block_data["transactions"])
-
-    return BlockResponse(**block_data)
+    return BlockResponse.from_rpc_block(block)

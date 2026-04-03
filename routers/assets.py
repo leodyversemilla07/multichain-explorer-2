@@ -385,16 +385,11 @@ async def holder_transactions(
 
     # Apply pagination
     page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
-        total=len(transactions),
+    paginated_txs, page_info = pagination.paginate(
+        transactions,
         page=page,
         items_per_page=count,
     )
-
-    paginated_txs = transactions[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     pagination_context = pagination.build_context(
         page_info,

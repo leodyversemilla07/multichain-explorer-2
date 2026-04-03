@@ -2,13 +2,13 @@
 API Addresses Router - JSON endpoints for address-related operations.
 """
 
-import asyncio
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import AddressResponse, TransactionResponse
 from exceptions import ChainConnectionError, RPCError
 
+from routers.api.helpers import load_transaction_responses
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
@@ -90,15 +90,7 @@ async def list_address_transactions(
 
         tx_list = await service.get_address_transactions(address, count, start)
         txids = [tx.get("txid") for tx in tx_list if "txid" in tx]
-        tasks = [service.get_transaction(txid) for txid in txids]
-
-        transactions = []
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for res in results:
-                if isinstance(res, dict):
-                    transactions.append(TransactionResponse(**res))
-        return transactions
+        return await load_transaction_responses(service, txids)
     except HTTPException:
         raise
     except (ChainConnectionError, RPCError) as exc:

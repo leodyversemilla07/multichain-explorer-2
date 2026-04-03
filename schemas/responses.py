@@ -56,6 +56,18 @@ class BlockResponse(BaseResponse):
     tx_count: int = 0
     transactions: List[str] = Field(default_factory=list)
 
+    @classmethod
+    def from_rpc_block(cls, block: Dict[str, Any]) -> "BlockResponse":
+        """Build a response model from a raw MultiChain block payload."""
+        block_data = block.copy()
+        if "tx" in block_data:
+            block_data["transactions"] = block_data.pop("tx")
+        if "nTx" in block_data:
+            block_data["tx_count"] = block_data.pop("nTx")
+        elif "transactions" in block_data:
+            block_data["tx_count"] = len(block_data["transactions"])
+        return cls(**block_data)
+
 
 # --- Transaction Models ---
 

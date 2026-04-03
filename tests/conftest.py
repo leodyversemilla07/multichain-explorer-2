@@ -545,6 +545,30 @@ def app_mock_blockchain_service():
     async def mock_get_recent_blocks(start_height, count=10):
         return await service.list_blocks(start_height, count)
 
+    async def mock_get_newest_blocks_page(total_blocks, *, start, count):
+        end_height = total_blocks - 1 - start
+        start_height = max(0, end_height - count + 1)
+        blocks_to_fetch = end_height - start_height + 1
+
+        if blocks_to_fetch <= 0 or start_height > end_height:
+            return []
+
+        blocks = await service.list_blocks(start_height, blocks_to_fetch)
+        blocks = blocks or []
+        return sorted(blocks, key=lambda x: x.get("height", 0), reverse=True)
+
+    async def mock_get_transactions_by_ids(tx_ids, *, return_exceptions=False):
+        results = []
+        for tx_id in [tx_id for tx_id in tx_ids if tx_id]:
+            try:
+                results.append(await service.get_transaction(tx_id))
+            except Exception as exc:
+                if return_exceptions:
+                    results.append(exc)
+                else:
+                    raise
+        return results
+
     async def mock_get_mining_info():
         return await service.call("getmininginfo")
 
@@ -695,6 +719,8 @@ def app_mock_blockchain_service():
     service.get_all_streams = AsyncMock(side_effect=mock_get_all_streams)
     service.get_all_addresses = AsyncMock(side_effect=mock_get_all_addresses)
     service.get_recent_blocks = AsyncMock(side_effect=mock_get_recent_blocks)
+    service.get_newest_blocks_page = AsyncMock(side_effect=mock_get_newest_blocks_page)
+    service.get_transactions_by_ids = AsyncMock(side_effect=mock_get_transactions_by_ids)
     service.get_recent_transaction_summaries = AsyncMock(
         side_effect=mock_get_recent_transaction_summaries
     )

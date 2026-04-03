@@ -374,6 +374,36 @@ class TestBlockchainService:
         assert first == second == [{"height": 99}]
         service.call.assert_awaited_once_with("listblocks", ["90-99"])
 
+    async def test_get_newest_blocks_page_fetches_newest_first_window(self, service):
+        """Test newest-first block pagination is centralized in the service."""
+        service.call = AsyncMock(
+            return_value=[
+                {"height": 960, "hash": "a"},
+                {"height": 961, "hash": "b"},
+                {"height": 962, "hash": "c"},
+            ]
+        )
+
+        blocks = await service.get_newest_blocks_page(1000, start=37, count=3)
+
+        service.call.assert_awaited_with("listblocks", ["960-962"])
+        assert [block["height"] for block in blocks] == [962, 961, 960]
+
+    async def test_get_transactions_by_ids_fetches_concurrently(self, service):
+        """Test batch transaction loading uses the shared transaction getter."""
+        service.get_transaction = AsyncMock(
+            side_effect=[
+                {"txid": "tx1"},
+                {"txid": "tx2"},
+            ]
+        )
+
+        results = await service.get_transactions_by_ids(["tx1", "tx2"])
+
+        assert results == [{"txid": "tx1"}, {"txid": "tx2"}]
+        service.get_transaction.assert_any_await("tx1")
+        service.get_transaction.assert_any_await("tx2")
+
     async def test_get_all_addresses_is_cached(self, service):
         """Test homepage address summaries reuse the shared cached full-list helper."""
         await service.get_all_addresses.cache_clear()

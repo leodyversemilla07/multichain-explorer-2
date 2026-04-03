@@ -366,6 +366,21 @@ def get_page_info_from_query(
     )
 
 
+def get_page_info_from_start_count(
+    pagination: PaginationService,
+    total: int,
+    start: int,
+    count: int,
+) -> PaginationInfo:
+    """Build PaginationInfo from normalized start/count values."""
+    page = ((start // count) + 1) if count > 0 else 1
+    return pagination.get_pagination_info(
+        total=total,
+        page=page,
+        items_per_page=count,
+    )
+
+
 async def get_page_count_dep(request: Request) -> tuple[int, int]:
     """Async dependency that returns normalized page/count values."""
     return get_page_count(get_query_params(request))

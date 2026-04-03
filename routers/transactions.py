@@ -22,8 +22,9 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_query_params_dep,
     get_page_count,
+    get_page_info_from_query,
     raise_backend_http_error,
 )
 
@@ -48,7 +49,7 @@ async def list_transactions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List recent transactions.
@@ -66,10 +67,11 @@ async def list_transactions(
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    page_info = pagination.get_pagination_info(
+    page_info = get_page_info_from_query(
+        pagination,
+        query_params,
         total=recent_tx_window["total"],
-        page=page,
-        items_per_page=count,
+        default_count=count,
     )
 
     pagination_context = pagination.build_context(
@@ -270,7 +272,7 @@ async def legacy_list_transactions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy transactions list route."""
     return await list_transactions(

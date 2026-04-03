@@ -7,6 +7,26 @@ from exceptions import ChainConnectionError, RPCError
 class TestApiBlocksRouter:
     """Test API blocks router."""
 
+    def test_block_response_from_rpc_block_maps_multichain_fields(self):
+        """Test block response normalization maps MultiChain tx fields."""
+        from schemas.responses import BlockResponse
+
+        block = BlockResponse.from_rpc_block(
+            {
+                "hash": "blockhash_new",
+                "height": 999,
+                "confirmations": 1,
+                "size": 100,
+                "version": 1,
+                "merkleroot": "root",
+                "tx": ["tx1", "tx2"],
+                "nTx": 2,
+            }
+        )
+
+        assert block.transactions == ["tx1", "tx2"]
+        assert block.tx_count == 2
+
     def test_api_list_blocks(self, api_test_client):
         """Test GET /api/v1/{chain}/blocks returns JSON list."""
         response = api_test_client.get("/api/v1/test-chain/blocks")

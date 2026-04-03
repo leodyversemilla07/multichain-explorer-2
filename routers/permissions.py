@@ -20,7 +20,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_query_params_dep,
     get_page_count,
     raise_backend_http_error,
 )
@@ -41,7 +41,7 @@ async def list_permissions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List all permissions on the blockchain.
@@ -76,14 +76,11 @@ async def list_permissions(
             global_count += 1
 
     page, count = get_page_count(query_params)
-    page_info = pagination.get_pagination_info(
-        total=len(permissions),
+    paginated_permissions, page_info = pagination.paginate(
+        permissions,
         page=page,
         items_per_page=count,
     )
-    paginated_permissions = permissions[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
     pagination_context = pagination.build_context(
         page_info,
         f"/{chain.path_name}/permissions",
@@ -118,7 +115,7 @@ async def global_permissions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List global permissions.
@@ -142,15 +139,11 @@ async def global_permissions(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(global_permissions),
+    paginated_perms, page_info = pagination.paginate(
+        global_permissions,
         page=page,
         items_per_page=count,
     )
-
-    paginated_perms = global_permissions[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -185,7 +178,7 @@ async def legacy_list_permissions(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy permissions list route."""
     return await list_permissions(

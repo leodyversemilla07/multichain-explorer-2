@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import AssetResponse, TransactionResponse
 
+from routers.api.helpers import map_response_models, paginate_response_models
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
@@ -59,19 +60,15 @@ async def list_assets(
     except Exception as exc:
         raise_backend_http_error(exc)
 
-    # Sort by name
-    assets = sorted(assets, key=lambda x: x.get("name", ""))
-
-    # Pagination
     page, count = page_count
-
-    paginated_assets, _ = pagination.paginate(
+    return paginate_response_models(
+        pagination,
+        AssetResponse,
         assets,
         page=page,
-        items_per_page=count,
+        count=count,
+        sort_names=True,
     )
-
-    return [AssetResponse(**a) for a in paginated_assets]
 
 
 @router.get(
@@ -122,10 +119,14 @@ async def list_asset_transactions(
     await _get_asset_or_raise(service, asset_ref)
 
     try:
-        tx_list = await service.call(
-            "listassettransactions", [asset_ref, True, count, start]
+        tx_list = await service.call_windowed_list(
+            "listassettransactions",
+            asset_ref,
+            count=count,
+            start=start,
+            verbose=True,
         )
     except Exception as exc:
         raise_backend_http_error(exc, not_found_detail=f"Asset {asset_ref} not found")
 
-    return [TransactionResponse(**tx) for tx in (tx_list or [])]
+    return map_response_models(TransactionResponse, tx_list or [])

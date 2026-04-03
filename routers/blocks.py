@@ -22,8 +22,9 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     CommonContextDep,
-    get_query_params,
-    get_page_count,
+    get_query_params_dep,
+    get_page_info_from_query,
+    get_page_info_from_start_count,
     get_start_count,
     raise_backend_http_error,
 )
@@ -44,7 +45,7 @@ async def list_blocks(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List blocks in the blockchain.
@@ -56,28 +57,17 @@ async def list_blocks(
     info = await service.get_blockchain_info()
     total_blocks = info.get("blocks", 0)
 
-    # Apply pagination
-    page, count = get_page_count(query_params)
-
-    page_info = pagination.get_pagination_info(
+    page_info = get_page_info_from_query(
+        pagination,
+        query_params,
         total=total_blocks,
-        page=page,
-        items_per_page=count,
     )
 
-    # Calculate block range for newest-first display
-    # Page 1 shows the newest blocks, page 2 shows older ones, etc.
-    end_height = total_blocks - 1 - page_info["start"]
-    start_height = max(0, end_height - page_info["count"] + 1)
-    blocks_to_fetch = end_height - start_height + 1
-
-    # Use list_blocks API for batch fetching (much faster than individual calls)
-    if blocks_to_fetch > 0 and start_height <= end_height:
-        blocks = await service.list_blocks(start_height, blocks_to_fetch)
-        # Sort blocks by height descending (newest first)
-        blocks.sort(key=lambda x: x.get("height", 0), reverse=True)
-    else:
-        blocks = []
+    blocks = await service.get_newest_blocks_page(
+        total_blocks,
+        start=page_info["start"],
+        count=page_info["count"],
+    )
 
     # Prepare pagination context
     pagination_context = pagination.build_context(
@@ -160,13 +150,10 @@ async def block_by_identifier(
     tx_ids = block.get("tx", [])
     tx_details = []
 
-    # Concurrent fetch for transactions
-    tasks = [service.get_transaction(txid) for txid in tx_ids]
-    if tasks:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for res in results:
-            if isinstance(res, dict):
-                tx_details.append(res)
+    results = await service.get_transactions_by_ids(tx_ids, return_exceptions=True)
+    for res in results:
+        if isinstance(res, dict):
+            tx_details.append(res)
 
     return templates.TemplateResponse(
         name="pages/block.html",
@@ -229,7 +216,7 @@ async def block_transactions(
     templates: TemplatesDep,
     context: CommonContextDep,
     height: int = Path(..., ge=0, description="Block height"),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List transactions in a specific block.
@@ -247,26 +234,24 @@ async def block_transactions(
 
     # Apply pagination
     start, count = get_start_count(query_params)
-
-    page_info = pagination.get_pagination_info(
+    page_info = get_page_info_from_start_count(
+        pagination,
         total=len(tx_ids),
         start=start,
         count=count,
     )
 
-    # Get transaction details
-    transactions = []
-    paginated_tx_ids = tx_ids[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
+    paginated_tx_ids, page_info = pagination.paginate(
+        tx_ids,
+        page=page_info["page"],
+        items_per_page=page_info["count"],
+    )
 
-    # Concurent fetch
-    tasks = [service.get_transaction(txid) for txid in paginated_tx_ids]
-    if tasks:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for res in results:
-            if isinstance(res, dict):
-                transactions.append(res)
+    results = await service.get_transactions_by_ids(
+        paginated_tx_ids,
+        return_exceptions=True,
+    )
+    transactions = [res for res in results if isinstance(res, dict)]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -299,7 +284,7 @@ async def legacy_list_blocks(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy blocks list route."""
     return await list_blocks(
