@@ -357,6 +357,14 @@ class TestQueryParsingHelpers:
         assert start == 0
         assert count == 20
 
+    def test_get_start_count_prefers_page_over_start(self):
+        """Test start/count helper derives start from page/count when present."""
+        from routers.dependencies import get_start_count
+
+        start, count = get_start_count({"page": "3", "start": "5", "count": "10"})
+        assert start == 20
+        assert count == 10
+
 
 class TestGetTemplates:
     """Test get_templates dependency."""

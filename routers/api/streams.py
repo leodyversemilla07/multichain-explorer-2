@@ -2,16 +2,15 @@
 
 from typing import Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import StreamResponse, StreamItemResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
+    PageCountDep,
     PaginationServiceDep,
-    get_query_params,
-    get_page_count,
-    get_start_count,
+    StartCountDep,
     raise_backend_http_error,
 )
 
@@ -46,7 +45,7 @@ async def list_streams(
     chain: ChainDep,
     service: BlockchainServiceDep,
     pagination: PaginationServiceDep,
-    query_params: dict = Depends(get_query_params),
+    page_count: PageCountDep,
 ):
     """
     List streams in the blockchain (JSON).
@@ -57,17 +56,13 @@ async def list_streams(
         raise_backend_http_error(exc)
 
     streams = sorted(streams, key=lambda x: x.get("name", ""))
-    page, count = get_page_count(query_params)
+    page, count = page_count
 
-    page_info = pagination.get_pagination_info(
-        total=len(streams),
+    paginated_streams, _ = pagination.paginate(
+        streams,
         page=page,
         items_per_page=count,
     )
-
-    paginated_streams = streams[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     return [StreamResponse(**s) for s in paginated_streams]
 
@@ -100,7 +95,7 @@ async def get_stream(
     response_model=List[StreamItemResponse],
     name="api_list_stream_items",
     summary="List stream items",
-    description="Returns a paginated list of items published to a stream. Accepts `start` and `count` query params.",
+    description="Returns a paginated list of items published to a stream. Accepts `page` and `count` query params, with legacy `start` support.",
     responses={
         200: {"description": "Stream items"},
         404: {"description": "Stream not found"},
@@ -109,13 +104,13 @@ async def get_stream(
 async def list_stream_items(
     chain: ChainDep,
     service: BlockchainServiceDep,
+    start_count: StartCountDep,
     stream_ref: str = Path(..., description="Stream name or reference"),
-    query_params: dict = Depends(get_query_params),
 ):
     """
     List items in a stream (JSON).
     """
-    start, count = get_start_count(query_params)
+    start, count = start_count
     await _get_stream_or_raise(service, stream_ref)
 
     try:

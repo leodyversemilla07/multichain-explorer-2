@@ -27,7 +27,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_query_params_dep,
     get_page_count,
     raise_backend_http_error,
 )
@@ -86,7 +86,7 @@ async def list_streams(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List all streams on the blockchain.
@@ -100,18 +100,12 @@ async def list_streams(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(streams),
+    paginated_streams, page_info = pagination.paginate(
+        streams,
         page=page,
         items_per_page=count,
     )
-
-    paginated_streams = [
-        dict(stream)
-        for stream in streams[
-            page_info["start"] : page_info["start"] + page_info["count"]
-        ]
-    ]
+    paginated_streams = [dict(stream) for stream in paginated_streams]
 
     for stream in paginated_streams:
         if "items" not in stream or not isinstance(stream.get("items"), (int, float)):
@@ -216,7 +210,7 @@ async def stream_items(
     templates: TemplatesDep,
     context: CommonContextDep,
     stream_name: str = Path(..., min_length=1, description="Stream name"),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List items in a stream.
@@ -286,7 +280,7 @@ async def stream_keys(
     templates: TemplatesDep,
     context: CommonContextDep,
     stream_name: str = Path(..., min_length=1, description="Stream name"),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List keys in a stream.
@@ -346,7 +340,7 @@ async def stream_publishers(
     templates: TemplatesDep,
     context: CommonContextDep,
     stream_name: str = Path(..., min_length=1, description="Stream name"),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List publishers in a stream.
@@ -446,7 +440,7 @@ async def key_items(
     context: CommonContextDep,
     stream_name: str = Path(..., min_length=1, description="Stream name"),
     key: str = Path(..., min_length=1, description="Key name"),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List items for a specific key in a stream.
@@ -521,7 +515,7 @@ async def publisher_items(
     publisher: str = Path(
         ..., min_length=26, max_length=52, description="Publisher address"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List items from a specific publisher in a stream.
@@ -593,7 +587,7 @@ async def legacy_list_streams(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy streams list route."""
     return await list_streams(

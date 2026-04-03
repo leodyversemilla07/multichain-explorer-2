@@ -4,16 +4,15 @@ API Assets Router - JSON endpoints for asset-related operations.
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import AssetResponse, TransactionResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
+    PageCountDep,
     PaginationServiceDep,
-    get_query_params,
-    get_page_count,
-    get_start_count,
+    StartCountDep,
     raise_backend_http_error,
 )
 
@@ -50,7 +49,7 @@ async def list_assets(
     chain: ChainDep,
     service: BlockchainServiceDep,
     pagination: PaginationServiceDep,
-    query_params: dict = Depends(get_query_params),
+    page_count: PageCountDep,
 ):
     """
     List assets in the blockchain (JSON).
@@ -64,17 +63,13 @@ async def list_assets(
     assets = sorted(assets, key=lambda x: x.get("name", ""))
 
     # Pagination
-    page, count = get_page_count(query_params)
+    page, count = page_count
 
-    page_info = pagination.get_pagination_info(
-        total=len(assets),
+    paginated_assets, _ = pagination.paginate(
+        assets,
         page=page,
         items_per_page=count,
     )
-
-    paginated_assets = assets[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     return [AssetResponse(**a) for a in paginated_assets]
 
@@ -108,7 +103,7 @@ async def get_asset(
     response_model=List[TransactionResponse],
     name="api_list_asset_transactions",
     summary="List asset transactions",
-    description="Returns a paginated list of transactions involving a specific asset. Accepts `start` and `count` query params.",
+    description="Returns a paginated list of transactions involving a specific asset. Accepts `page` and `count` query params, with legacy `start` support.",
     responses={
         200: {"description": "Transactions for the asset"},
         404: {"description": "Asset not found"},
@@ -117,13 +112,13 @@ async def get_asset(
 async def list_asset_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,
+    start_count: StartCountDep,
     asset_ref: str = Path(..., description="Asset name or reference"),
-    query_params: dict = Depends(get_query_params),
 ):
     """
     List transactions involving a specific asset (JSON).
     """
-    start, count = get_start_count(query_params)
+    start, count = start_count
     await _get_asset_or_raise(service, asset_ref)
 
     try:

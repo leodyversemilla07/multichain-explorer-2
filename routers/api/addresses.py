@@ -5,15 +5,14 @@ API Addresses Router - JSON endpoints for address-related operations.
 import asyncio
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import AddressResponse, TransactionResponse
 from exceptions import ChainConnectionError, RPCError
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
-    get_query_params,
-    get_start_count,
+    StartCountDep,
     raise_backend_http_error,
 )
 
@@ -64,7 +63,7 @@ async def get_address(
     response_model=List[TransactionResponse],
     name="api_list_address_transactions",
     summary="List address transactions",
-    description="Returns a paginated list of transactions involving this address. Accepts `start` and `count` query params.",
+    description="Returns a paginated list of transactions involving this address. Accepts `page` and `count` query params, with legacy `start` support.",
     responses={
         200: {"description": "Transactions for the address"},
         404: {"description": "Address not found"},
@@ -75,14 +74,14 @@ async def get_address(
 async def list_address_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,
+    start_count: StartCountDep,
     address: str = Path(..., description="Wallet address"),
-    query_params: dict = Depends(get_query_params),
 ):
     """
     List transactions for a specific address (JSON).
     """
     # Apply pagination
-    start, count = get_start_count(query_params)
+    start, count = start_count
 
     try:
         address_info = await service.call("validateaddress", [address])

@@ -89,6 +89,25 @@ class TestApiTransactionsRouter:
         assert len(data) == 1
         assert data[0]["txid"] == "tx1"
 
+    def test_api_list_block_transactions_accepts_page_param(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test block transactions derive the slice offset from page/count."""
+        app_mock_blockchain_service.get_block_by_height = AsyncMock(
+            return_value={
+                "hash": "blockhash_new",
+                "height": 999,
+                "time": 1700000000,
+                "tx": ["tx1", "tx2", "tx3"],
+                "nTx": 3,
+            }
+        )
+        response = api_test_client.get(
+            "/api/v1/test-chain/blocks/999/transactions?page=2&count=1"
+        )
+        assert response.status_code == 200
+        app_mock_blockchain_service.get_transaction.assert_awaited_with("tx2")
+
     def test_api_list_block_transactions_returns_503_when_all_tx_fetches_fail(
         self, api_test_client, app_mock_blockchain_service
     ):
@@ -142,6 +161,18 @@ class TestApiAddressesRouter:
         assert isinstance(data, list)
         assert len(data) == 1
         assert data[0]["txid"] == "tx1"
+
+    def test_api_list_address_transactions_accepts_page_param(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test address transactions derive start offset from page/count."""
+        response = api_test_client.get(
+            "/api/v1/test-chain/addresses/addr1/transactions?page=3&count=5"
+        )
+        assert response.status_code == 200
+        app_mock_blockchain_service.get_address_transactions.assert_awaited_with(
+            "addr1", 5, 10
+        )
 
     def test_api_list_address_transactions_invalid_address(
         self, api_test_client, app_mock_blockchain_service
@@ -233,6 +264,18 @@ class TestApiAssetsRouter:
         assert len(data) == 1
         assert data[0]["txid"] == "tx1"
 
+    def test_api_list_asset_transactions_accepts_page_param(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test asset transactions derive start offset from page/count."""
+        response = api_test_client.get(
+            "/api/v1/test-chain/assets/asset1/transactions?page=2&count=4"
+        )
+        assert response.status_code == 200
+        app_mock_blockchain_service.call.assert_any_await(
+            "listassettransactions", ["asset1", True, 4, 4]
+        )
+
     def test_api_list_asset_transactions_does_not_rehydrate_each_tx(
         self, api_test_client, app_mock_blockchain_service
     ):
@@ -308,6 +351,18 @@ class TestApiStreamsRouter:
         assert isinstance(data, list)
         assert len(data) == 1
         assert data[0]["key"] == "key1"
+
+    def test_api_list_stream_items_accepts_page_param(
+        self, api_test_client, app_mock_blockchain_service
+    ):
+        """Test stream items derive start offset from page/count."""
+        response = api_test_client.get(
+            "/api/v1/test-chain/streams/stream1/items?page=2&count=3"
+        )
+        assert response.status_code == 200
+        app_mock_blockchain_service.call.assert_any_await(
+            "liststreamitems", ["stream1", True, 3, 3]
+        )
 
 
 class TestApiSearchRouter:

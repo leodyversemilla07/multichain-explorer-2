@@ -4,15 +4,14 @@ API Transactions Router - JSON endpoints for transaction-related operations.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import TransactionResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
     PaginationServiceDep,
-    get_query_params,
-    get_start_count,
+    StartCountDep,
     raise_backend_http_error,
 )
 
@@ -67,7 +66,7 @@ async def get_transaction(
     response_model=List[TransactionResponse],
     name="api_list_block_transactions",
     summary="List transactions in a block",
-    description="Returns a paginated list of transactions in a block by height. Accepts `start` and `count` query params.",
+    description="Returns a paginated list of transactions in a block by height. Accepts `page` and `count` query params, with legacy `start` support.",
     responses={
         200: {"description": "Transactions in the specified block"},
         404: {"description": "Block not found"},
@@ -77,8 +76,8 @@ async def list_block_transactions(
     chain: ChainDep,
     service: BlockchainServiceDep,
     pagination: PaginationServiceDep,
+    start_count: StartCountDep,
     height: int = Path(..., description="Block height"),
-    query_params: dict = Depends(get_query_params),
 ):
     """
     List transactions in a specific block (JSON).
@@ -91,7 +90,7 @@ async def list_block_transactions(
         return []
 
     # Apply pagination
-    start, count = get_start_count(query_params)
+    start, count = start_count
 
     page_info = pagination.get_pagination_info(
         total=len(tx_ids),

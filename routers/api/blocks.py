@@ -4,15 +4,14 @@ API Blocks Router - JSON endpoints for block-related operations.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path
 from schemas.responses import BlockResponse
 
 from routers.dependencies import (
     ChainDep,
     BlockchainServiceDep,
+    PageCountDep,
     PaginationServiceDep,
-    get_query_params,
-    get_page_count,
     raise_backend_http_error,
 )
 
@@ -52,7 +51,7 @@ async def list_blocks(
     chain: ChainDep,
     service: BlockchainServiceDep,
     pagination: PaginationServiceDep,
-    query_params: dict = Depends(get_query_params),
+    page_count: PageCountDep,
 ):
     """
     List blocks in the blockchain (JSON).
@@ -65,7 +64,7 @@ async def list_blocks(
     total_blocks = info.get("blocks", 0)
 
     # Apply pagination
-    page, count = get_page_count(query_params)
+    page, count = page_count
 
     page_info = pagination.get_pagination_info(
         total=total_blocks,

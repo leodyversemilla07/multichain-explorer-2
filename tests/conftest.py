@@ -774,13 +774,21 @@ class DirectTestResponse:
 
 class DirectAppClient:
     def __init__(self, app, blockchain_service=None):
-        from routers.dependencies import CommonContext, PaginationService, _resolve_base_url
+        from routers.dependencies import (
+            CommonContext,
+            PaginationService,
+            _resolve_base_url,
+            get_page_count,
+            get_start_count,
+        )
 
         self.app = app
         self._blockchain_service = blockchain_service
         self._CommonContext = CommonContext
         self._PaginationService = PaginationService
         self._resolve_base_url = _resolve_base_url
+        self._get_page_count = get_page_count
+        self._get_start_count = get_start_count
 
     def _build_scope(self, method: str, path: str, query_string: bytes):
         return {
@@ -921,6 +929,10 @@ class DirectAppClient:
                     )
                 elif name == "query_params":
                     endpoint_kwargs[name] = dict(request.query_params)
+                elif name == "page_count":
+                    endpoint_kwargs[name] = self._get_page_count(dict(request.query_params))
+                elif name == "start_count":
+                    endpoint_kwargs[name] = self._get_start_count(dict(request.query_params))
                 elif name == "base_url":
                     endpoint_kwargs[name] = (
                         self._resolve_base_url(state) if state else "/"

@@ -25,7 +25,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_query_params_dep,
     get_page_count,
     raise_backend_http_error,
 )
@@ -56,7 +56,7 @@ async def list_addresses(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List addresses with balances.
@@ -74,15 +74,11 @@ async def list_addresses(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(addresses),
+    paginated_addresses, page_info = pagination.paginate(
+        addresses,
         page=page,
         items_per_page=count,
     )
-
-    paginated_addresses = addresses[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     pagination_context = pagination.build_context(
         page_info,
@@ -185,7 +181,7 @@ async def address_transactions(
     address: str = Path(
         ..., min_length=26, max_length=52, description="Blockchain address"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List transactions for an address.
@@ -289,7 +285,7 @@ async def address_streams(
     address: str = Path(
         ..., min_length=26, max_length=52, description="Blockchain address"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List streams associated with an address.
@@ -390,7 +386,7 @@ async def legacy_list_addresses(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy addresses list route."""
     return await list_addresses(

@@ -55,6 +55,11 @@ def get_templates(request: Request) -> Jinja2Templates:
     return request.app.state.templates
 
 
+def _resolve_base_url(state: ApplicationState) -> str:
+    """Resolve the configured base URL from application state."""
+    return state.get_setting("main", "base", "/")
+
+
 def get_base_url(state: ApplicationState = Depends(get_state)) -> str:
     """
     Get the base URL from application settings.
@@ -62,7 +67,7 @@ def get_base_url(state: ApplicationState = Depends(get_state)) -> str:
     Returns:
         Base URL string
     """
-    return state.get_setting("main", "base", "/")
+    return _resolve_base_url(state)
 
 
 def get_chain(
@@ -158,7 +163,7 @@ class CommonContext:
         self.request = request
         self.chain = chain
         self.templates = request.app.state.templates
-        base = get_base_url(state)
+        base = _resolve_base_url(state)
         # Remove trailing slash from base_url to avoid double slashes, but keep it if it's just "/"
         self.base_url = base.rstrip("/") if len(base) > 1 else base
         self.chain_name = chain.display_name
@@ -184,14 +189,72 @@ class CommonContext:
         return context
 
 
+async def get_state_dep(request: Request) -> ApplicationState:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_state(request)
+
+
+async def get_templates_dep(request: Request) -> Jinja2Templates:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_templates(request)
+
+
+async def get_base_url_dep(
+    state: ApplicationState = Depends(get_state_dep),
+) -> str:
+    """Async wrapper for FastAPI dependency injection."""
+    return _resolve_base_url(state)
+
+
+async def get_chain_dep(
+    chain_name: str = Path(..., description="Chain path name"),
+    state: ApplicationState = Depends(get_state_dep),
+) -> ChainConfig:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_chain(chain_name=chain_name, state=state)
+
+
+async def get_blockchain_service_dep(
+    request: Request,
+    chain: ChainConfig = Depends(get_chain_dep),
+) -> BlockchainService:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_blockchain_service(request=request, chain=chain)
+
+
+async def get_pagination_service_dep() -> PaginationService:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_pagination_service()
+
+
+async def get_query_params_dep(request: Request) -> Dict[str, str]:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_query_params(request)
+
+
+async def get_optional_query_params_dep(request: Request) -> Dict[str, str]:
+    """Async wrapper for FastAPI dependency injection."""
+    return get_optional_query_params(request)
+
+
+async def get_common_context(
+    request: Request,
+    chain: ChainConfig = Depends(get_chain_dep),
+    state: ApplicationState = Depends(get_state_dep),
+) -> CommonContext:
+    """Build the shared template context without threadpool dependency hops."""
+    return CommonContext(request=request, chain=chain, state=state)
+
+
 # Type aliases for cleaner dependency injection
-StateDep = Annotated[ApplicationState, Depends(get_state)]
-ChainDep = Annotated[ChainConfig, Depends(get_chain)]
-BlockchainServiceDep = Annotated[BlockchainService, Depends(get_blockchain_service)]
-PaginationServiceDep = Annotated[PaginationService, Depends(get_pagination_service)]
+StateDep = Annotated[ApplicationState, Depends(get_state_dep)]
+ChainDep = Annotated[ChainConfig, Depends(get_chain_dep)]
+BlockchainServiceDep = Annotated[BlockchainService, Depends(get_blockchain_service_dep)]
+PaginationServiceDep = Annotated[PaginationService, Depends(get_pagination_service_dep)]
 PaginationDep = Annotated[PaginationParams, Depends()]
-TemplatesDep = Annotated[Jinja2Templates, Depends(get_templates)]
-CommonContextDep = Annotated[CommonContext, Depends()]
+TemplatesDep = Annotated[Jinja2Templates, Depends(get_templates_dep)]
+CommonContextDep = Annotated[CommonContext, Depends(get_common_context)]
+BaseUrlDep = Annotated[str, Depends(get_base_url_dep)]
 
 
 def get_query_params(request: Request) -> Dict[str, str]:
@@ -207,7 +270,7 @@ def get_query_params(request: Request) -> Dict[str, str]:
     return dict(request.query_params)
 
 
-QueryParamsDep = Annotated[Dict[str, str], Depends(get_query_params)]
+QueryParamsDep = Annotated[Dict[str, str], Depends(get_query_params_dep)]
 
 
 def safe_int(value: Any, default: int = 0) -> int:
@@ -268,11 +331,32 @@ def get_start_count(
     default_start: int = 0,
     default_count: int = 20,
 ) -> tuple[int, int]:
-    """Parse standard start/count query params with safe integer fallback."""
+    """Parse pagination params, preferring page/count and falling back to start/count."""
+    count = safe_int(query_params.get("count", default_count), default_count)
+
+    if "page" in query_params:
+        page = safe_int(query_params.get("page", 1), 1)
+        page = max(page, 1)
+        return ((page - 1) * count, count)
+
     return (
         safe_int(query_params.get("start", default_start), default_start),
-        safe_int(query_params.get("count", default_count), default_count),
+        count,
     )
+
+
+async def get_page_count_dep(request: Request) -> tuple[int, int]:
+    """Async dependency that returns normalized page/count values."""
+    return get_page_count(get_query_params(request))
+
+
+async def get_start_count_dep(request: Request) -> tuple[int, int]:
+    """Async dependency that returns normalized start/count values."""
+    return get_start_count(get_query_params(request))
+
+
+PageCountDep = Annotated[tuple[int, int], Depends(get_page_count_dep)]
+StartCountDep = Annotated[tuple[int, int], Depends(get_start_count_dep)]
 
 
 # Optional version for routes where query params might not be needed
@@ -283,4 +367,6 @@ def get_optional_query_params(request: Request) -> Dict[str, str]:
     return dict(request.query_params) if request.query_params else {}
 
 
-OptionalQueryParamsDep = Annotated[Dict[str, str], Depends(get_optional_query_params)]
+OptionalQueryParamsDep = Annotated[
+    Dict[str, str], Depends(get_optional_query_params_dep)
+]

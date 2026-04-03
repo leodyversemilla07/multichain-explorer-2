@@ -25,7 +25,7 @@ from routers.dependencies import (
     BlockchainServiceDep,
     PaginationServiceDep,
     CommonContextDep,
-    get_query_params,
+    get_query_params_dep,
     get_page_count,
     raise_backend_http_error,
 )
@@ -79,7 +79,7 @@ async def list_assets(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List all assets on the blockchain.
@@ -92,15 +92,11 @@ async def list_assets(
     # Apply pagination
     page, count = get_page_count(query_params)
 
-    page_info = pagination.get_pagination_info(
-        total=len(assets),
+    paginated_assets, page_info = pagination.paginate(
+        assets,
         page=page,
         items_per_page=count,
     )
-
-    paginated_assets = assets[
-        page_info["start"] : page_info["start"] + page_info["count"]
-    ]
 
     pagination_context = pagination.build_context(
         page_info, f"/{chain.path_name}/assets"
@@ -163,7 +159,7 @@ async def asset_holders(
     asset_name: str = Path(
         ..., min_length=1, max_length=32, description="Asset name or reference"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List asset holders.
@@ -223,7 +219,7 @@ async def asset_transactions(
     asset_name: str = Path(
         ..., min_length=1, max_length=32, description="Asset name or reference"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List asset transactions.
@@ -290,7 +286,7 @@ async def asset_issues(
     asset_name: str = Path(
         ..., min_length=1, max_length=32, description="Asset name or reference"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     Show asset issuance history.
@@ -387,7 +383,7 @@ async def holder_transactions(
     address: str = Path(
         ..., min_length=26, max_length=52, description="Holder address"
     ),
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """
     List transactions for a specific asset holder.
@@ -448,7 +444,7 @@ async def legacy_list_assets(
     pagination: PaginationServiceDep,
     templates: TemplatesDep,
     context: CommonContextDep,
-    query_params: Dict[str, str] = Depends(get_query_params),
+    query_params: Dict[str, str] = Depends(get_query_params_dep),
 ):
     """Legacy assets list route."""
     return await list_assets(
