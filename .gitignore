@@ -41,6 +41,8 @@ dmypy.json
 # IDEs
 .vscode/
 .idea/
+.codex
+.codex/
 *.swp
 *.swo
 *~
