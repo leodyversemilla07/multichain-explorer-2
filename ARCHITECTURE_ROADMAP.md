@@ -1,8 +1,8 @@
 # MultiChain Explorer 2 - Architecture Refactoring Roadmap
 
-**Version:** 8.1 - Single Entry Point  
-**Date:** December 8, 2025  
-**Status:** ✅ **PRODUCTION READY** - FastAPI implementation with maintained compatibility routes
+**Version:** 9.0 - Current State  
+**Date:** April 3, 2026  
+**Status:** ✅ **CLEANED UP AND STABLE** - FastAPI runtime consolidated, legacy modules removed
 
 > Note
 > This roadmap reflects the original migration project and is no longer the authoritative description of the current runtime boundaries.
@@ -13,56 +13,52 @@
 
 ## 🎯 Executive Summary
 
-**What We Built:**
-A modern, production-grade blockchain explorer with clean architecture, comprehensive testing, beautiful UI, and **pure FastAPI-powered async backend**.
+The migration and cleanup work is complete enough that this document should now be read as a historical roadmap plus a current-state summary.
 
-**Key Metrics:**
-- **Time Invested:** 23+ hours total (including legacy removal & consolidation)
-- **Test Coverage:** historical migration snapshot; see current test suite for the active runtime baseline
-- **Code Quality:** Excellent (all files <300 lines) 📝
-- **Templates:** 34 responsive pages with modern UI 🎨
-- **Architecture:** FastAPI routers → services → models 🏗️
-- **Framework:** FastAPI + Uvicorn (async ASGI) ⚡
-- **Entry Point:** `main.py` (single entry point)
-- **Legacy Entry Points Removed:** `http_server.py`, `routing.py`, `app.py`, `cfg.py`
-- **Compatibility Inputs Still Supported:** legacy `/chain/...` routes and legacy `start`/`count` pagination links
+**Current Codebase Snapshot**
+- **Architecture:** `main.py` -> FastAPI routers -> shared dependencies -> services -> templates / API schemas
+- **Framework:** FastAPI + Uvicorn
+- **Entry Point:** `main.py`
+- **Compatibility Surface:** legacy `/chain/...` routes and legacy `start`/`count` pagination inputs only
+- **Legacy Compatibility Modules:** removed
+- **Boundary Enforcement:** `tests/test_architecture_boundaries.py`
 
-**Current Status:**
-- ✅ All core functionality complete
-- ✅ FastAPI implementation with legacy URL compatibility retained intentionally
-- ✅ Single entry point (`main.py`)
-- ✅ Production-ready codebase
-- ✅ Auto-generated API documentation
-- ℹ️ Legacy compatibility modules have been removed; compatibility is now limited to supported route and pagination inputs
-- 🎯 Ready for Production Deployment
+**Current Repo Metrics**
+- **Tests collected:** 399
+- **Focused active-runtime regression baseline:** 162 tests
+- **Router modules:** 18 Python files under `routers/` and `routers/api/`
+- **Service modules:** 6 Python files under `services/`
+- **Page templates:** 35 files under `templates/pages/`
+
+**Current Status**
+- ✅ Active FastAPI runtime path consolidated
+- ✅ Shared pagination, batching, and response-mapping helpers in place
+- ✅ Search base-URL handling fixed
+- ✅ Legacy compatibility modules removed
+- ✅ Architecture and compatibility boundaries documented
+- ✅ Repo clean and ready for feature work, performance work, or deployment hardening
 
 ---
 
-## 📊 PROGRESS AT A GLANCE
+## 📊 CURRENT ROADMAP STATUS
 
-| Phase | Status | Time | Tests | Key Deliverables |
-|-------|--------|------|-------|------------------|
-| **Phase 0** | ✅ | 30m | 23 | Testing infrastructure, CI/CD |
-| **Phase 1** | ✅ | 4h | 141 | Security, config, errors, quality tools |
-| **Phase 2** | ✅ | 2h | 32 | Template engine, TailwindCSS, AlpineJS |
-| **Phase 3A** | ✅ | 3.5h | 27 | 7 core pages integrated |
-| **Phase 3B** | ✅ | 2h | 25 | Search & filtering |
-| **Phase 3C** | ✅ | 2h | 12 | Detail pages (stream, asset) |
-| **Phase 3D** | ✅ | 0h* | 0 | 34 total templates (already done!) |
-| **Phase 3.1** | ✅ | 1.5h | 46 | 7 specialized handlers |
-| **Phase 3.2** | ✅ | 30m | 30 | 3 service modules |
-| **Phase 3.3** | ✅ | 45m | 23 | Routing system (53 routes) |
-| **Phase 3.4** | ✅ | 1h | 37 | 13 domain models |
-| **Phase 3.5** | ✅ | 2h | - | **FastAPI Migration** 🆕 |
-| **Phase 3.6** | ✅ | 1h | - | **Legacy Code Removal** 🆕 |
-| **Phase 3.7** | ✅ | 3h | - | **Standard FastAPI Refactor** 🆕 |
-| **Phase 4** | 🎯 | - | - | Performance & caching (NEXT) |
-| **Phase 5** | ⏳ | - | - | Production readiness |
-| **Phase 6** | ⏳ | - | - | Advanced features |
+| Workstream | Status | Notes |
+|-----------|--------|-------|
+| FastAPI runtime consolidation | ✅ Complete | Shared deps, services, pagination, batching, response shaping |
+| Legacy compatibility module isolation/removal | ✅ Complete | `multichain.py` and `performance.py` removed |
+| Compatibility boundary documentation | ✅ Complete | `ACTIVE_ARCHITECTURE.md` and `COMPATIBILITY_BOUNDARY.md` |
+| Architecture boundary enforcement | ✅ Complete | Active runtime blocked from legacy imports |
+| Performance tuning | ⏳ Not started | Candidate next phase |
+| Production hardening | ⏳ Not started | Candidate next phase |
+| Advanced feature work | ⏳ Not started | Candidate next phase |
 
-**Total Completed:** Phases 0-3.7 (all sub-phases) | **26 hours** | **300+ tests**
+**Recommended next phase:** performance tuning or production-readiness work, not further cleanup.
 
-*Phase 3D templates were created organically during earlier phases
+---
+
+## 📚 Historical Migration Detail
+
+The sections below preserve the original migration roadmap and progress archive for reference.
 
 ---
 
