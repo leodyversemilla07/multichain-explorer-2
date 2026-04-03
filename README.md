@@ -35,7 +35,7 @@ A modern, web-based explorer for MultiChain blockchains with a clean architectur
 - **Auto-Generated API Docs** - Interactive Swagger UI at `/docs`
 - **Clean Architecture** - Modular HTML/API routers with shared services and dependencies
 - **Type-Safe** - Input validation with Pydantic and FastAPI
-- **Well-Tested** - 375 automated tests passing locally
+- **Well-Tested** - Comprehensive automated regression coverage
 - **Production-Ready** - Security hardening, error handling, and performance optimizations
 
 ---
@@ -349,7 +349,7 @@ tests/
 
 ### Test Coverage
 
-- The repo includes targeted coverage for the active FastAPI runtime path and separate regression coverage for compatibility surfaces.
+- The repo includes targeted coverage for the active FastAPI runtime path and architecture-boundary regression coverage.
 - Comprehensive coverage of:
   - Input validation and security
   - Configuration management

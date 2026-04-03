@@ -18,7 +18,7 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 
 **Key Metrics:**
 - **Time Invested:** 23+ hours total (including legacy removal & consolidation)
-- **Test Coverage:** 375 tests passing locally ✅
+- **Test Coverage:** historical migration snapshot; see current test suite for the active runtime baseline
 - **Code Quality:** Excellent (all files <300 lines) 📝
 - **Templates:** 34 responsive pages with modern UI 🎨
 - **Architecture:** FastAPI routers → services → models 🏗️
@@ -33,7 +33,7 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 - ✅ Single entry point (`main.py`)
 - ✅ Production-ready codebase
 - ✅ Auto-generated API documentation
-- ℹ️ Compatibility-only modules remain in the repository but are outside the active FastAPI runtime path
+- ℹ️ Legacy compatibility modules have been removed; compatibility is now limited to supported route and pagination inputs
 - 🎯 Ready for Production Deployment
 
 ---
