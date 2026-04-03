@@ -1,3 +1,10 @@
+"""Compatibility-only legacy performance/cache utilities.
+
+This module remains in the repository for backward compatibility and
+regression coverage. The active FastAPI runtime path should prefer
+service-layer caching helpers in `services.cache_service`.
+"""
+
 # -*- coding: utf-8 -*-
 
 # MultiChain Explorer 2 - Performance Module

@@ -8,6 +8,13 @@ import pytest
 class TestCompressResponse:
     """Test gzip compression behavior."""
 
+    def test_module_docstring_marks_compatibility_only(self):
+        """The legacy utility module should describe itself as compatibility-only."""
+        import performance
+
+        assert performance.__doc__ is not None
+        assert "Compatibility-only" in performance.__doc__
+
     def test_small_response_is_not_compressed(self):
         """Small payloads should bypass compression."""
         from performance import compress_response

@@ -4,6 +4,11 @@
 **Date:** December 8, 2025  
 **Status:** ✅ **PRODUCTION READY** - FastAPI implementation with maintained compatibility routes
 
+> Note
+> This roadmap reflects the original migration project and is no longer the authoritative description of the current runtime boundaries.
+> For the current active runtime path, see `ACTIVE_ARCHITECTURE.md`.
+> For compatibility-only modules and supported compatibility inputs, see `COMPATIBILITY_BOUNDARY.md`.
+
 ---
 
 ## 🎯 Executive Summary
@@ -19,7 +24,8 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 - **Architecture:** FastAPI routers → services → models 🏗️
 - **Framework:** FastAPI + Uvicorn (async ASGI) ⚡
 - **Entry Point:** `main.py` (single entry point)
-- **Legacy Files:** Removed ❌ (http_server.py, routing.py, app.py, cfg.py)
+- **Legacy Entry Points Removed:** `http_server.py`, `routing.py`, `app.py`, `cfg.py`
+- **Compatibility-Only Modules Still Present:** `multichain.py`, `performance.py`
 
 **Current Status:**
 - ✅ All core functionality complete
@@ -27,6 +33,7 @@ A modern, production-grade blockchain explorer with clean architecture, comprehe
 - ✅ Single entry point (`main.py`)
 - ✅ Production-ready codebase
 - ✅ Auto-generated API documentation
+- ℹ️ Compatibility-only modules remain in the repository but are outside the active FastAPI runtime path
 - 🎯 Ready for Production Deployment
 
 ---

@@ -302,6 +302,8 @@ MultiChain Explorer 2 follows a clean, modular architecture powered by **FastAPI
 - **`routers/api/`** - JSON API endpoints under `/api/v1`
 - **`services/`** - Shared RPC, cache, pagination, formatting, and search services
 - **Legacy `/chain/...` routes** - Supported compatibility URLs with dedicated regression coverage
+- **`ACTIVE_ARCHITECTURE.md`** - Current runtime architecture and active-path notes
+- **`COMPATIBILITY_BOUNDARY.md`** - Compatibility surface and compatibility-only module policy
 - **`templates/`** - Jinja2 templates with TailwindCSS
 - **`validators.py`** - Input validation with Pydantic
 - **`config.py`** - Type-safe configuration management
@@ -348,7 +350,7 @@ tests/
 
 ### Test Coverage
 
-- **375 tests** passing locally
+- The repo includes targeted coverage for the active FastAPI runtime path and separate regression coverage for compatibility surfaces.
 - Comprehensive coverage of:
   - Input validation and security
   - Configuration management
@@ -358,6 +360,7 @@ tests/
   - Startup and dependency injection
   - Template-backed HTML views
   - Legacy `/chain/...` compatibility routes
+  - Architecture boundary enforcement for compatibility-only modules
 
 ### Running Specific Test Categories
 
@@ -384,9 +387,11 @@ multichain-explorer-2/
 ├── env_config.py            # Environment-backed settings loader
 ├── validators.py            # Input validation helpers
 ├── exceptions.py            # Error handling
-├── multichain.py            # Legacy RPC client
-├── performance.py           # Cache/compression utilities
+├── multichain.py            # Compatibility-only legacy RPC client
+├── performance.py           # Compatibility-only utility surface
 ├── utils.py                 # Utility functions
+├── ACTIVE_ARCHITECTURE.md   # Current active runtime path
+├── COMPATIBILITY_BOUNDARY.md # Compatibility policy and boundaries
 │
 ├── routers/                 # FastAPI routers
 │   ├── __init__.py

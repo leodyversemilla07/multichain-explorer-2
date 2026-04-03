@@ -13,6 +13,13 @@ import app_state
 class TestIsMissing:
     """Test is_missing helper function."""
 
+    def test_module_docstring_marks_compatibility_only(self):
+        """The legacy module should describe itself as compatibility-only."""
+        import multichain
+
+        assert multichain.__doc__ is not None
+        assert "Compatibility-only" in multichain.__doc__
+
     def test_missing_key(self):
         """Test with missing key."""
         from multichain import is_missing

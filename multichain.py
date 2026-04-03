@@ -1,3 +1,10 @@
+"""Compatibility-only legacy MultiChain RPC wrapper.
+
+This module remains in the repository for backward compatibility and
+regression coverage. The active FastAPI runtime path should use
+`services.blockchain_service.BlockchainService` instead.
+"""
+
 # -*- coding: utf-8 -*-
 
 # MultiChain Explorer 2 (c) Coin Sciences Ltd
